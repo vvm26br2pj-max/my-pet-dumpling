@@ -1,0 +1,530 @@
+/* My Pet Dumpling — adoption, menus, shop, milestones, settings, developer panel */
+(function (DG) {
+  const esc = (s) => DG.ui.esc(s);
+  const pname = () => esc(DG.pet().name);
+
+  /* ================= Adoption ================= */
+  const PREVIEW_STYLE = {
+    bao: (t) => ({ mood: Math.sin(t * 0.8) > 0.6 ? 'joy' : 'happy', hop: Math.max(0, Math.sin(t * 4)) * 14, squash: Math.sin(t * 8) * 0.03, blink: (t % 3.5) < 0.12 }),
+    gyoza: (t) => ({ mood: (t % 4) < 1.2 ? 'joy' : 'happy', rot: Math.sin(t * 7) * 0.12, hop: Math.max(0, Math.sin(t * 7)) * 8, flip: Math.sin(t * 1.3) > 0, blink: (t % 2.7) < 0.12 }),
+    soup: (t) => ({ mood: (t % 6) < 2 ? 'sleeping' : 'sleepy', rot: Math.sin(t * 1.5) * 0.06, squash: Math.sin(t * 2) * 0.04 }),
+  };
+  let adoptStops = [];
+  function adoptEnter() {
+    const root = document.getElementById('screen-adopt');
+    adoptStops.forEach((s) => s()); adoptStops = [];
+    root.innerHTML = `
+      <div class="adopt">
+        <h1 class="logo">My Pet <span>Dumpling</span></h1>
+        <p class="lead">Three baby dumplings are looking for a home. Who will you adopt?</p>
+        <div class="starter-grid">
+          ${Object.values(DG.STARTERS).map((s) => `
+            <button class="starter-card" data-type="${s.id}">
+              <canvas class="starter-canvas" data-type="${s.id}"></canvas>
+              <h3>${s.name}</h3><div class="kind">${s.kind}</div>
+              <p>${s.desc}</p>
+              <div class="tag">💪 ${s.strength}</div>
+              <div class="tag special">✨ <b>${DG.MOVES[s.moves.special].name}:</b> ${DG.MOVES[s.moves.special].desc}</div>
+            </button>`).join('')}
+        </div>
+        <p class="fine">All three are equally strong overall — training can improve any weaker area.</p>
+        <p class="save-note">💾 Your dumpling is saved in <b>this browser</b> on this device. Clearing browser data or switching browsers starts a new save.</p>
+      </div>`;
+    root.querySelectorAll('.starter-canvas').forEach((cv) => {
+      const type = cv.dataset.type;
+      adoptStops.push(DG.ui.previewLoop(cv, (t) => Object.assign({ type, stage: 0, size: 120 }, PREVIEW_STYLE[type](t)), 240, 170));
+    });
+    root.querySelectorAll('.starter-card').forEach((b) => (b.onclick = () => { DG.audio.unlock(); DG.audio.play('babysqueak'); adoptStep2(b.dataset.type); }));
+  }
+  /* Shared color / eyes / cheeks picker (adoption + closet) */
+  function lookPickerHtml(type, look) {
+    const colors = Object.entries(DG.LOOK_COLORS).map(([id, c]) => {
+      const col = c.base ? c : DG.STARTERS[type].colors;
+      return `<button class="swatch ${look.color === id ? 'on' : ''}" data-lk="color" data-v="${id}" title="${c.name}" aria-label="${c.name}" style="background:linear-gradient(135deg, ${col.light}, ${col.base});border-color:${col.line}"></button>`;
+    }).join('');
+    const chips = (key, table) => Object.entries(table).map(([id, x]) =>
+      `<button class="chip-btn ${look[key] === id ? 'on' : ''}" data-lk="${key}" data-v="${id}">${x.name}</button>`).join('');
+    return `<div class="lbl">Color <small class="lk-name" id="lk-color-name">${DG.LOOK_COLORS[look.color].name}</small></div>
+      <div class="swatch-row">${colors}</div>
+      <div class="lbl">Eyes</div><div class="chip-row tight">${chips('eyes', DG.EYES)}</div>
+      <div class="lbl">Cheeks</div><div class="chip-row tight">${chips('cheeks', DG.CHEEKS)}</div>`;
+  }
+  function wireLookPicker(el, look, onChange) {
+    el.querySelectorAll('[data-lk]').forEach((b) => (b.onclick = () => {
+      const k = b.dataset.lk; look[k] = b.dataset.v; DG.audio.play('pop');
+      el.querySelectorAll(`[data-lk="${k}"]`).forEach((x) => x.classList.toggle('on', x === b));
+      const nm = el.querySelector('#lk-color-name'); if (nm && k === 'color') nm.textContent = DG.LOOK_COLORS[look.color].name;
+      if (onChange) onChange();
+    }));
+  }
+
+  function adoptStep2(type) {
+    const s = DG.STARTERS[type];
+    let acc = 'bow';
+    const look = { color: 'classic', eyes: 'round', cheeks: 'blush' };
+    let stop = null;
+    DG.ui.modal({
+      title: `Adopt ${s.name}?`, wide: true, cls: 'adopt-modal',
+      html: `<div class="adopt2">
+          <canvas class="adopt-preview" id="ad-prev"></canvas>
+          <div class="adopt-form">
+            <label class="lbl" for="ad-name">Name your baby dumpling</label>
+            <input id="ad-name" class="text-in" maxlength="14" value="${s.name === 'Soup Dumpling' ? 'Soupy' : s.name}" autocomplete="off" enterkeyhint="done">
+            ${lookPickerHtml(type, look)}
+            <div class="lbl">Starting accessory</div>
+            <div class="acc-pick">${Object.keys(DG.ACCESSORIES).filter((k) => DG.ACCESSORIES[k].starter).map((a) => `<button class="chip-btn ${a === acc ? 'on' : ''}" data-acc="${a}">${DG.ACCESSORIES[a].icon} ${DG.ACCESSORIES[a].name}</button>`).join('')}</div>
+            <p class="fine">You can change the name, color, eyes, cheeks and accessory later in the Closet.</p>
+          </div></div>`,
+      buttons: [{ label: '← Back', cls: 'ghost' }, {
+        label: '🥟 Adopt!', cls: 'primary', keep: true, onClick(close) {
+          const name = document.getElementById('ad-name').value.trim() || s.name;
+          close(); if (stop) stop();
+          DG.adopt(type, name, acc, look);
+          DG.unlock('adopted');
+          DG.audio.play('levelup');
+          adoptStops.forEach((f) => f()); adoptStops = [];
+          DG.ui.show('home');
+          setTimeout(() => {
+            DG.Home.celebrate(`Hi! I'm ${DG.pet().name}!`);
+            DG.ui.modal({
+              title: `Welcome home, ${pname()}! 🎉`,
+              html: `<p>Your baby dumpling grows in <b>real time</b> — even when the game is closed:</p>
+                <ul class="nice-list"><li>🌱 <b>Medium</b> after 1 day — unlocks arena battles</li><li>🌿 <b>Large</b> after 3 days — advanced training & a second move</li><li>🌳 <b>Giant</b> after 7 days — an ultimate move!</li></ul>
+                <p>Keep ${pname()} fed, happy, rested and clean. If any need drops below <b>20</b>, growing <b>pauses</b> until you raise it again. Dumplings never lose progress.</p>
+                <p>🌙 From <b>9 PM to 7 AM</b>, ${pname()} goes to bed on its own.</p>
+                <p>Want to try a battle now? Visit the <b>Arena</b> for a <b>Practice Match</b>.</p>`,
+              buttons: [{ label: "Let's go!", cls: 'primary' }],
+            });
+          }, 400);
+        },
+      }],
+      onClose() { if (stop) stop(); },
+      onOpen(el) {
+        let pokeT = -9;
+        stop = DG.ui.previewLoop(el.querySelector('#ad-prev'), (t) => {
+          const o = Object.assign({ type, stage: 0, size: 140, accessory: acc, look }, PREVIEW_STYLE[type](t));
+          if (o.mood === 'sleeping' || o.mood === 'sleepy') o.mood = 'happy';
+          if (t - pokeT < 0.6) { o.mood = 'joy'; o.hop = Math.sin((t - pokeT) / 0.6 * Math.PI) * 18; }
+          el._t = t;
+          return o;
+        }, 260, 200);
+        const poke = () => { pokeT = el._t || 0; };
+        el.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => {
+          acc = b.dataset.acc; DG.audio.play('pop'); poke();
+          el.querySelectorAll('[data-acc]').forEach((x) => x.classList.toggle('on', x === b));
+        }));
+        wireLookPicker(el, look, poke);
+        const inp = el.querySelector('#ad-name');
+        if (!DG.ui.isTouch()) { inp.focus(); inp.select(); }
+      },
+    });
+  }
+  DG.ui.register('adopt', { enter: adoptEnter, exit() { adoptStops.forEach((s) => s()); adoptStops = []; } });
+
+  /* ================= Feed & toys ================= */
+  function feed() {
+    const p = DG.pet(), inv = DG.state.inventory.food;
+    const close = DG.ui.modal({
+      title: '🍚 What should we eat?', wide: true,
+      html: `${p.foodBonus ? `<p class="note">Active battle bonus: ${DG.FOODS[p.foodBonus.food].icon} <b>${p.foodBonus.label}</b> (lasts one battle; a new bonus food replaces it).</p>` : '<p class="note">Tofu Bites and Noodle Nests give a bonus for your next battle (one at a time).</p>'}
+        <div class="food-grid">${DG.FOOD_ORDER.map((id) => {
+          const f = DG.FOODS[id], have = f.free ? '∞' : inv[id] || 0;
+          const fav = p.favoriteKnown && p.favoriteFood === id;
+          return `<div class="food-card ${fav ? 'fav' : ''}">
+            <div class="food-ico">${f.icon}</div>
+            <div class="food-info"><b>${f.name}</b>${fav ? ' <span class="fav-tag">⭐ Favorite</span>' : ''}<small>${f.desc}</small><small class="own">Have: <b>${have}</b></small></div>
+            <div class="food-btns">
+              <button class="btn small primary" data-feed="${id}" ${!f.free && !inv[id] ? 'disabled' : ''}>Feed</button>
+              ${f.free ? '<span class="free">Free!</span>' : `<button class="btn small" data-buy="${id}" ${DG.state.coins < f.price ? 'disabled' : ''}>Buy 🪙${f.price}</button>`}
+            </div></div>`;
+        }).join('')}</div>
+        <p class="fine">🪙 You have <b>${DG.state.coins}</b> Dumpling Coins.</p>`,
+      onOpen(el, cl) {
+        el.querySelectorAll('[data-feed]').forEach((b) => (b.onclick = () => { if (DG.Home.feed(b.dataset.feed)) cl(); }));
+        el.querySelectorAll('[data-buy]').forEach((b) => (b.onclick = () => { if (buy('food', b.dataset.buy)) { cl(); feed(); } }));
+      },
+    });
+    return close;
+  }
+  function toys() {
+    const own = DG.state.inventory.toys;
+    DG.ui.modal({
+      title: '🧺 Toy Basket',
+      html: `<div class="toy-row">${Object.entries(DG.TOYS).map(([id, t]) => own.includes(id)
+        ? `<button class="toy-btn" data-toy="${id}"><span>${t.icon}</span>${t.name}<small>${t.tip}</small></button>`
+        : `<div class="toy-btn locked"><span>${t.icon}</span>${t.name}<small>Shop · 🪙${t.price}</small></div>`).join('')}</div>
+        <p class="fine">Playing makes your dumpling happy but uses a little energy. Every 5 plays completes a care challenge for coins.</p>`,
+      onOpen(el, cl) { el.querySelectorAll('[data-toy]').forEach((b) => (b.onclick = () => { cl(); DG.Home.startPlay(b.dataset.toy); })); },
+    });
+  }
+
+  /* ================= Shop ================= */
+  function buy(cat, id) {
+    const st = DG.state, inv = st.inventory;
+    const table = { food: DG.FOODS, accessories: DG.ACCESSORIES, toys: DG.TOYS, decor: DG.DECOR, arenas: DG.ARENAS }[cat];
+    const item = table[id];
+    if (cat !== 'food' && inv[cat].includes(id)) return false;
+    if (!DG.spend(item.price)) { DG.ui.toast('Not enough Dumpling Coins yet — train or battle to earn more!'); DG.audio.play('bad'); return false; }
+    if (cat === 'food') inv.food[id] = (inv.food[id] || 0) + 1;
+    else inv[cat].push(id);
+    if (cat === 'decor') st.equipped.decor.push(id);
+    DG.audio.play('coin');
+    DG.ui.toast(`Bought ${item.icon} ${item.name}!`);
+    DG.unlock('shopper');
+    DG.save(); if (DG.Home) DG.Home.renderHud();
+    return true;
+  }
+  function shop(tab) {
+    tab = tab || 'food';
+    const st = DG.state, inv = st.inventory;
+    const tabs = [['food', '🍱 Food'], ['accessories', '🎀 Hats & Accessories'], ['toys', '🧸 Toys'], ['decor', '🪴 Decor'], ['arenas', '🏟️ Arenas']];
+    const table = { food: DG.FOODS, accessories: DG.ACCESSORIES, toys: DG.TOYS, decor: DG.DECOR, arenas: DG.ARENAS }[tab];
+    const items = Object.entries(table).filter(([, it]) => !(tab === 'food' && it.free) && !(tab !== 'food' && it.price === 0));
+    DG.ui.modal({
+      title: '🛍️ Dumpling Shop', wide: true,
+      html: `<div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${k === tab ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>
+        <p class="coins-line">🪙 <b>${st.coins}</b> Dumpling Coins</p>
+        <div class="shop-grid">${items.map(([id, it]) => {
+          const owned = tab !== 'food' && inv[tab].includes(id);
+          return `<div class="shop-item ${owned ? 'owned' : ''}"><div class="shop-ico">${it.icon}</div><b>${it.name}</b>
+            ${tab === 'food' ? `<small>${it.desc}<br>Have: ${inv.food[id] || 0}</small>` : ''}
+            ${owned ? '<span class="owned-tag">Owned ✓</span>' : `<button class="btn small primary" data-buy="${id}" ${st.coins < it.price ? 'disabled' : ''}>🪙 ${it.price}</button>`}</div>`;
+        }).join('')}</div>
+        <p class="fine">Everything is earned through play. Accessories, decor and arenas are cosmetic. Equip them in the Closet.</p>`,
+      onOpen(el, cl) {
+        el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { cl(); shop(b.dataset.tab); }));
+        el.querySelectorAll('[data-buy]').forEach((b) => (b.onclick = () => { if (buy(tab, b.dataset.buy)) { cl(); shop(tab); } }));
+      },
+    });
+  }
+
+  /* ================= Closet ================= */
+  function closet() {
+    const st = DG.state, p = DG.pet();
+    let stop = null;
+    const accs = st.inventory.accessories;
+    if (!p.look) p.look = { color: 'classic', eyes: 'round', cheeks: 'blush' };
+    DG.ui.modal({
+      title: '🎀 Closet', wide: true,
+      html: `<div class="closet">
+        <canvas class="closet-prev" id="cl-prev"></canvas>
+        <div>
+          <label class="lbl" for="cl-name">Name</label>
+          <div class="name-row"><input id="cl-name" class="text-in" maxlength="14" value="${esc(p.name)}" autocomplete="off" enterkeyhint="done"><button class="btn small" id="cl-rename">Rename</button></div>
+          ${lookPickerHtml(p.type, p.look)}
+          <div class="lbl">Accessory</div>
+          <div class="chip-row tight" id="cl-acc">
+            <button class="chip-btn ${!p.accessory ? 'on' : ''}" data-acc="">🚫 None</button>
+            ${accs.map((a) => `<button class="chip-btn ${p.accessory === a ? 'on' : ''}" data-acc="${a}">${DG.ACCESSORIES[a].icon} ${DG.ACCESSORIES[a].name}</button>`).join('')}
+          </div>
+          ${p.trait ? `<p class="note">${DG.TRAITS[p.trait].icon} Training look: <b>${DG.TRAITS[p.trait].name}</b> (earned at Large stage)</p>` : ''}
+          <div class="lbl">Arena look</div>
+          <div class="chip-row tight">${st.inventory.arenas.map((a) => `<button class="chip-btn ${st.equipped.arena === a ? 'on' : ''}" data-arena="${a}">${DG.ARENAS[a].icon} ${DG.ARENAS[a].name}</button>`).join('')}</div>
+          <p class="fine">Decorate your house with the 🏠 <b>Decorate</b> button on the home screen.</p>
+        </div></div>`,
+      buttons: [{ label: 'Done', cls: 'primary' }],
+      onClose() { if (stop) stop(); DG.save(); if (DG.Home) DG.Home.renderHud(); },
+      onOpen(el) {
+        let pokeT = -9;
+        stop = DG.ui.previewLoop(el.querySelector('#cl-prev'), (t) => {
+          el._t = t;
+          const poked = t - pokeT < 0.7;
+          return { type: p.type, look: p.look, stage: DG.stageIndex(), size: 130, accessory: p.accessory, trait: p.trait,
+            mood: poked ? 'joy' : 'happy', blink: (t % 3.2) < 0.12, hop: poked ? Math.sin((t - pokeT) / 0.7 * Math.PI) * 16 : Math.max(0, Math.sin(t * 3)) * 5 };
+        }, 240, 200);
+        const poke = () => { pokeT = el._t || 0; DG.save(); };
+        wireLookPicker(el, p.look, poke);
+        const nameIn = el.querySelector('#cl-name');
+        const rename = () => {
+          const v = nameIn.value.trim().slice(0, 14);
+          if (!v) { nameIn.value = p.name; return; }
+          if (v === p.name) return;
+          p.name = v; DG.save(); DG.audio.play('good'); poke();
+          DG.ui.toast(`✏️ Your dumpling is now called <b>${esc(v)}</b>!`);
+          if (DG.Home) DG.Home.renderHud();
+        };
+        el.querySelector('#cl-rename').onclick = rename;
+        nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { rename(); nameIn.blur(); } });
+        el.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => {
+          p.accessory = b.dataset.acc || null; DG.audio.play('pop'); poke();
+          el.querySelectorAll('[data-acc]').forEach((x) => x.classList.toggle('on', x === b));
+        }));
+        el.querySelectorAll('[data-arena]').forEach((b) => (b.onclick = () => {
+          st.equipped.arena = b.dataset.arena; DG.audio.play('pop');
+          el.querySelectorAll('[data-arena]').forEach((x) => x.classList.toggle('on', x === b)); DG.save();
+        }));
+      },
+    });
+  }
+
+  /* ================= Decorate home ================= */
+  function decorate() {
+    const st = DG.state;
+    if (!st.home) st.home = { wall: 'peach', pattern: 'stripes', floor: 'wood' };
+    const h = st.home;
+    let raf = 0;
+    const chips = (key, table) => Object.entries(table).map(([id, x]) =>
+      `<button class="chip-btn ${h[key] === id ? 'on' : ''}" data-hk="${key}" data-v="${id}">${x.a ? `<i class="dot" style="background:${x.custom ? (h.wallColor || x.a) : x.a};border-color:${x.trim || x.b}"></i>` : ''}${x.name}</button>`).join('');
+    DG.ui.modal({
+      title: '🏠 Decorate Your Home', wide: true, cls: 'decor-modal',
+      html: `<canvas class="decor-prev" id="dc-prev"></canvas>
+        <div class="lbl">Wall color</div><div class="chip-row tight">${chips('wall', DG.WALLS)}<label class="chip-btn color-pick" title="Pick any wall color">🎨 Pick any color <input type="color" id="dc-wallcol" value="${h.wallColor || '#ffe9d6'}"></label></div>
+        <div class="lbl">Wallpaper pattern</div><div class="chip-row tight">${chips('pattern', DG.PATTERNS)}</div>
+        <div class="lbl">Floor</div><div class="chip-row tight">${chips('floor', DG.FLOORS)}</div>
+        <div class="lbl">Decorations <small>(tap to show or hide)</small></div>
+        <div class="chip-row tight">${Object.entries(DG.DECOR).map(([d, x]) => st.inventory.decor.includes(d)
+          ? `<button class="chip-btn ${st.equipped.decor.includes(d) ? 'on' : ''}" data-decor="${d}">${x.icon} ${x.name}</button>`
+          : `<span class="chip-btn locked" title="Buy in the Shop">🔒 ${x.icon} ${x.name} · 🪙${x.price}</span>`).join('')}</div>
+        <p class="fine">Walls, patterns and floors are free to change any time. Buy more decorations in the 🛍️ Shop.</p>`,
+      buttons: [{ label: '🛍️ Shop decor', cls: 'ghost', onClick: () => setTimeout(() => shop('decor'), 200) }, { label: 'Done', cls: 'primary' }],
+      onClose() { cancelAnimationFrame(raf); DG.save(); },
+      onOpen(el) {
+        const cv = el.querySelector('#dc-prev'), c = cv.getContext('2d'), R = DG.ROOM;
+        const t0 = performance.now();
+        const frame = (now) => {
+          if (!cv.isConnected) return;
+          const k = DG.ui.fitCanvas(cv, R.W, R.H); c.setTransform(k, 0, 0, k, 0, 0);
+          const t = (now - t0) / 1000;
+          DG.draw.room(c, { t, decor: st.equipped.decor, toys: st.inventory.toys, home: h });
+          const p = DG.pet();
+          if (p) DG.draw.dumpling(c, { type: p.type, look: p.look, x: R.spots.home.x, y: R.spots.home.y, size: 150 * DG.stage().scale, t, stage: DG.stageIndex(),
+            accessory: p.accessory, trait: p.trait, mood: 'happy', hop: Math.max(0, Math.sin(t * 3)) * 6, blink: (t % 3.4) < 0.12 });
+          raf = requestAnimationFrame(frame);
+        };
+        raf = requestAnimationFrame(frame);
+        el.querySelectorAll('[data-hk]').forEach((b) => (b.onclick = () => {
+          const key = b.dataset.hk; h[key] = b.dataset.v; DG.audio.play('pop');
+          el.querySelectorAll(`[data-hk="${key}"]`).forEach((x) => x.classList.toggle('on', x === b));
+          DG.unlock('decorator'); DG.save();
+        }));
+        const wc = el.querySelector('#dc-wallcol');
+        wc.oninput = () => {
+          h.wallColor = wc.value; h.wall = 'custom';
+          const dot = el.querySelector('[data-hk="wall"][data-v="custom"] .dot'); if (dot) dot.style.background = wc.value;
+          el.querySelectorAll('[data-hk="wall"]').forEach((x) => x.classList.toggle('on', x.dataset.v === 'custom'));
+          DG.save();
+        };
+        el.querySelectorAll('[data-decor]').forEach((b) => (b.onclick = () => {
+          const d = b.dataset.decor, eq = st.equipped.decor, i = eq.indexOf(d);
+          if (i >= 0) eq.splice(i, 1); else eq.push(d);
+          b.classList.toggle('on', i < 0); DG.audio.play('pop'); DG.save();
+        }));
+      },
+    });
+  }
+
+  /* ================= Stats ================= */
+  function stats() {
+    const p = DG.pet(), si = DG.stageIndex(), cap = DG.statCap(), c = DG.state.counters;
+    const bs = DG.battleStats(p.stats, null, false);
+    const mv = DG.STARTERS[p.type].moves;
+    const moveLine = (k, need, label) => `<li class="${si >= need ? '' : 'locked'}">${si >= need ? '✅' : '🔒'} <b>${label}: ${DG.MOVES[mv[k]].name}</b> — ${DG.MOVES[mv[k]].desc}${si >= need ? '' : ` <small>(${DG.STAGES[need].name} stage)</small>`}</li>`;
+    DG.ui.modal({
+      title: `📊 ${pname()}'s Stats`, wide: true,
+      html: `<p><b>${DG.STARTERS[p.type].name}</b> · ${DG.STAGES[si].name} · ${DG.fmtAge(DG.ageMs())} · Personality: <b>${DG.personality()}</b></p>
+        <p class="fine">Stats can grow up to <b>${cap}</b> at the ${DG.STAGES[si].name} stage. Growing bigger raises the cap.</p>
+        <div class="stat-list">${DG.STAT_KEYS.map((k) => {
+          const i = DG.STAT_INFO[k];
+          return `<div class="stat-row"><span class="stat-name">${i.icon} ${i.name}</span>${DG.ui.bar(p.stats[k], cap, i.color, i.name)}<b>${Math.floor(p.stats[k])}<small>/${cap}</small></b></div>`;
+        }).join('')}</div>
+        <div class="two-col">
+          <div><div class="lbl">Battle profile</div><ul class="nice-list small">
+            <li>❤️ Health ${bs.maxHp}</li><li>🔋 Stamina ${bs.maxSta}</li><li>👊 Attack ${bs.dmg.toFixed(1)}</li>
+            <li>💨 Speed ${bs.speed.toFixed(1)}</li><li>🛡️ Block ${Math.round(bs.blockRed * 100)}%</li><li>🎯 Special charge ${bs.charge.toFixed(1)}/s</li></ul></div>
+          <div><div class="lbl">Moves</div><ul class="nice-list small">
+            <li>✅ <b>Basic attack</b>, block and dodge</li>${moveLine('special', 1, 'Special')}${moveLine('move2', 2, 'Move 2')}${moveLine('ult', 3, 'Ultimate')}</ul></div>
+        </div>
+        <p>⭐ Favorite food: <b>${p.favoriteKnown ? DG.FOODS[p.favoriteFood].icon + ' ' + DG.FOODS[p.favoriteFood].name : '??? — try different foods!'}</b>
+        ${p.foodBonus ? `<br>🍱 Next battle: <b>${p.foodBonus.label}</b>` : ''}
+        ${DG.cozy() ? '<br>🏠 Cozy bonus: well cared for → +10% special charge in battle.' : '<br>🏠 Keep all needs high (avg 70+) for a cozy +10% special charge.'}
+        <br>🏟️ Record: ${c.wins} wins · ${c.losses} losses · ${c.draws} draws · 🏋️ ${c.trainings} training sessions</p>`,
+      buttons: [{ label: 'Close', cls: 'primary' }],
+    });
+  }
+
+  function trophies() {
+    const a = DG.state.achievements;
+    const ids = Object.keys(DG.ACHIEVEMENTS);
+    DG.ui.modal({
+      title: `🏆 Trophies (${ids.filter((i) => a[i]).length}/${ids.length})`, wide: true,
+      html: `<div class="ach-grid">${ids.map((id) => {
+        const x = DG.ACHIEVEMENTS[id];
+        return `<div class="ach ${a[id] ? 'got' : ''}"><div class="ach-ico">${a[id] ? x.icon : '🔒'}</div><b>${x.name}</b><small>${x.desc}</small><small class="coin">🪙 ${x.coins}</small></div>`;
+      }).join('')}</div>`,
+      buttons: [{ label: 'Close', cls: 'primary' }],
+    });
+  }
+
+  function settings() {
+    const s = DG.state.settings;
+    DG.ui.modal({
+      title: '⚙️ Settings',
+      html: `<div class="settings">
+          <label class="toggle"><input type="checkbox" id="st-sound" ${s.sound ? 'checked' : ''}> 🔊 Sound effects</label>
+          <label class="toggle"><input type="checkbox" id="st-music" ${s.music ? 'checked' : ''}> 🎵 Music</label>
+          <label class="toggle"><input type="checkbox" id="st-big" ${s.bigText ? 'checked' : ''}> 🔠 Larger text</label>
+          <label class="lbl" for="st-touch">📱 On-screen touch controls</label>
+          <select id="st-touch" class="text-in"><option value="auto">Automatic</option><option value="on">Always show</option><option value="off">Hide</option></select>
+        </div>
+        <details class="howto"><summary>❓ How to play</summary>
+          <ul class="nice-list small">
+            <li><b>Care:</b> tap your dumpling to pet it. Tap the food bowl, toy basket, bath and bed (or the Sleep button) to keep its four needs up. Tap anywhere else in the room and it walks there.</li>
+            <li><b>Grow:</b> your dumpling grows with real time — 1 day to Medium, 3 days to Large, 7 days to Giant. Growing <b>pauses</b> while any need is below 20.</li>
+            <li><b>Night:</b> from 9 PM to 7 AM your dumpling sleeps in bed. Waking it up makes its energy drain fast. Sleeping refills energy slowly (about 8 hours from empty to full).</li>
+            <li><b>Walk:</b> take your dumpling to the park. Tap to hop over puddles and grab coins.</li>
+            <li><b>Decorate:</b> change wall colors, wallpaper, floors and decorations for free.</li>
+            <li><b>Train:</b> five 40-second minigames each raise a different stat.</li>
+            <li><b>Battle (keyboard):</b> WASD/arrows move, J attack (tap 3 times for a combo, hold for a charged Smash), K block (hold), Space dodge, L special, I second move, O ultimate. Esc pauses.</li>
+            <li><b>Battle tricks:</b> block just before a hit to <b>Parry</b>, or dodge at the last moment for a <b>Perfect Dodge</b>. Both slow time and make your next hit critical. A fully charged Smash breaks through blocks.</li>
+            <li><b>Battle (phone):</b> drag anywhere on the left to move; tap the big buttons on the right. Turn your phone sideways for a bigger arena.</li>
+            <li><b>Rewards:</b> earn Dumpling Coins from training, battles and care challenges; spend them in the Shop.</li>
+          </ul></details>
+        <p class="save-note">💾 Your save lives in <b>this browser</b> on this device and is saved automatically. Clearing browser data or using a different browser starts fresh.</p>`,
+      buttons: [{ label: 'Done', cls: 'primary' }],
+      onOpen(el) {
+        el.querySelector('#st-touch').value = s.touch || 'auto';
+        el.querySelector('#st-sound').onchange = (e) => { s.sound = e.target.checked; DG.save(); DG.audio.play('pop'); };
+        el.querySelector('#st-music').onchange = (e) => { s.music = e.target.checked; DG.save(); DG.audio.syncMusic(); };
+        el.querySelector('#st-big').onchange = (e) => { s.bigText = e.target.checked; document.body.classList.toggle('big-text', s.bigText); DG.save(); };
+        el.querySelector('#st-touch').onchange = (e) => { s.touch = e.target.value; DG.save(); };
+      },
+    });
+  }
+
+  /* ================= Milestones ================= */
+  function checkMilestones() {
+    const p = DG.pet();
+    if (!p || DG._holdMilestones || DG.ui.current() !== 'home' || DG.ui.anyModal() || (DG.Home && DG.Home.isBusy())) return;
+    const real = DG.realStageIndex();
+    if (real > p.lastStageSeen) {
+      const from = p.lastStageSeen;
+      p.lastStageSeen = real;
+      DG.save();
+      celebrateStage(real, from);
+    } else if (real >= 2 && !p.trait) traitPick();
+  }
+  function celebrateStage(idx, from, preview) {
+    const p = DG.pet(), st = DG.STAGES[idx];
+    const unlocks = [];
+    for (let i = (from || 0) + 1; i <= idx; i++) {
+      DG.STAGES[i].unlocks.forEach((u) => unlocks.push(u));
+      if (!preview) DG.unlock(['', 'grownMedium', 'grownLarge', 'fullyGrown'][i]);
+    }
+    const mv = DG.STARTERS[p.type].moves;
+    const moveName = idx === 1 ? DG.MOVES[mv.special].name : idx === 2 ? DG.MOVES[mv.move2].name : idx === 3 ? DG.MOVES[mv.ult].name : '';
+    let stop = null;
+    DG.audio.play('levelup');
+    DG.ui.modal({
+      title: `🎉 ${pname()} grew into a ${st.name} dumpling!`, wide: true, cls: 'celebrate',
+      html: `<canvas class="celebrate-canvas" id="cel-cv"></canvas>
+        <p>${idx === 3 ? `Look how HUGE and lovable ${pname()} is! 🌳` : `${pname()} is bigger, bouncier and more coordinated!`}</p>
+        <div class="lbl">Unlocked</div>
+        <ul class="nice-list">${unlocks.map((u) => `<li>✨ ${u}${u.includes('move') && moveName ? `: <b>${moveName}</b>` : ''}</li>`).join('')}</ul>`,
+      buttons: [{ label: 'Hooray!', cls: 'primary' }],
+      onClose() { if (stop) stop(); if (!preview) { DG.Home.celebrate('I grew!'); setTimeout(checkMilestones, 600); } },
+      onOpen(el) {
+        const parts = [];
+        const fromScale = DG.STAGES[from || 0].scale, toScale = st.scale;
+        stop = DG.ui.previewLoop(el.querySelector('#cel-cv'), (t) => {
+          const k = Math.min(1, t / 1.2), e = 1 - Math.pow(1 - k, 3);
+          const pulse = k < 1 ? Math.sin(t * 25) * 0.04 * (1 - k) : 0;
+          return {
+            type: p.type, look: p.look, stage: idx, accessory: p.accessory, trait: p.trait, mood: 'joy',
+            size: 120 * (fromScale + (toScale - fromScale) * e) / 1.0 + 20, squash: pulse,
+            hop: k >= 1 ? Math.max(0, Math.sin(t * 4)) * 14 : 0,
+            after(ctx, tt) {
+              if (Math.random() < 0.35) DG.draw.confetti(parts, Math.random() * 360, -10, 1);
+              DG.draw.updateParticles(parts, 1 / 60); parts.forEach((pp) => DG.draw.particle(ctx, pp));
+            },
+          };
+        }, 360, 240);
+      },
+    });
+  }
+  function traitPick() {
+    const p = DG.pet(); if (p.trait) return;
+    const c = DG.traitCandidates();
+    const assign = (k) => {
+      p.trait = k; DG.save();
+      DG.ui.toast(`${DG.TRAITS[k].icon} ${pname()} earned the <b>${DG.TRAITS[k].name}</b>!`, 'gold');
+      DG.audio.play('fanfare'); DG.Home.celebrate('Looking sharp!');
+    };
+    if (c.length === 1) {
+      DG.ui.modal({
+        title: `${DG.TRAITS[c[0]].icon} A new look!`,
+        html: `<p>All that <b>${DG.STAT_INFO[c[0]].name.toLowerCase()}</b> training paid off. ${pname()} now wears a <b>${DG.TRAITS[c[0]].name}</b>!</p>`,
+        buttons: [{ label: 'Awesome!', cls: 'primary', onClick: () => assign(c[0]) }], dismissable: false,
+      });
+    } else {
+      DG.ui.modal({
+        title: '✨ Choose a new look!', dismissable: false,
+        html: `<p>${pname()} trained ${c.map((k) => DG.STAT_INFO[k].name.toLowerCase()).join(' and ')} equally. Which look should it wear?</p>`,
+        buttons: c.map((k) => ({ label: `${DG.TRAITS[k].icon} ${DG.TRAITS[k].name}`, cls: 'primary', onClick: () => assign(k) })),
+      });
+    }
+  }
+
+  function welcomeBack(info) {
+    const p = DG.pet();
+    const grewFrom = info.stageBefore, grewTo = DG.realStageIndex();
+    DG.ui.modal({
+      title: `${pname()} missed you! 💕`,
+      html: `<p>You were away for <b>${DG.fmtDuration(info.gap)}</b>.</p>
+        <ul class="nice-list small">
+          <li>🌱 ${pname()} is now ${DG.fmtAge(DG.ageMs())}${grewTo > grewFrom ? ` — and grew into a <b>${DG.STAGES[grewTo].name}</b>!` : '.'}</li>
+          <li>Needs dipped a little while you were gone, but nothing a snack, a cuddle and a nap can't fix.</li>
+          ${p.asleep ? (DG.isNight() ? `<li>🌙 It's night time, so ${pname()} is tucked into bed. It wakes up at 7 AM.</li>` : '<li>😴 Still napping.</li>') : info.wokeUp ? '<li>☀️ It woke up and is ready for the day.</li>' : ''}
+          ${DG.frozenNeeds().length ? `<li>⏸ Growing is <b>paused</b> until ${DG.frozenNeeds().map((k) => DG.NEED_NAMES[k]).join(' and ')} ${DG.frozenNeeds().length > 1 ? 'are' : 'is'} above ${DG.GROWTH_FREEZE}.</li>` : ''}
+        </ul>`,
+      buttons: [{ label: 'Hello again! 👋', cls: 'primary' }],
+      onClose() { if (!DG.pet().asleep) DG.Home.celebrate("You're back!!"); else DG.Home.say('zzz... ♥', 2); setTimeout(checkMilestones, 500); },
+    });
+  }
+
+  /* ================= Developer panel ================= */
+  function devPanel() {
+    const el = document.getElementById('dev-panel');
+    el.hidden = !el.hidden;
+    if (el.hidden) return;
+    const render = () => {
+      const p = DG.pet();
+      el.innerHTML = `<div class="dev-head">🛠️ DEVELOPER PANEL <small>testing only · Ctrl+Shift+D</small><button id="dv-x">✕</button></div>
+        ${p ? `<div class="dev-info">Age: ${DG.fmtDuration(DG.ageMs())} · Growth: ${DG.fmtDuration(DG.growMs())} · Stage: ${DG.STAGES[DG.realStageIndex()].name}${DG.frozenNeeds().length ? ' · ⏸ paused' : ''}<br>Night: ${DG.isNight() ? 'yes' : 'no'} · Asleep: ${p.asleep ? 'yes' : 'no'}</div>
+        <div class="dev-row"><button data-d="day">+1 day age</button><button data-d="hour">+1 hour age</button></div>
+        <div class="dev-row"><label>Preview stage <select id="dv-stage"><option value="">Actual</option>${DG.STAGES.map((s, i) => `<option value="${i}" ${DG.devPreviewStage === i ? 'selected' : ''}>${s.name}</option>`).join('')}</select></label></div>
+        <div class="dev-row"><button data-d="away">Simulate 12h away</button><button data-d="coins">+100 coins</button></div>
+        <div class="dev-row"><button data-d="low">Lower needs</button><button data-d="fill">Fill needs</button></div>
+        <div class="dev-row"><button data-d="night">Toggle fake night</button><button data-d="lowEnergy">Energy to 30</button></div>` : '<div class="dev-info">No pet adopted yet.</div>'}
+        <div class="dev-row"><button data-d="reset" class="danger">Reset test save</button></div>`;
+      el.querySelector('#dv-x').onclick = () => (el.hidden = true);
+      const sel = el.querySelector('#dv-stage');
+      if (sel) sel.onchange = () => { DG.devPreviewStage = sel.value === '' ? null : +sel.value; DG.Home.renderHud(); render(); };
+      el.querySelectorAll('[data-d]').forEach((b) => (b.onclick = () => {
+        const d = b.dataset.d, pt = DG.pet();
+        if (d === 'day') { pt.adoptedAt -= DG.DAY; pt.growMs = (pt.growMs || 0) + DG.DAY; DG.save(); DG.ui.toast('🛠️ Aged +1 day'); }
+        if (d === 'hour') { pt.adoptedAt -= DG.HOUR; pt.growMs = (pt.growMs || 0) + DG.HOUR; DG.save(); }
+        if (d === 'coins') { DG.state.coins += 100; DG.save(); }
+        if (d === 'fill') { Object.keys(pt.needs).forEach((k) => (pt.needs[k] = 100)); DG.save(); }
+        if (d === 'low') { Object.keys(pt.needs).forEach((k) => (pt.needs[k] = 15)); DG.save(); }
+        if (d === 'lowEnergy') { pt.needs.energy = 30; DG.save(); }
+        if (d === 'night') { DG.devNight = DG.devNight == null ? !DG.isNight() : null; DG.ui.toast(DG.devNight == null ? '🛠️ Using the real clock' : DG.devNight ? '🛠️ Pretending it is night' : '🛠️ Pretending it is day'); }
+        if (d === 'away') {
+          const stageBefore = DG.realStageIndex();
+          pt.lastUpdate -= 12 * DG.HOUR; pt.adoptedAt -= 12 * DG.HOUR;
+          const info = DG.updateNeeds(); DG.save();
+          if (info) { info.stageBefore = stageBefore; if (DG.ui.current() === 'home') welcomeBack(info); }
+        }
+        if (d === 'reset') {
+          if (!confirm('Reset the test save? This erases the pet and all progress in this browser.')) return;
+          DG.resetSave(); el.hidden = true; DG.ui.show('adopt'); return;
+        }
+        if (DG.ui.current() === 'home') { DG.Home.renderHud(); checkMilestones(); }
+        render();
+      }));
+    };
+    render();
+    clearInterval(el._t); el._t = setInterval(() => { if (!el.hidden && !el.contains(document.activeElement)) render(); }, 2000);
+  }
+
+  DG.Menus = { feed, toys, shop, closet, decorate, stats, trophies, settings, checkMilestones, celebrateStage, traitPick, welcomeBack, devPanel, buy };
+})(window.DG);
