@@ -94,13 +94,19 @@
     }
     const r = canvas.getBoundingClientRect(), top = r.top + window.scrollY;
     const cssW = canvas.clientWidth, cssH = Math.max(300, Math.round(window.innerHeight - top - 12));
-    let vw = 470, s = cssW / vw, vh = cssH / s;
-    if (vh < R.H) { s = cssH / R.H; vw = Math.min(R.W, cssW / s); vh = R.H; }
-    const extra = Math.max(0, vh - R.H);
-    // the button bar sits at the bottom: keep just enough floor under the room for it, the rest becomes wall above
-    const dock = root.querySelector('.dock'), dockL = ((dock ? dock.offsetHeight : 50) + 14) / s;
-    const F = Math.min(extra, dockL + 18);
-    Object.assign(CAM, { on: true, s, vw, cssW, cssH, E: extra - F, F, measured: true, walkMax: 495 + Math.max(0, F - dockL) });
+    // Fit the room so only a thin strip of wall shows above the window (window top is at y=40),
+    // with just enough floor under the furniture for the button bar. Solved for the zoom s.
+    const dock = root.querySelector('.dock'), dockPx = (dock ? dock.offsetHeight : 50) + 14;
+    const TOP_WALL = 22; // room units of wall visible above the window
+    // keep the zoom close to the old phone view; trim the wall to a thin strip above the window and
+    // give the rest of the height to extra floor (the dumpling can walk there; the button bar sits on it)
+    let s = cssW / 360;
+    s = Math.max(s, (cssH - dockPx) / (R.H - 40 + TOP_WALL + 18 + 400)); // very tall screens: don't add endless floor
+    const vw = Math.min(R.W, cssW / s), vh = cssH / s;
+    const dockL = dockPx / s;
+    const F = Math.max(dockL + 18, vh - (R.H - 40 + TOP_WALL));
+    const extra = vh - R.H;
+    Object.assign(CAM, { on: true, s, vw, cssW, cssH, E: extra - F, F, measured: true, walkMax: 495 + Math.max(0, F - dockL - 18) });
     if (!CAM.init) { CAM.init = true; CAM.x = clampCam(P.x - vw / 2); }
   }
   function toRoom(e) {
@@ -136,7 +142,6 @@
           <button class="act a-walk" data-a="walk" title="Walk" aria-label="Walk"><span>🌳</span></button>
           <button class="act big train" data-a="train" title="Training" aria-label="Training"><span>🏋️</span></button>
           <button class="act big arena" data-a="arena" id="h-arena" title="Arena" aria-label="Arena"><span>🏟️</span></button>
-          <div class="dock-title" role="img" aria-label="My Pet Dumpling"></div>
           <button class="act a-shop" data-a="shop" title="Shop" aria-label="Shop"><span>🛍️</span></button>
           <button class="act a-closet" data-a="closet" title="Closet" aria-label="Closet"><span><svg class="ico-svg" viewBox="0 0 64 64" aria-hidden="true"><path d="M10 14 Q32 3 54 14 L54 18 L10 18 Z" fill="#c98a4f" stroke="#6b3f1e" stroke-width="3" stroke-linejoin="round"/><rect x="12" y="17" width="40" height="38" rx="4" fill="#e6b073" stroke="#6b3f1e" stroke-width="3"/><rect x="16" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><rect x="33" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><circle cx="28" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><circle cx="36" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><path d="M15 55 v5 M49 55 v5" stroke="#6b3f1e" stroke-width="4" stroke-linecap="round"/><path d="M18 24 v10" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"/></svg></span></button>
           <button class="act a-decorate" data-a="decorate" title="Decorate" aria-label="Decorate"><span>🏠</span></button>
