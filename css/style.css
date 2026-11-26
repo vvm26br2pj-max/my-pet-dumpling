@@ -779,3 +779,5 @@ body.touch .a-moves { display: none; }
   .room-wrap .dock.glass .act { padding: 0; flex: 1 1 0; display: grid; place-items: center; }
   .room-wrap .dock.glass .act span, .room-wrap .dock.glass .act.big span { width: min(46px, 11.5vw); height: min(46px, 11.5vw); }
 }
+/* phones: the room handles its own pinch-zoom and swipes */
+@media (max-width: 600px) { #screen-home #room-canvas { touch-action: none; } }

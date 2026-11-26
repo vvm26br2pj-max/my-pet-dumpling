@@ -100,14 +100,24 @@
     const TOP_WALL = 22; // room units of wall visible above the window
     // keep the zoom close to the old phone view; trim the wall to a thin strip above the window and
     // give the rest of the height to extra floor (the dumpling can walk there; the button bar sits on it)
-    let s = cssW / 430;
-    s = Math.max(s, (cssH - dockPx) / (R.H - 40 + TOP_WALL + 18 + 400)); // very tall screens: don't add endless floor
+    // zoom = how much of the room's width is shown; players change it by pinching (remembered in settings)
+    const sMin = Math.max(cssW / R.W, (cssH - dockPx) / (R.H - 40 + TOP_WALL + 18 + 400)); // most zoomed out
+    CAM.zoomMax = cssW / sMin; CAM.zoomMin = 260;
+    const zoom = Math.max(CAM.zoomMin, Math.min(CAM.zoomMax, (DG.state.settings && DG.state.settings.roomZoom) || 430));
+    let s = Math.max(cssW / zoom, sMin);
     const vw = Math.min(R.W, cssW / s), vh = cssH / s;
     const dockL = dockPx / s;
-    const F = Math.max(dockL + 18, vh - (R.H - 40 + TOP_WALL));
+    // spare height goes to floor first; past ~120 units it is shared with the wall so the room stays centred
+    const spare = Math.max(0, vh - (R.H - 40 + TOP_WALL) - (dockL + 18));
+    const F = dockL + 18 + Math.min(spare, 120) + Math.max(0, spare - 120) / 2;
     const extra = vh - R.H;
     Object.assign(CAM, { on: true, s, vw, cssW, cssH, E: extra - F, F, measured: true, walkMax: 495 + Math.max(0, F - dockL - 18) });
     if (!CAM.init) { CAM.init = true; CAM.x = clampCam(P.x - vw / 2); }
+  }
+  function setRoomZoom(z) {
+    const st = DG.state.settings || (DG.state.settings = {});
+    st.roomZoom = Math.max(CAM.zoomMin || 260, Math.min(CAM.zoomMax || 900, z));
+    layoutRoom();
   }
   function toRoom(e) {
     if (!CAM.on) return DG.ui.toLogical(canvas, e, R.W);
@@ -157,13 +167,33 @@
     ctx = canvas.getContext('2d');
     root.querySelector('#h-settings').onclick = () => DG.Menus.settings();
     root.querySelectorAll('.act').forEach((b) => (b.onclick = () => { DG.audio.play('click'); action(b.dataset.a); }));
-    // On phones the room is shown zoomed in: a swipe pans the view, a tap acts.
-    let down = null;
+    // On phones the room is shown zoomed in: a swipe pans the view, a tap acts, two fingers pinch to zoom.
+    let down = null, pinch = null;
+    const touches = new Map();
+    const pinchInfo = () => {
+      const [a, b] = [...touches.values()], r = canvas.getBoundingClientRect();
+      return { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2 - r.left };
+    };
     canvas.addEventListener('pointerdown', (e) => {
       if (!CAM.on) { onPointer(e); return; }
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) { // start pinching: remember the spot between the fingers
+        const pi = pinchInfo();
+        pinch = { d0: pi.d, zoom0: CAM.vw, anchor: CAM.x + pi.mx / CAM.s };
+        down = null; return;
+      }
+      if (touches.size > 2) return;
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
       down = { x: e.clientX, y: e.clientY, cam: CAM.x, panned: false };
     });
     canvas.addEventListener('pointermove', (e) => {
+      if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (CAM.on && pinch && touches.size >= 2) {
+        const pi = pinchInfo();
+        setRoomZoom(pinch.zoom0 * pinch.d0 / Math.max(10, pi.d));
+        CAM.x = clampCam(pinch.anchor - pi.mx / CAM.s); CAM.userT = T;
+        return;
+      }
       if (CAM.on && down) {
         const dx = e.clientX - down.x;
         if (!down.panned && Math.abs(dx) > 10) down.panned = true;
@@ -171,9 +201,23 @@
       }
       onHover(e);
     });
-    const up = (e) => { if (CAM.on && down && !down.panned) onPointer(e); down = null; };
+    const up = (e) => {
+      touches.delete(e.pointerId);
+      if (pinch) { if (touches.size < 2) { pinch = null; DG.save(); } down = null; return; }
+      if (CAM.on && down && !down.panned) onPointer(e);
+      down = null;
+    };
     canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', () => { down = null; });
+    canvas.addEventListener('pointercancel', (e) => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; down = null; });
+    // trackpad pinch / Ctrl + scroll wheel also zooms the phone view
+    canvas.addEventListener('wheel', (e) => {
+      if (!CAM.on || !e.ctrlKey) return;
+      e.preventDefault();
+      const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, anchor = CAM.x + mx / CAM.s;
+      setRoomZoom(CAM.vw * Math.exp(e.deltaY * 0.01));
+      CAM.x = clampCam(anchor - mx / CAM.s); CAM.userT = T;
+      clearTimeout(canvas._zt); canvas._zt = setTimeout(() => DG.save(), 400);
+    }, { passive: false });
     window.addEventListener('resize', () => { CAM.measured = false; });
   }
 
