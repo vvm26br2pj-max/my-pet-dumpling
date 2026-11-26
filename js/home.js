@@ -100,7 +100,7 @@
     const TOP_WALL = 22; // room units of wall visible above the window
     // keep the zoom close to the old phone view; trim the wall to a thin strip above the window and
     // give the rest of the height to extra floor (the dumpling can walk there; the button bar sits on it)
-    let s = cssW / 360;
+    let s = cssW / 430;
     s = Math.max(s, (cssH - dockPx) / (R.H - 40 + TOP_WALL + 18 + 400)); // very tall screens: don't add endless floor
     const vw = Math.min(R.W, cssW / s), vh = cssH / s;
     const dockL = dockPx / s;
