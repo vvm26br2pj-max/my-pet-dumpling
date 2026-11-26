@@ -781,3 +781,10 @@ body.touch .a-moves { display: none; }
 }
 /* phones: the room handles its own pinch-zoom and swipes */
 @media (max-width: 600px) { #screen-home #room-canvas { touch-action: none; } }
+
+/* phones: the 8 icons sit in two rows of four, so each can be much bigger */
+@media (max-width: 600px) {
+  .room-wrap .dock.glass { display: grid; grid-template-columns: repeat(4, 1fr); row-gap: 0; column-gap: 0; padding: 3px 4px; border-radius: 20px; }
+  .room-wrap .dock.glass .act { flex: none; }
+  .room-wrap .dock.glass .act span, .room-wrap .dock.glass .act.big span { width: min(64px, 16vw); height: min(64px, 16vw); }
+}
