@@ -136,6 +136,7 @@
   function layoutRoom() {
     const phone = window.matchMedia('(max-width: 600px)').matches;
     const dockEl = root.querySelector('.dock');
+    placeProps(phone);
     if (!phone) { // whole room visible, with a strip of extra floor under it for the button bar
       const k = (canvas.clientWidth || R.W) / R.W;
       Object.assign(CAM, { on: false, E: 0, x: 0, vw: R.W, measured: true, F: ((dockEl ? dockEl.offsetHeight : 70) + 16) / k });
@@ -167,6 +168,15 @@
     const st = DG.state.settings || (DG.state.settings = {});
     st.roomZoom = Math.max(CAM.zoomMin || 260, Math.min(CAM.zoomMax || 900, z));
     layoutRoom();
+  }
+  /** On tall phone screens the bowl and toy basket sit further forward on the floor, so the
+      furniture isn't all in one line. Their tap areas and the eating spot move with them. */
+  const PROP_HOME = { bowl: R.bowl.y, basket: R.basket.y, eat: R.spots.bowl.y };
+  const PHONE_DROP = { bowl: 120, basket: 48 };
+  function placeProps(phone) {
+    R.bowl.y = PROP_HOME.bowl + (phone ? PHONE_DROP.bowl : 0);
+    R.basket.y = PROP_HOME.basket + (phone ? PHONE_DROP.basket : 0);
+    R.spots.bowl.y = PROP_HOME.eat + (phone ? PHONE_DROP.bowl : 0);
   }
   function toRoom(e) {
     if (!CAM.on) return DG.ui.toLogical(canvas, e, R.W);

@@ -1101,8 +1101,8 @@
     // furniture and anything standing on the floor are drawn back-to-front by where they touch the floor
     const items = [
       { y: 462, draw: () => drawTub(ctx, t) },
-      { y: 484, draw: () => drawBowl(ctx, o.bowlFood, t, wall) },
-      { y: 486, draw: () => drawBasket(ctx, o.toys || ['ball']) },
+      { y: ROOM.bowl.y + ROOM.bowl.h - 4, draw: () => drawBowl(ctx, o.bowlFood, t, wall) },
+      { y: ROOM.basket.y + ROOM.basket.h - 4, draw: () => drawBasket(ctx, o.toys || ['ball']) },
       { y: 470, draw: () => {
         drawBed(ctx, t);
         if (decor.includes('teddy')) {
