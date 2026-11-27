@@ -850,10 +850,10 @@
       W: 900,
       tub: { x: 25, y: 362, w: 158, h: 107 }, bowl: { x: 286, y: 444, w: 89, h: 58 },
       basket: { x: 520, y: 420, w: 102, h: 83 }, bed: { x: 690, y: 300, w: 182, h: 171 },
-      door: { x: 14, y: 77, w: 144, h: 239 },
+      door: { x: 14, y: 62, w: 144, h: 239 },
       spots: { home: { x: 450, y: 455 }, bowl: { x: 400, y: 490 }, bed: { x: 781, y: 490 }, tub: { x: 104, y: 450 } },
       bedO: [636, 312], bedK: 0.207,
-      pos: { door: [14, 77], mat: [29, 304], pot: [162, 222], lantern: [205, 28], window: [272, 89], painting: [470, 91],
+      pos: { door: [14, 62], mat: [29, 297], pot: [162, 222], lantern: [205, 28], window: [272, 89], painting: [470, 91],
         poster: [566, 140], clock: [810, 58], shelf: [680, 128], fish: [494, 253], plant: [580, 251] },
       deco: { beanbag: [396, 346, 1, 420, 346], rug: [450, 450, 1, 450, 450] },
     },
@@ -861,10 +861,10 @@
       W: 560,
       tub: { x: 14, y: 412, w: 158, h: 107 }, bowl: { x: 190, y: 524, w: 89, h: 58 },
       basket: { x: 444, y: 548, w: 102, h: 83 }, bed: { x: 368, y: 320, w: 182, h: 171 },
-      door: { x: 5, y: 77, w: 144, h: 239 },
+      door: { x: 5, y: 62, w: 144, h: 239 },
       spots: { home: { x: 270, y: 462 }, bowl: { x: 234, y: 516 }, bed: { x: 458, y: 500 }, tub: { x: 93, y: 496 } },
       bedO: [339, 345], bedK: 0.172,
-      pos: { door: [5, 77], mat: [20, 304], pot: [144, 222], lantern: [131, 28], window: [168, 89], painting: [354, 91],
+      pos: { door: [5, 62], mat: [20, 297], pot: [144, 222], lantern: [131, 28], window: [168, 89], painting: [354, 91],
         poster: [354, 154], clock: [480, 61], shelf: [431, 114], fish: [312, 253], plant: [364, 251] },
       deco: { beanbag: [222, 340, 0.72, 420, 346], rug: [262, 525, 0.86, 450, 450] },
     },
@@ -903,6 +903,15 @@
     x.drawImage(o.im, 0, 0); x.globalCompositeOperation = 'multiply'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
     x.globalCompositeOperation = 'destination-in'; x.drawImage(o.im, 0, 0);
     return (TINTS[key] = c);
+  }
+  const RECOL = {};
+  function recoloured(n, color) {
+    const key = n + color; if (RECOL[key]) return RECOL[key];
+    const o = SPR[n], c = document.createElement('canvas'); c.width = o.im.naturalWidth; c.height = o.im.naturalHeight;
+    const x = c.getContext('2d');
+    x.drawImage(o.im, 0, 0); x.globalCompositeOperation = 'color'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(o.im, 0, 0);
+    return (RECOL[key] = c);
   }
   function tintAt(ctx, n, at, color) { const p = ROOM.pos[at], o = SPR[n]; ctx.drawImage(tinted(n, color), p[0], p[1], o.w, o.h); }
   /** Soft contact shadow so pieces sit on the floor. */
@@ -1186,8 +1195,10 @@
     const WT = floorY - 36;
     for (let k = 1; (k - 1) * WT < E; k++) { ctx.save(); ctx.translate(0, -k * WT); ctx.beginPath(); ctx.rect(0, 0, W, WT); ctx.clip(); wallPaint(); ctx.restore(); }
     wallPaint();
-    ctx.fillStyle = wall.trim; ctx.fillRect(0, floorY - 36, W, 36);
-    ctx.fillStyle = 'rgba(0,0,0,0.06)'; ctx.fillRect(0, floorY - 38, W, 5);
+    if (!(sprReady() && !o.vector)) { // the painted room has its own skirting board right at the floor
+      ctx.fillStyle = wall.trim; ctx.fillRect(0, floorY - 36, W, 36);
+      ctx.fillStyle = 'rgba(0,0,0,0.06)'; ctx.fillRect(0, floorY - 38, W, 5);
+    }
     // window + wall decorations sit a bit lower, clear of the floating button bar
     ctx.save(); ctx.translate(0, WALL_DY);
     const night = DG.isNight ? DG.isNight() : false;
@@ -1198,8 +1209,10 @@
       const wl = ctx.createRadialGradient(wcx, 150, 20, wcx, 150, W * 0.55);
       wl.addColorStop(0, night ? 'rgba(160,170,255,0.12)' : 'rgba(255,250,235,0.45)'); wl.addColorStop(1, 'rgba(255,250,235,0)');
       ctx.fillStyle = wl; ctx.fillRect(0, -E, W, floorY + E);
-      const sk = ctx.createLinearGradient(0, floorY - 16, 0, floorY); sk.addColorStop(0, '#fffaf2'); sk.addColorStop(1, '#f1dcc4');
-      ctx.fillStyle = sk; ctx.fillRect(0, floorY - 16, W, 16); ctx.fillStyle = 'rgba(150,90,50,0.15)'; ctx.fillRect(0, floorY - 17, W, 2);
+      const sk = ctx.createLinearGradient(0, floorY - 14, 0, floorY); sk.addColorStop(0, '#fffaf2'); sk.addColorStop(1, '#ecd6bd');
+      ctx.fillStyle = sk; ctx.fillRect(0, floorY - 14, W, 14);
+      ctx.fillStyle = 'rgba(150,90,50,0.18)'; ctx.fillRect(0, floorY - 15, W, 1.5); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(0, floorY - 13.5, W, 1.5);
+      ctx.fillStyle = 'rgba(110,60,30,0.22)'; ctx.fillRect(0, floorY, W, 3); // where the floor meets the board
       sprAt(ctx, 'window'); // cream curtains
 
       if (night) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgba(70,80,170,0.5)'; ctx.fillRect(wp[0] + 20, wp[1] + 8, SPR.window.w - 40, SPR.window.h - 26); ctx.restore(); }
@@ -1462,7 +1475,8 @@
       } },
       { y: ROOM.bowl.y + ROOM.bowl.h - 4, draw: () => {
         if (!useSpr) return drawBowl(ctx, o.bowlFood, t, wall);
-        const b = ROOM.bowl; floorShadow(ctx, b.x + b.w / 2, b.y + b.h - 3, b.w * 0.55, 8, 0.32); spr(ctx, 'bowl', b.x, b.y);
+        const b = ROOM.bowl; floorShadow(ctx, b.x + b.w / 2, b.y + b.h - 3, b.w * 0.55, 8, 0.32);
+        ctx.drawImage(recoloured('bowl', themeColor(wall)), b.x, b.y, SPR.bowl.w, SPR.bowl.h); // the bowl matches the walls
         if (o.bowlFood) { ctx.font = '34px serif'; ctx.textAlign = 'center'; ctx.fillText(o.bowlFood, b.x + b.w / 2, b.y + 22 + Math.sin(t * 10) * 1.5); }
       } },
       { y: ROOM.basket.y + ROOM.basket.h - 4, draw: () => {
