@@ -49,8 +49,7 @@
             const prev = DG.OPPONENTS[i - 1];
             const beaten = st.beaten[o.id];
             let lock = '';
-            if (si < 1) lock = 'Small stage';
-            else if (si < o.minStage) lock = `Reach ${DG.STAGES[o.minStage].name} stage`;
+            if (si < o.minStage) lock = `${DG.STAGES[o.minStage].name} stage`;
             else if (prev && !st.beaten[prev.id]) lock = `Beat ${prev.name} first`;
             return `<div class="opp ${lock ? 'locked' : ''}">
               <div class="opp-ico" style="background:${o.color}">${DG.STYLES[o.style].icon}</div>

@@ -63,62 +63,78 @@
     }));
   }
 
+  const BOW_SVG = '<svg viewBox="0 0 64 48" aria-hidden="true"><path d="M32 22 C22 6 4 4 5 16 C6 28 20 30 32 25 Z M32 22 C42 6 60 4 59 16 C58 28 44 30 32 25 Z" fill="#ff8fb4" stroke="#c94f7c" stroke-width="2.6" stroke-linejoin="round"/><path d="M29 25 L20 42 L26 39 L28 45 L32 28 Z M35 25 L44 42 L38 39 L36 45 L32 28 Z" fill="#ff7aa6" stroke="#c94f7c" stroke-width="2.6" stroke-linejoin="round"/><ellipse cx="32" cy="23" rx="6.5" ry="6" fill="#ff6b9c" stroke="#c94f7c" stroke-width="2.6"/><path d="M12 13 C15 10 19 10 22 13" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".8"/></svg>';
+  const VIKING_SVG = '<svg viewBox="0 0 64 48" aria-hidden="true"><path d="M14 30 C6 28 3 18 6 6 C9 16 13 20 19 22 Z" fill="#f6ead2" stroke="#a68858" stroke-width="2.4" stroke-linejoin="round"/><path d="M50 30 C58 28 61 18 58 6 C55 16 51 20 45 22 Z" fill="#f6ead2" stroke="#a68858" stroke-width="2.4" stroke-linejoin="round"/><path d="M13 36 C13 16 51 16 51 36 Z" fill="#c9d2df" stroke="#5f6878" stroke-width="2.6" stroke-linejoin="round"/><path d="M19 24 C23 18 30 17 34 18" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".8"/><rect x="30" y="17" width="5" height="19" fill="#b8875a" stroke="#7a5530" stroke-width="1.6"/><rect x="11" y="33" width="42" height="7" rx="2" fill="#b8875a" stroke="#7a5530" stroke-width="2.4"/><circle cx="18" cy="36.5" r="1.6" fill="#ffd36a"/><circle cx="27" cy="36.5" r="1.6" fill="#ffd36a"/><circle cx="37" cy="36.5" r="1.6" fill="#ffd36a"/><circle cx="46" cy="36.5" r="1.6" fill="#ffd36a"/></svg>';
+  const STARTER_ACC = [['bow', BOW_SVG], ['viking', VIKING_SVG]];
   function adoptStep2(type) {
     const s = DG.STARTERS[type];
     let acc = 'bow';
     const look = { color: 'classic', eyes: 'round', cheeks: 'blush' };
     let stop = null;
+    const swatches = Object.entries(DG.LOOK_COLORS).map(([id, c]) => {
+      const col = c.base ? c : DG.STARTERS[type].colors;
+      return `<button class="ad2-sw ${look.color === id ? 'on' : ''}" data-lk="color" data-v="${id}" title="${c.name}" aria-label="${c.name}" style="--c:${col.base};--l:${col.light};--d:${col.line}"></button>`;
+    }).join('');
+    const pills = (key, table) => Object.entries(table).map(([id, x]) => `<button class="ad2-pill ${look[key] === id ? 'on' : ''}" data-lk="${key}" data-v="${id}">${x.name}</button>`).join('');
+    const flower = '<i class="ad2-fl" aria-hidden="true">🌸</i>';
+    const doAdopt = (close) => {
+      const name = document.getElementById('ad-name').value.trim() || s.name;
+      close(); if (stop) stop();
+      DG.adopt(type, name, acc, look);
+      DG.unlock('adopted');
+      DG.audio.play('levelup');
+      adoptStops.forEach((f) => f()); adoptStops = [];
+      DG.ui.show('home');
+      setTimeout(() => {
+        DG.Home.celebrate(`Hi! I'm ${DG.pet().name}!`);
+        DG.ui.modal({
+          title: `Welcome home, ${pname()}! 🎉`,
+          html: `<p>Your baby dumpling grows in <b>real time</b> — even when the game is closed:</p>
+            <ul class="nice-list"><li>🌱 <b>Small</b> after 1 hour — unlocks arena battles</li><li>🌿 <b>Medium</b> after 1 day — a special move</li><li>🌳 <b>Large</b> after 7 days — advanced training & a second move</li><li>🏔️ <b>Giant</b> after 1 month — an ultimate move!</li></ul>
+            <p>Keep ${pname()} fed, happy, rested and clean. If any need drops below <b>20</b>, growing <b>pauses</b> until you raise it again. Dumplings never lose progress.</p>
+            <p>🌙 From <b>9 PM to 7 AM</b>, ${pname()} goes to bed on its own.</p>
+            <p>Want to battle right away? In the <b>Arena</b> you can battle a friend on the same Wi‑Fi.</p>`,
+          buttons: [{ label: "Let's go!", cls: 'primary' }],
+        });
+      }, 400);
+    };
     DG.ui.modal({
-      title: `Adopt ${s.name}?`, wide: true, cls: 'adopt-modal',
-      html: `<div class="adopt2">
-          <canvas class="adopt-preview" id="ad-prev"></canvas>
-          <div class="adopt-form">
-            <label class="lbl" for="ad-name">Name your baby dumpling</label>
-            <input id="ad-name" class="text-in" maxlength="14" value="${s.id === 'soup' ? 'Shu' : s.name}" autocomplete="off" enterkeyhint="done">
-            ${lookPickerHtml(type, look)}
-            <div class="lbl">Starting accessory</div>
-            <div class="acc-pick">${Object.keys(DG.ACCESSORIES).filter((k) => DG.ACCESSORIES[k].starter).map((a) => `<button class="chip-btn ${a === acc ? 'on' : ''}" data-acc="${a}">${DG.ACCESSORIES[a].icon} ${DG.ACCESSORIES[a].name}</button>`).join('')}</div>
-            <p class="fine">You can change the name, color, eyes, cheeks and accessory later in the Closet.</p>
-          </div></div>`,
-      buttons: [{ label: '← Back', cls: 'ghost' }, {
-        label: '🥟 Adopt!', cls: 'primary', keep: true, onClick(close) {
-          const name = document.getElementById('ad-name').value.trim() || s.name;
-          close(); if (stop) stop();
-          DG.adopt(type, name, acc, look);
-          DG.unlock('adopted');
-          DG.audio.play('levelup');
-          adoptStops.forEach((f) => f()); adoptStops = [];
-          DG.ui.show('home');
-          setTimeout(() => {
-            DG.Home.celebrate(`Hi! I'm ${DG.pet().name}!`);
-            DG.ui.modal({
-              title: `Welcome home, ${pname()}! 🎉`,
-              html: `<p>Your baby dumpling grows in <b>real time</b> — even when the game is closed:</p>
-                <ul class="nice-list"><li>🌱 <b>Small</b> after 1 hour — unlocks arena battles</li><li>🌿 <b>Medium</b> after 1 day — a special move</li><li>🌳 <b>Large</b> after 7 days — advanced training & a second move</li><li>🏔️ <b>Giant</b> after 1 month — an ultimate move!</li></ul>
-                <p>Keep ${pname()} fed, happy, rested and clean. If any need drops below <b>20</b>, growing <b>pauses</b> until you raise it again. Dumplings never lose progress.</p>
-                <p>🌙 From <b>9 PM to 7 AM</b>, ${pname()} goes to bed on its own.</p>
-                <p>Want to battle right away? In the <b>Arena</b> you can battle a friend on the same Wi‑Fi.</p>`,
-              buttons: [{ label: "Let's go!", cls: 'primary' }],
-            });
-          }, 400);
-        },
-      }],
+      cls: 'ad2-modal', wide: true,
+      html: `<div class="ad2">
+          <div class="ad2-sign"><span class="ad2-flowers" aria-hidden="true">🌸<b>🌸</b></span><h2>Adopt ${s.name}?</h2><span class="ad2-pop" aria-hidden="true"></span></div>
+          <div class="ad2-stage"><span class="ad2-hearts" aria-hidden="true">💕</span><canvas class="adopt-preview" id="ad-prev"></canvas><span class="ad2-pop small" aria-hidden="true"></span></div>
+          <label class="ad2-label" for="ad-name">Name your baby dumpling</label>
+          <div class="ad2-name"><input id="ad-name" maxlength="14" value="${s.id === 'soup' ? 'Shu' : s.name}" autocomplete="off" enterkeyhint="done"><span aria-hidden="true">✏️</span></div>
+          <div class="ad2-grid">
+            <section class="ad2-card"><h4>${flower}Color</h4><div class="ad2-swatches">${swatches}</div></section>
+            <section class="ad2-card"><h4>${flower}Eyes</h4><div class="ad2-pills">${pills('eyes', DG.EYES)}</div></section>
+            <section class="ad2-card"><h4>${flower}Cheeks</h4><div class="ad2-pills">${pills('cheeks', DG.CHEEKS)}</div></section>
+            <section class="ad2-card"><h4>${flower}Starting Accessory</h4><div class="ad2-accs">${STARTER_ACC.map(([a, svg]) => `<button class="ad2-acc ${a === acc ? 'on' : ''}" data-acc="${a}" title="${DG.ACCESSORIES[a].name}" aria-label="${DG.ACCESSORIES[a].name}">${svg}</button>`).join('')}</div></section>
+          </div>
+          <p class="fine ad2-fine">You can change all of this later in the Closet.</p>
+          <div class="ad2-foot">
+            <button class="ad2-back" id="ad-back"><span>←</span>Back</button>
+            <span class="ad2-leaf" aria-hidden="true">🌸</span><button class="ad2-go" id="ad-go">Adopt!</button><span class="ad2-leaf" aria-hidden="true">🌸</span>
+          </div>
+        </div>`,
       onClose() { if (stop) stop(); },
-      onOpen(el) {
+      onOpen(el, close) {
         let pokeT = -9;
         stop = DG.ui.previewLoop(el.querySelector('#ad-prev'), (t) => {
-          const o = Object.assign({ type, stage: 0, size: 140, accessory: acc, look }, PREVIEW_STYLE[type](t));
+          const o = Object.assign({ type, stage: 0, size: 150, accessory: acc, look, shadow: false }, PREVIEW_STYLE[type](t));
           if (o.mood === 'sleeping' || o.mood === 'sleepy') o.mood = 'happy';
           if (t - pokeT < 0.6) { o.mood = 'joy'; o.hop = Math.sin((t - pokeT) / 0.6 * Math.PI) * 18; }
           el._t = t;
           return o;
-        }, 260, 200);
+        }, 260, 190);
         const poke = () => { pokeT = el._t || 0; };
         el.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => {
           acc = b.dataset.acc; DG.audio.play('pop'); poke();
           el.querySelectorAll('[data-acc]').forEach((x) => x.classList.toggle('on', x === b));
         }));
         wireLookPicker(el, look, poke);
+        el.querySelector('#ad-back').onclick = () => { DG.audio.play('click'); close(); };
+        el.querySelector('#ad-go').onclick = () => { DG.audio.play('click'); doAdopt(close); };
         const inp = el.querySelector('#ad-name');
         if (!DG.ui.isTouch()) { inp.focus(); inp.select(); }
       },
@@ -137,7 +153,7 @@
           const fav = p.favoriteKnown && p.favoriteFood === id;
           return `<div class="food-card ${fav ? 'fav' : ''}">
             <div class="food-ico">${f.icon}</div>
-            <div class="food-info"><b>${f.name}</b>${fav ? ' <span class="fav-tag">⭐ Favorite</span>' : ''}<small>${f.desc}</small><small class="own">Have: <b>${have}</b></small></div>
+            <div class="food-info"><b>${f.name}</b>${fav ? ' <span class="fav-tag">⭐ Favorite</span>' : ''}<small class="desc">${f.desc}</small><small class="own">Have: <b>${have}</b></small></div>
             <div class="food-btns">
               <button class="btn small primary" data-feed="${id}" ${!f.free && !inv[id] ? 'disabled' : ''}>Feed</button>
               ${f.free ? '<span class="free">Free!</span>' : `<button class="btn small" data-buy="${id}" ${DG.state.coins < f.price ? 'disabled' : ''}>Buy 🪙${f.price}</button>`}
@@ -191,8 +207,8 @@
         <p class="coins-line">🪙 <b>${st.coins}</b> Dumpling Coins</p>
         <div class="shop-grid">${items.map(([id, it]) => {
           const owned = tab !== 'food' && inv[tab].includes(id);
-          return `<div class="shop-item ${owned ? 'owned' : ''}"><div class="shop-ico">${it.icon}</div><b>${it.name}</b>
-            ${tab === 'food' ? `<small>${it.desc}<br>Have: ${inv.food[id] || 0}</small>` : ''}
+          return `<div class="shop-item ${owned ? 'owned' : ''}" title="${esc(it.desc || it.name)}"><div class="shop-ico">${it.icon}</div><b>${it.name}</b>
+            ${tab === 'food' ? `<small class="desc">${it.desc}</small><small class="have">Have: ${inv.food[id] || 0}</small>` : ''}
             ${owned ? '<span class="owned-tag">Owned ✓</span>' : `<button class="btn small primary" data-buy="${id}" ${st.coins < it.price ? 'disabled' : ''}>🪙 ${it.price}</button>`}</div>`;
         }).join('')}</div>
         <p class="fine">Everything is earned through play. Accessories, decor and arenas are cosmetic. Equip them in the Closet.</p>`,

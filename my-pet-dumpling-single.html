@@ -871,6 +871,195 @@ body.touch .a-moves { display: none; }
 .net-in { font-size: 2em; text-align: center; letter-spacing: 0.3em; text-transform: uppercase; }
 .friend-card .chip-row { gap: 8px; }
 
+/* ---------- Adopt pop-up (from the "Adopt Bao?" design) ---------- */
+.modal.ad2-modal {
+  max-width: 560px; padding: 0; overflow: visible auto; background: transparent; box-shadow: none;
+}
+.ad2-modal .modal-x { top: 18px; right: 14px; z-index: 3; width: 46px; height: 46px; font-size: 1.3em; font-weight: 700; color: #5a3a24;
+  background: radial-gradient(circle at 40% 30%, #fffdf8, #f6e9d6); border: 3px solid #e7cfae; box-shadow: 0 3px 0 #d8b98f; }
+.ad2 { position: relative; margin-top: 30px; padding: 46px 16px 18px; border-radius: 34px; text-align: center; color: #5a3a24;
+  background: radial-gradient(ellipse at 50% 20%, #fffaf0, #fbf0dd 70%); border: 4px solid #e3c29a;
+  box-shadow: 0 0 0 3px #fff6e8 inset, 0 6px 0 #c99d6c, 0 18px 40px rgba(90, 50, 20, 0.35); }
+.ad2-sign { position: absolute; left: 50%; top: -34px; transform: translateX(-50%) rotate(-1.5deg); padding: 6px 34px 10px; border-radius: 22px 22px 26px 26px;
+  background: linear-gradient(180deg, #e9b77b, #d1955a); border: 3px solid #8c5a2e; box-shadow: inset 0 3px 0 rgba(255, 240, 210, 0.6), 0 5px 0 #8c5a2e; white-space: nowrap; }
+.ad2-sign h2 { margin: 0; font-size: 2em; color: #4a2c1a; text-shadow: 0 2px 0 #ffe7c4, 0 -1px 0 #ffe7c4, 2px 0 0 #ffe7c4, -2px 0 0 #ffe7c4; letter-spacing: 0.5px; }
+.ad2-flowers { position: absolute; left: -26px; top: -16px; font-size: 34px; transform: rotate(-12deg); filter: drop-shadow(0 2px 0 rgba(120, 60, 40, 0.25)); }
+.ad2-flowers b { position: absolute; left: 10px; top: 26px; font-size: 26px; font-weight: 400; }
+.ad2-pop { position: absolute; right: -24px; top: -10px; width: 30px; height: 26px; transform: rotate(18deg);
+  background: linear-gradient(#ffc93c, #ffc93c) 0 12px / 12px 6px no-repeat, linear-gradient(#ffc93c, #ffc93c) 10px 0 / 6px 12px no-repeat, linear-gradient(#ffc93c, #ffc93c) 20px 2px / 6px 11px no-repeat; }
+.ad2-pop.small { position: absolute; right: 22%; top: 14%; transform: rotate(18deg) scale(0.8); }
+.ad2-stage { position: relative; margin: 0 auto 4px; width: min(300px, 80%); }
+.ad2-stage::before { content: ''; position: absolute; left: -10%; right: -10%; bottom: 4%; height: 24%; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 40%, #fbe3c8, #efcca2 70%); box-shadow: inset 0 -4px 0 rgba(170, 110, 60, 0.18), 0 4px 10px rgba(150, 90, 40, 0.12); }
+.ad2-stage canvas { position: relative; display: block; width: 100%; height: auto; }
+.ad2-hearts { position: absolute; left: 6%; top: 12%; font-size: 30px; transform: rotate(-12deg); }
+.ad2-label { display: inline-block; position: relative; z-index: 1; margin-top: -14px; padding: 4px 22px; border-radius: 18px 18px 6px 6px; background: #fbe9cf; font-weight: 700; font-size: 1.05em; color: #5a3a24; }
+.ad2-name { display: flex; align-items: center; gap: 6px; margin: 0 auto 14px; padding: 6px 18px 6px 24px; max-width: 420px; border-radius: 999px; background: #fffdf8;
+  border: 3px solid #f0dcc0; box-shadow: inset 0 2px 4px rgba(150, 100, 60, 0.12); }
+.ad2-name input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-size: 1.35em; color: #5a3a24; }
+.ad2-name span { font-size: 1.2em; opacity: 0.75; }
+.ad2-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
+.ad2-card { padding: 10px 10px 12px; border-radius: 22px; background: rgba(255, 248, 236, 0.9); border: 2px solid #f2e0c6; box-shadow: inset 0 2px 0 #fff; }
+.ad2-card h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px 2px; font-size: 1.2em; color: #4a2c1a; }
+.ad2-fl { font-style: normal; font-size: 0.95em; }
+.ad2-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+.ad2-sw { aspect-ratio: 1; width: 100%; border-radius: 50%; cursor: pointer; padding: 0;
+  background: radial-gradient(circle at 38% 32%, var(--l), var(--c) 70%); border: 3px solid var(--d); box-shadow: 0 2px 0 rgba(120, 80, 40, 0.18); transition: transform 0.12s; }
+.ad2-sw:hover { transform: scale(1.08); }
+.ad2-sw.on { box-shadow: 0 0 0 3px #fff, 0 0 0 6px #f27f97; }
+.ad2-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.ad2-pill { flex: 1 1 auto; padding: 7px 10px; border-radius: 999px; border: 2px solid #f0dcc0; background: #fffaf2; color: #5a3a24; font: inherit; font-size: 0.98em; cursor: pointer; box-shadow: 0 2px 0 #ead3b4; }
+.ad2-pill.on { background: linear-gradient(180deg, #ffd5dd, #ffbcc9); border-color: #f08ca1; box-shadow: 0 2px 0 #e0788f; }
+.ad2-accs { display: flex; gap: 10px; justify-content: center; }
+.ad2-acc { flex: 1; max-width: 110px; aspect-ratio: 1; display: grid; place-items: center; padding: 10px; border-radius: 20px; cursor: pointer;
+  background: #fffaf2; border: 3px solid #f0dcc0; box-shadow: 0 3px 0 #ead3b4; }
+.ad2-acc svg { width: 100%; height: auto; }
+.ad2-acc.on { border-color: #f08ca1; box-shadow: 0 0 0 3px #ffe1e7, 0 3px 0 #e0788f; background: #fff3f5; }
+.ad2-fine { margin: 10px 0 4px; }
+.ad2-foot { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 10px; }
+.ad2-back { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 78px; height: 78px; flex: none; margin-right: 6px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 30%, #fffdf8, #f6e9d6); border: 3px solid #e7cfae; box-shadow: 0 4px 0 #d8b98f; font: inherit; font-weight: 700; color: #4a2c1a; cursor: pointer; line-height: 1.1; }
+.ad2-back span { font-size: 1.5em; line-height: 1; }
+.ad2-go { flex: 1; max-width: 330px; padding: 14px 18px 16px; border-radius: 999px; border: 3px solid #e26f84; cursor: pointer;
+  background: linear-gradient(180deg, #ffa1ae 0%, #f97e93 60%, #ef6d84 100%); color: #fff; font: inherit; font-weight: 700; font-size: 1.9em; letter-spacing: 0.5px;
+  text-shadow: 0 2px 0 rgba(170, 40, 70, 0.35); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), 0 5px 0 #c9566c, 0 10px 18px rgba(200, 80, 100, 0.25); transition: transform 0.1s; }
+.ad2-go:hover { transform: translateY(-2px); }
+.ad2-go:active { transform: translateY(3px); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), 0 1px 0 #c9566c; }
+.ad2-leaf { font-size: 30px; }
+@media (max-width: 600px) {
+  .ad2 { padding: 40px 10px 14px; border-radius: 26px; margin-top: 26px; }
+  .ad2-sign { padding: 5px 22px 8px; top: -30px; }
+  .ad2-sign h2 { font-size: 1.5em; }
+  .ad2-flowers { font-size: 26px; left: -18px; } .ad2-flowers b { font-size: 20px; top: 20px; }
+  .ad2-modal .modal-x { width: 38px; height: 38px; top: 12px; right: 8px; }
+  .ad2-grid { gap: 7px; }
+  .ad2-card { padding: 8px 7px 9px; border-radius: 16px; }
+  .ad2-card h4 { font-size: 0.95em; margin-bottom: 6px; }
+  .ad2-swatches { gap: 5px; }
+  .ad2-pill { padding: 5px 6px; font-size: 0.78em; }
+  .ad2-acc { padding: 6px; border-radius: 14px; }
+  .ad2-back { width: 60px; height: 60px; font-size: 0.85em; }
+  .ad2-go { font-size: 1.45em; padding: 11px 12px 13px; }
+  .ad2-leaf { font-size: 22px; }
+  .ad2-name input { font-size: 1.15em; }
+}
+.modal.ad2-modal { padding-top: 14px; }
+.ad2 { margin-top: 36px; }
+@media (max-width: 600px) { .ad2 { margin-top: 32px; } .ad2-swatches { grid-template-columns: repeat(4, 1fr); } }
+
+/* ================= Phone: menus fit on one screen (as far as possible) ================= */
+@media (max-width: 600px) {
+  .modal { padding: 12px 12px 10px; }
+  .modal-title { font-size: 1.08em; margin: 0 36px 6px 0; }
+  .modal-x { width: 30px; height: 30px; top: 8px; right: 8px; }
+  .modal .fine { font-size: 0.74em; margin: 6px 0; }
+  .modal .note { font-size: 0.8em; padding: 6px 9px; margin: 4px 0 8px; }
+  .modal .lbl { margin: 6px 0 3px; font-size: 0.85em; }
+  .modal-btns { margin-top: 8px; }
+  .modal-btns .btn { padding: 8px 14px; }
+  /* option rows: one line you can swipe sideways instead of many wrapped lines */
+  .modal .chip-row.tight, .modal .swatch-row, .modal .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    margin: 2px -12px 6px; padding: 2px 12px 4px; scroll-padding: 12px; }
+  .modal .chip-row.tight::-webkit-scrollbar, .modal .swatch-row::-webkit-scrollbar, .modal .tabs::-webkit-scrollbar { display: none; }
+  .modal .chip-row.tight .chip-btn, .modal .tab { flex: none; white-space: nowrap; padding: 5px 10px; font-size: 0.8em; }
+  .modal .swatch { flex: none; width: 30px; height: 30px; }
+  /* shop */
+  .shop-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .shop-item { padding: 6px 4px; gap: 3px; border-radius: 12px; }
+  .shop-item b { font-size: 0.78em; line-height: 1.15; }
+  .shop-item .desc { display: none; }
+  .shop-item small { font-size: 0.7em; }
+  .shop-ico { font-size: 1.6em; }
+  .shop-item .btn.small, .shop-item .owned-tag { padding: 3px 8px; font-size: 0.78em; }
+  .modal .coins-line { margin: 2px 0 6px; font-size: 0.92em; }
+  /* feed */
+  .food-grid { gap: 6px; }
+  .food-card { flex-direction: column; text-align: center; gap: 3px; padding: 6px; border-radius: 12px; }
+  .food-ico { font-size: 1.6em; line-height: 1; }
+  .food-info b { font-size: 0.82em; }
+  .food-info .desc { display: none; }
+  .food-info small { font-size: 0.72em; }
+  .food-btns { flex-direction: row; gap: 4px; justify-content: center; }
+  .food-btns .btn.small { padding: 4px 8px; font-size: 0.76em; }
+  .food-btns .free { font-size: 0.72em; align-self: center; }
+  /* trophies */
+  .ach-grid { grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .ach { padding: 5px 3px; border-radius: 10px; }
+  .ach-ico { font-size: 1.3em; }
+  .ach b { font-size: 0.7em; line-height: 1.1; }
+  .ach small { font-size: 0.6em; line-height: 1.15; }
+  /* stats */
+  .modal .stat-list { margin: 4px 0; }
+  .modal .stat-row { gap: 6px; margin: 2px 0; font-size: 0.82em; }
+  .modal .stat-row .bar { height: 9px; }
+  .modal .two-col { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+  .modal .nice-list.small { font-size: 0.72em; padding-left: 0; margin: 2px 0; }
+  .modal .nice-list.small li { margin: 1px 0; }
+  .modal p { margin: 5px 0; font-size: 0.86em; }
+  /* closet + decorate */
+  .closet { grid-template-columns: 1fr; gap: 4px; }
+  .closet-prev, .adopt-preview.closet-prev { max-width: 150px !important; max-height: 120px; margin: 0 auto !important; display: block; }
+  .closet .name-row .text-in { padding: 6px 10px; font-size: 0.95em; }
+  .closet .name-row .btn { padding: 6px 10px; }
+  .decor-prev { max-height: 150px; object-fit: cover; margin-bottom: 4px; }
+  /* adoption pop-up */
+  .ad2-stage { width: 62%; }
+  .ad2-name { margin-bottom: 8px; padding: 3px 14px 3px 18px; }
+  .ad2-fine { display: none; }
+  .ad2-foot { margin-top: 6px; }
+}
+@media (max-width: 600px) { .modal .food-grid { grid-template-columns: repeat(3, 1fr); } .food-btns { flex-direction: column; } }
+@media (max-width: 600px) { .food-info .desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.62em; line-height: 1.2; color: var(--ink-soft); } }
+@media (max-width: 600px) {
+  .closet { grid-template-columns: minmax(0, 1fr); }
+  .closet > *, .modal-body > * { min-width: 0; }
+  .modal-body { min-width: 0; overflow-x: hidden; }
+}
+@media (max-width: 600px) {
+  /* shared slim header for training + arena */
+  #screen-train .topbar.slim, #screen-arena .topbar.slim { padding: 6px 8px; margin-bottom: 8px; gap: 6px; flex-wrap: nowrap; }
+  #screen-train .topbar.slim .btn, #screen-arena .topbar.slim .btn { padding: 6px 10px; font-size: 0.85em; }
+  #screen-train .screen-title, #screen-arena .screen-title { font-size: 1.05em; white-space: nowrap; }
+  #screen-train .topbar.slim .coins, #screen-arena .topbar.slim .coins { font-size: 0.85em; padding: 3px 8px; }
+  /* training */
+  #screen-train .lead { font-size: 0.78em; margin: 0 2px 8px; line-height: 1.3; }
+  #screen-train .train-grid { gap: 7px; grid-template-columns: 1fr; }
+  #screen-train .train-card { padding: 8px 10px; gap: 4px; border-radius: 16px; }
+  #screen-train .train-card > p { display: none; }
+  #screen-train .train-head { gap: 8px; }
+  #screen-train .train-head h3 { font-size: 0.95em; margin: 0; display: inline; }
+  #screen-train .train-head > div { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #screen-train .train-ico { font-size: 1.6em; }
+  #screen-train .stat-chip { font-size: 0.7em; padding: 1px 7px; }
+  #screen-train .stat-row.compact { font-size: 0.78em; margin: 0; }
+  #screen-train .stat-row.compact .bar { height: 8px; }
+  #screen-train .diff-row { gap: 5px; }
+  #screen-train .diff-row .btn.small { padding: 4px 8px; font-size: 0.76em; }
+  #screen-train .fine.center { font-size: 0.7em; margin: 6px 0 0; }
+  /* arena lobby */
+  #screen-arena .lobby { gap: 8px; }
+  #screen-arena .lobby-col { gap: 7px; }
+  #screen-arena .card { padding: 8px 10px; border-radius: 16px; }
+  #screen-arena .card h3 { font-size: 0.98em; margin: 0 0 3px; }
+  #screen-arena .card p { font-size: 0.78em; margin: 2px 0 6px; line-height: 1.3; }
+  #screen-arena .fighter-card { gap: 8px; }
+  #screen-arena .fighter-card canvas { width: 78px; }
+  #screen-arena .fighter-card .fine, #screen-arena .fighter-card .bonus-chip { font-size: 0.72em; margin: 1px 0; }
+  #screen-arena .friend-card .chip-row { margin: 2px 0 0; gap: 6px; flex-wrap: nowrap; }
+  #screen-arena .friend-card .btn.small { flex: 1; padding: 6px 6px; font-size: 0.78em; white-space: nowrap; }
+  #screen-arena .controls-btn { padding: 6px; font-size: 0.85em; margin: 0; }
+  #screen-arena .col-title { font-size: 0.95em; margin: 2px 0 0; }
+  #screen-arena .note { font-size: 0.75em; padding: 6px 9px; margin: 0; }
+  #screen-arena .opp-list { gap: 5px; }
+  #screen-arena .opp { padding: 5px 8px; gap: 8px; border-radius: 12px; }
+  #screen-arena .opp-ico { width: 32px; height: 32px; font-size: 1.05em; }
+  #screen-arena .opp-info { font-size: 0.82em; line-height: 1.2; }
+  #screen-arena .opp-info .tip { display: none; }
+  #screen-arena .opp .btn.small { padding: 4px 10px; font-size: 0.8em; }
+  #screen-arena .lock-tag { font-size: 0.68em; text-align: right; max-width: 92px; line-height: 1.15; }
+  #screen-arena .lobby-col > .fine { font-size: 0.7em; margin: 2px 0 0; }
+}
+
 </style>
 </head>
 <body>
@@ -1062,14 +1251,14 @@ window.DG = window.DG || {};
 
   DG.ACCESSORIES = {
     bow:      { name: 'Pink Bow',        icon: '\u{1f380}', price: 15, starter: true, tint: '#ff8fb4' },
-    tinyhat:  { name: 'Tiny Top Hat',    icon: '\u{1f3a9}', price: 15, starter: true, tint: '#7c7590' },
-    headband: { name: 'Polka Headband',  icon: '\u{1f49c}', price: 15, starter: true, tint: '#c9a8f5' },
-    cap:      { name: 'Baseball Cap',    icon: '\u{1f9e2}', price: 15, starter: true, tint: '#5a95e6' },
-    bowtie:   { name: 'Bow Tie',         icon: '\u{1f454}', price: 15, starter: true, tint: '#4a6bb0' },
+    tinyhat:  { name: 'Tiny Top Hat',    icon: '\u{1f3a9}', price: 15, tint: '#7c7590' },
+    headband: { name: 'Polka Headband',  icon: '\u{1f49c}', price: 15, tint: '#c9a8f5' },
+    cap:      { name: 'Baseball Cap',    icon: '\u{1f9e2}', price: 15, tint: '#5a95e6' },
+    bowtie:   { name: 'Bow Tie',         icon: '\u{1f454}', price: 15, tint: '#4a6bb0' },
     shades:   { name: 'Cool Shades',     icon: '\u{1f576}\u{fe0f}', price: 25, tint: '#5d6375' },
     headphones: { name: 'Headphones',    icon: '\u{1f3a7}', price: 30, tint: '#3fbf7a' },
     ninja:    { name: 'Ninja Headband',  icon: '\u{1f977}', price: 30, tint: '#5a6680' },
-    viking:   { name: 'Viking Helmet',   icon: '\u{2694}\u{fe0f}', price: 45, tint: '#b8875a' },
+    viking:   { name: 'Viking Helmet',   icon: '\u{2694}\u{fe0f}', price: 45, starter: true, tint: '#b8875a' },
     mustache: { name: 'Mustache',        icon: '\u{1f978}', price: 20, tint: '#9a6a44' },
     chef:     { name: 'Chef Hat',        icon: '\u{1f468}\u{200d}\u{1f373}', price: 30, tint: '#a9bccf' },
     party:    { name: 'Party Hat',       icon: '\u{1f973}', price: 25, tint: '#6fc3ff' },
@@ -4379,62 +4568,78 @@ window.DG = window.DG || {};
     }));
   }
 
+  const BOW_SVG = '<svg viewBox="0 0 64 48" aria-hidden="true"><path d="M32 22 C22 6 4 4 5 16 C6 28 20 30 32 25 Z M32 22 C42 6 60 4 59 16 C58 28 44 30 32 25 Z" fill="#ff8fb4" stroke="#c94f7c" stroke-width="2.6" stroke-linejoin="round"/><path d="M29 25 L20 42 L26 39 L28 45 L32 28 Z M35 25 L44 42 L38 39 L36 45 L32 28 Z" fill="#ff7aa6" stroke="#c94f7c" stroke-width="2.6" stroke-linejoin="round"/><ellipse cx="32" cy="23" rx="6.5" ry="6" fill="#ff6b9c" stroke="#c94f7c" stroke-width="2.6"/><path d="M12 13 C15 10 19 10 22 13" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".8"/></svg>';
+  const VIKING_SVG = '<svg viewBox="0 0 64 48" aria-hidden="true"><path d="M14 30 C6 28 3 18 6 6 C9 16 13 20 19 22 Z" fill="#f6ead2" stroke="#a68858" stroke-width="2.4" stroke-linejoin="round"/><path d="M50 30 C58 28 61 18 58 6 C55 16 51 20 45 22 Z" fill="#f6ead2" stroke="#a68858" stroke-width="2.4" stroke-linejoin="round"/><path d="M13 36 C13 16 51 16 51 36 Z" fill="#c9d2df" stroke="#5f6878" stroke-width="2.6" stroke-linejoin="round"/><path d="M19 24 C23 18 30 17 34 18" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".8"/><rect x="30" y="17" width="5" height="19" fill="#b8875a" stroke="#7a5530" stroke-width="1.6"/><rect x="11" y="33" width="42" height="7" rx="2" fill="#b8875a" stroke="#7a5530" stroke-width="2.4"/><circle cx="18" cy="36.5" r="1.6" fill="#ffd36a"/><circle cx="27" cy="36.5" r="1.6" fill="#ffd36a"/><circle cx="37" cy="36.5" r="1.6" fill="#ffd36a"/><circle cx="46" cy="36.5" r="1.6" fill="#ffd36a"/></svg>';
+  const STARTER_ACC = [['bow', BOW_SVG], ['viking', VIKING_SVG]];
   function adoptStep2(type) {
     const s = DG.STARTERS[type];
     let acc = 'bow';
     const look = { color: 'classic', eyes: 'round', cheeks: 'blush' };
     let stop = null;
+    const swatches = Object.entries(DG.LOOK_COLORS).map(([id, c]) => {
+      const col = c.base ? c : DG.STARTERS[type].colors;
+      return `<button class="ad2-sw ${look.color === id ? 'on' : ''}" data-lk="color" data-v="${id}" title="${c.name}" aria-label="${c.name}" style="--c:${col.base};--l:${col.light};--d:${col.line}"></button>`;
+    }).join('');
+    const pills = (key, table) => Object.entries(table).map(([id, x]) => `<button class="ad2-pill ${look[key] === id ? 'on' : ''}" data-lk="${key}" data-v="${id}">${x.name}</button>`).join('');
+    const flower = '<i class="ad2-fl" aria-hidden="true">\u{1f338}</i>';
+    const doAdopt = (close) => {
+      const name = document.getElementById('ad-name').value.trim() || s.name;
+      close(); if (stop) stop();
+      DG.adopt(type, name, acc, look);
+      DG.unlock('adopted');
+      DG.audio.play('levelup');
+      adoptStops.forEach((f) => f()); adoptStops = [];
+      DG.ui.show('home');
+      setTimeout(() => {
+        DG.Home.celebrate(`Hi! I'm ${DG.pet().name}!`);
+        DG.ui.modal({
+          title: `Welcome home, ${pname()}! \u{1f389}`,
+          html: `<p>Your baby dumpling grows in <b>real time</b> \u{2014} even when the game is closed:</p>
+            <ul class="nice-list"><li>\u{1f331} <b>Small</b> after 1 hour \u{2014} unlocks arena battles</li><li>\u{1f33f} <b>Medium</b> after 1 day \u{2014} a special move</li><li>\u{1f333} <b>Large</b> after 7 days \u{2014} advanced training & a second move</li><li>\u{1f3d4}\u{fe0f} <b>Giant</b> after 1 month \u{2014} an ultimate move!</li></ul>
+            <p>Keep ${pname()} fed, happy, rested and clean. If any need drops below <b>20</b>, growing <b>pauses</b> until you raise it again. Dumplings never lose progress.</p>
+            <p>\u{1f319} From <b>9 PM to 7 AM</b>, ${pname()} goes to bed on its own.</p>
+            <p>Want to battle right away? In the <b>Arena</b> you can battle a friend on the same Wi\u{2011}Fi.</p>`,
+          buttons: [{ label: "Let's go!", cls: 'primary' }],
+        });
+      }, 400);
+    };
     DG.ui.modal({
-      title: `Adopt ${s.name}?`, wide: true, cls: 'adopt-modal',
-      html: `<div class="adopt2">
-          <canvas class="adopt-preview" id="ad-prev"></canvas>
-          <div class="adopt-form">
-            <label class="lbl" for="ad-name">Name your baby dumpling</label>
-            <input id="ad-name" class="text-in" maxlength="14" value="${s.id === 'soup' ? 'Shu' : s.name}" autocomplete="off" enterkeyhint="done">
-            ${lookPickerHtml(type, look)}
-            <div class="lbl">Starting accessory</div>
-            <div class="acc-pick">${Object.keys(DG.ACCESSORIES).filter((k) => DG.ACCESSORIES[k].starter).map((a) => `<button class="chip-btn ${a === acc ? 'on' : ''}" data-acc="${a}">${DG.ACCESSORIES[a].icon} ${DG.ACCESSORIES[a].name}</button>`).join('')}</div>
-            <p class="fine">You can change the name, color, eyes, cheeks and accessory later in the Closet.</p>
-          </div></div>`,
-      buttons: [{ label: '\u{2190} Back', cls: 'ghost' }, {
-        label: '\u{1f95f} Adopt!', cls: 'primary', keep: true, onClick(close) {
-          const name = document.getElementById('ad-name').value.trim() || s.name;
-          close(); if (stop) stop();
-          DG.adopt(type, name, acc, look);
-          DG.unlock('adopted');
-          DG.audio.play('levelup');
-          adoptStops.forEach((f) => f()); adoptStops = [];
-          DG.ui.show('home');
-          setTimeout(() => {
-            DG.Home.celebrate(`Hi! I'm ${DG.pet().name}!`);
-            DG.ui.modal({
-              title: `Welcome home, ${pname()}! \u{1f389}`,
-              html: `<p>Your baby dumpling grows in <b>real time</b> \u{2014} even when the game is closed:</p>
-                <ul class="nice-list"><li>\u{1f331} <b>Small</b> after 1 hour \u{2014} unlocks arena battles</li><li>\u{1f33f} <b>Medium</b> after 1 day \u{2014} a special move</li><li>\u{1f333} <b>Large</b> after 7 days \u{2014} advanced training & a second move</li><li>\u{1f3d4}\u{fe0f} <b>Giant</b> after 1 month \u{2014} an ultimate move!</li></ul>
-                <p>Keep ${pname()} fed, happy, rested and clean. If any need drops below <b>20</b>, growing <b>pauses</b> until you raise it again. Dumplings never lose progress.</p>
-                <p>\u{1f319} From <b>9 PM to 7 AM</b>, ${pname()} goes to bed on its own.</p>
-                <p>Want to battle right away? In the <b>Arena</b> you can battle a friend on the same Wi\u{2011}Fi.</p>`,
-              buttons: [{ label: "Let's go!", cls: 'primary' }],
-            });
-          }, 400);
-        },
-      }],
+      cls: 'ad2-modal', wide: true,
+      html: `<div class="ad2">
+          <div class="ad2-sign"><span class="ad2-flowers" aria-hidden="true">\u{1f338}<b>\u{1f338}</b></span><h2>Adopt ${s.name}?</h2><span class="ad2-pop" aria-hidden="true"></span></div>
+          <div class="ad2-stage"><span class="ad2-hearts" aria-hidden="true">\u{1f495}</span><canvas class="adopt-preview" id="ad-prev"></canvas><span class="ad2-pop small" aria-hidden="true"></span></div>
+          <label class="ad2-label" for="ad-name">Name your baby dumpling</label>
+          <div class="ad2-name"><input id="ad-name" maxlength="14" value="${s.id === 'soup' ? 'Shu' : s.name}" autocomplete="off" enterkeyhint="done"><span aria-hidden="true">\u{270f}\u{fe0f}</span></div>
+          <div class="ad2-grid">
+            <section class="ad2-card"><h4>${flower}Color</h4><div class="ad2-swatches">${swatches}</div></section>
+            <section class="ad2-card"><h4>${flower}Eyes</h4><div class="ad2-pills">${pills('eyes', DG.EYES)}</div></section>
+            <section class="ad2-card"><h4>${flower}Cheeks</h4><div class="ad2-pills">${pills('cheeks', DG.CHEEKS)}</div></section>
+            <section class="ad2-card"><h4>${flower}Starting Accessory</h4><div class="ad2-accs">${STARTER_ACC.map(([a, svg]) => `<button class="ad2-acc ${a === acc ? 'on' : ''}" data-acc="${a}" title="${DG.ACCESSORIES[a].name}" aria-label="${DG.ACCESSORIES[a].name}">${svg}</button>`).join('')}</div></section>
+          </div>
+          <p class="fine ad2-fine">You can change all of this later in the Closet.</p>
+          <div class="ad2-foot">
+            <button class="ad2-back" id="ad-back"><span>\u{2190}</span>Back</button>
+            <span class="ad2-leaf" aria-hidden="true">\u{1f338}</span><button class="ad2-go" id="ad-go">Adopt!</button><span class="ad2-leaf" aria-hidden="true">\u{1f338}</span>
+          </div>
+        </div>`,
       onClose() { if (stop) stop(); },
-      onOpen(el) {
+      onOpen(el, close) {
         let pokeT = -9;
         stop = DG.ui.previewLoop(el.querySelector('#ad-prev'), (t) => {
-          const o = Object.assign({ type, stage: 0, size: 140, accessory: acc, look }, PREVIEW_STYLE[type](t));
+          const o = Object.assign({ type, stage: 0, size: 150, accessory: acc, look, shadow: false }, PREVIEW_STYLE[type](t));
           if (o.mood === 'sleeping' || o.mood === 'sleepy') o.mood = 'happy';
           if (t - pokeT < 0.6) { o.mood = 'joy'; o.hop = Math.sin((t - pokeT) / 0.6 * Math.PI) * 18; }
           el._t = t;
           return o;
-        }, 260, 200);
+        }, 260, 190);
         const poke = () => { pokeT = el._t || 0; };
         el.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => {
           acc = b.dataset.acc; DG.audio.play('pop'); poke();
           el.querySelectorAll('[data-acc]').forEach((x) => x.classList.toggle('on', x === b));
         }));
         wireLookPicker(el, look, poke);
+        el.querySelector('#ad-back').onclick = () => { DG.audio.play('click'); close(); };
+        el.querySelector('#ad-go').onclick = () => { DG.audio.play('click'); doAdopt(close); };
         const inp = el.querySelector('#ad-name');
         if (!DG.ui.isTouch()) { inp.focus(); inp.select(); }
       },
@@ -4453,7 +4658,7 @@ window.DG = window.DG || {};
           const fav = p.favoriteKnown && p.favoriteFood === id;
           return `<div class="food-card ${fav ? 'fav' : ''}">
             <div class="food-ico">${f.icon}</div>
-            <div class="food-info"><b>${f.name}</b>${fav ? ' <span class="fav-tag">\u{2b50} Favorite</span>' : ''}<small>${f.desc}</small><small class="own">Have: <b>${have}</b></small></div>
+            <div class="food-info"><b>${f.name}</b>${fav ? ' <span class="fav-tag">\u{2b50} Favorite</span>' : ''}<small class="desc">${f.desc}</small><small class="own">Have: <b>${have}</b></small></div>
             <div class="food-btns">
               <button class="btn small primary" data-feed="${id}" ${!f.free && !inv[id] ? 'disabled' : ''}>Feed</button>
               ${f.free ? '<span class="free">Free!</span>' : `<button class="btn small" data-buy="${id}" ${DG.state.coins < f.price ? 'disabled' : ''}>Buy \u{1fa99}${f.price}</button>`}
@@ -4507,8 +4712,8 @@ window.DG = window.DG || {};
         <p class="coins-line">\u{1fa99} <b>${st.coins}</b> Dumpling Coins</p>
         <div class="shop-grid">${items.map(([id, it]) => {
           const owned = tab !== 'food' && inv[tab].includes(id);
-          return `<div class="shop-item ${owned ? 'owned' : ''}"><div class="shop-ico">${it.icon}</div><b>${it.name}</b>
-            ${tab === 'food' ? `<small>${it.desc}<br>Have: ${inv.food[id] || 0}</small>` : ''}
+          return `<div class="shop-item ${owned ? 'owned' : ''}" title="${esc(it.desc || it.name)}"><div class="shop-ico">${it.icon}</div><b>${it.name}</b>
+            ${tab === 'food' ? `<small class="desc">${it.desc}</small><small class="have">Have: ${inv.food[id] || 0}</small>` : ''}
             ${owned ? '<span class="owned-tag">Owned \u{2713}</span>' : `<button class="btn small primary" data-buy="${id}" ${st.coins < it.price ? 'disabled' : ''}>\u{1fa99} ${it.price}</button>`}</div>`;
         }).join('')}</div>
         <p class="fine">Everything is earned through play. Accessories, decor and arenas are cosmetic. Equip them in the Closet.</p>`,
@@ -5832,8 +6037,7 @@ window.DG = window.DG || {};
             const prev = DG.OPPONENTS[i - 1];
             const beaten = st.beaten[o.id];
             let lock = '';
-            if (si < 1) lock = 'Small stage';
-            else if (si < o.minStage) lock = `Reach ${DG.STAGES[o.minStage].name} stage`;
+            if (si < o.minStage) lock = `${DG.STAGES[o.minStage].name} stage`;
             else if (prev && !st.beaten[prev.id]) lock = `Beat ${prev.name} first`;
             return `<div class="opp ${lock ? 'locked' : ''}">
               <div class="opp-ico" style="background:${o.color}">${DG.STYLES[o.style].icon}</div>
