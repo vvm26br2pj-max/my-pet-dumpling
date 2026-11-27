@@ -1289,3 +1289,7 @@ body { background:
 .dock.glass.labelled .act[data-a="closet"] span { background-image: url('../img/ic_wardrobe.webp?v=1') !important; }
 .dock.glass.labelled .act[data-a="decorate"] span { background-image: url('../img/ic_house.webp?v=1') !important; }
 .dock.glass.labelled .act span svg { display: none; }
+/* bottom bar: five equal columns, so the divider lines are evenly spaced and the same height */
+.room-wrap .dock.glass.labelled { display: grid; grid-template-columns: repeat(5, 1fr); justify-content: stretch; gap: 0; }
+.room-wrap .dock.glass.labelled .act { width: 100%; flex: none; padding-left: 0; padding-right: 0; }
+.dock.glass.labelled .act + .act::after { top: 14%; bottom: 14%; left: -1px; width: 2px; background: #ecd8c2; }
