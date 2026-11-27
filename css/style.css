@@ -1045,3 +1045,4 @@ body.touch .a-moves { display: none; }
   #screen-arena .lock-tag { font-size: 0.68em; text-align: right; max-width: 92px; line-height: 1.15; }
   #screen-arena .lobby-col > .fine { font-size: 0.7em; margin: 2px 0 0; }
 }
+@media (max-width: 600px) { #screen-home .hud .need-ico { width: 22px; height: 22px; font-size: 17px; line-height: 22px; } }

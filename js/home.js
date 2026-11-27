@@ -75,10 +75,59 @@
     dock.style.setProperty('--dk-edge', w.dark ? M(w.trim, '#ffffff', 0.25) : M(w.trim, '#ffffff', 0.15));
     dock.style.setProperty('--dk-line', w.dark ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)');
   }
+  /** Fullness icon: a glossy rice bowl piled with fluffy rice and a pair of chopsticks. */
+  function drawRiceBowl(c) {
+    const ink = '#6b3a22';
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    // chopsticks behind the rice
+    [[[58, 8], [30, 54]], [[72, 12], [40, 56]]].forEach(([a, b]) => {
+      c.strokeStyle = ink; c.lineWidth = 7; c.beginPath(); c.moveTo(...a); c.lineTo(...b); c.stroke();
+      c.strokeStyle = '#d9a45e'; c.lineWidth = 4; c.stroke();
+      c.strokeStyle = '#c0392b'; c.lineWidth = 4; c.beginPath(); c.moveTo(...a); c.lineTo(a[0] + (b[0] - a[0]) * 0.18, a[1] + (b[1] - a[1]) * 0.18); c.stroke();
+    });
+    // inside of the bowl (back of the rim), behind the rice
+    c.fillStyle = '#dbe8f6'; c.beginPath(); c.ellipse(48, 54, 39, 6, 0, 0, Math.PI * 2); c.fill(); c.lineWidth = 3.5; c.strokeStyle = ink; c.stroke();
+    // fluffy rice mound
+    const bumps = [[22, 52, 12], [34, 44, 14], [49, 39, 15], [63, 44, 14], [74, 52, 11], [48, 53, 16]];
+    c.fillStyle = ink; bumps.forEach(([x, y, r]) => { c.beginPath(); c.arc(x, y, r + 2.4, 0, Math.PI * 2); c.fill(); });
+    const rg = c.createRadialGradient(42, 36, 4, 48, 48, 32); rg.addColorStop(0, '#ffffff'); rg.addColorStop(1, '#efe8dc');
+    c.fillStyle = rg; bumps.forEach(([x, y, r]) => { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); });
+    c.fillStyle = 'rgba(200,185,160,0.8)';
+    [[30, 46], [42, 40], [55, 36], [66, 45], [38, 52], [58, 50], [48, 44], [26, 52]].forEach(([x, y], i) => {
+      c.save(); c.translate(x, y); c.rotate(i * 0.7); c.beginPath(); c.ellipse(0, 0, 3, 1.4, 0, 0, Math.PI * 2); c.fill(); c.restore();
+    });
+    c.fillStyle = 'rgba(255,255,255,0.95)'; c.beginPath(); c.ellipse(40, 34, 5, 2.5, -0.4, 0, Math.PI * 2); c.fill();
+    // the bowl
+    const bowl = () => { c.beginPath(); c.moveTo(10, 54); c.quadraticCurveTo(14, 86, 48, 88); c.quadraticCurveTo(82, 86, 86, 54); c.closePath(); };
+    bowl(); const bg = c.createLinearGradient(10, 0, 86, 0);
+    bg.addColorStop(0, '#7fb5ee'); bg.addColorStop(0.45, '#4f8fdc'); bg.addColorStop(1, '#2f6cc4');
+    c.fillStyle = bg; c.fill(); c.lineWidth = 4; c.strokeStyle = ink; c.stroke();
+    c.save(); bowl(); c.clip();
+    c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 2.5; // little wave pattern
+    for (let x = 14; x < 86; x += 12) { c.beginPath(); c.arc(x + 6, 72, 5, Math.PI, 0); c.stroke(); }
+    c.fillStyle = 'rgba(255,255,255,0.35)'; c.beginPath(); c.ellipse(24, 64, 4, 10, 0.4, 0, Math.PI * 2); c.fill();
+    c.restore();
+    // rim and foot
+    c.lineWidth = 5; c.strokeStyle = ink; c.beginPath(); c.ellipse(48, 54, 39, 6, 0, 0.05, Math.PI - 0.05); c.stroke(); // front lip of the rim
+    c.lineWidth = 2.5; c.strokeStyle = '#e9f2fc'; c.beginPath(); c.ellipse(48, 54.5, 37, 5, 0, 0.25, Math.PI - 0.25); c.stroke();
+    c.fillStyle = '#2f6cc4'; c.beginPath(); c.moveTo(36, 87); c.lineTo(38, 93); c.lineTo(58, 93); c.lineTo(60, 87); c.closePath(); c.fill(); c.lineWidth = 3; c.stroke();
+  }
   function drawNeedIcon() {
-    const cv = root && root.querySelector('#h-ico-full'); if (!cv || cv._done) return; cv._done = true;
-    const c = cv.getContext('2d');
-    DG.draw.dumpling(c, { type: 'bao', x: 32, y: 60, size: 46, mood: 'happy', shadow: false, t: 0, stage: 1 });
+    const cv = root && root.querySelector('#h-ico-full');
+    if (cv && !cv._done) { cv._done = true; drawRiceBowl(cv.getContext('2d')); }
+    // happiness: a beaming pink bao with rosy cheeks and a couple of sparkles
+    const hv = root && root.querySelector('#h-ico-happy');
+    if (hv && !hv._done) {
+      hv._done = true;
+      const c = hv.getContext('2d');
+      const glow = c.createRadialGradient(48, 56, 6, 48, 56, 46);
+      glow.addColorStop(0, 'rgba(255,190,210,0.55)'); glow.addColorStop(1, 'rgba(255,190,210,0)');
+      c.fillStyle = glow; c.fillRect(0, 0, 96, 96);
+      DG.draw.dumpling(c, { type: 'bao', x: 48, y: 90, size: 74, mood: 'joy', shadow: false, t: 0, stage: 1,
+        look: { color: 'pink', eyes: 'round', cheeks: 'big' }, colors: { base: '#ffa9c2', light: '#ffe4ee', line: '#d4577c' } });
+      DG.draw.sparkle(c, 82, 20, 9, '#ffd36a', '#c78a14');
+      DG.draw.sparkle(c, 14, 34, 6, '#ffd36a', '#c78a14');
+    }
   }
 
   /* ---------- Phone camera: the room is zoomed in to fill a tall phone screen ---------- */
@@ -142,7 +191,7 @@
         <div class="hud-deco" aria-hidden="true"><span class="sp s1">✦</span><span class="sp s2">✦</span><span class="sp s3">✦</span></div>
         <div class="grow-box" id="h-grow"></div>
         <div class="needs" id="h-needs">${NEED_ITEMS.map(([k, label, icon]) => `
-          <div class="need n-${k}" data-k="${k}"><div class="need-top"><span class="need-name">${k === 'fullness' ? '<canvas class="need-ico" id="h-ico-full" width="64" height="64"></canvas>' : `<span class="need-ico">${icon}</span>`}<span class="need-lbl">${label}</span></span><b class="need-val">0</b></div>${DG.ui.bar(0, 100, '#7fd8a6', label)}</div>`).join('')}
+          <div class="need n-${k}" data-k="${k}"><div class="need-top"><span class="need-name">${k === 'fullness' ? '<canvas class="need-ico" id="h-ico-full" width="96" height="96" aria-hidden="true"></canvas>' : k === 'happiness' ? '<canvas class="need-ico" id="h-ico-happy" width="96" height="96" aria-hidden="true"></canvas>' : `<span class="need-ico">${icon}</span>`}<span class="need-lbl">${label}</span></span><b class="need-val">0</b></div>${DG.ui.bar(0, 100, '#7fd8a6', label)}</div>`).join('')}
         </div>
         <div class="hud-trim" aria-hidden="true"></div><svg aria-hidden="true" class="hud-bow" viewBox="0 0 64 44"><path d="M32 20 C22 6 6 2 4 12 C2 22 16 28 32 22 Z M32 20 C42 6 58 2 60 12 C62 22 48 28 32 22 Z" class="bw-a" stroke-linejoin="round"/><path d="M29 23 L20 40 L26 37 L28 42 L32 26 Z M35 23 L44 40 L38 37 L36 42 L32 26 Z" class="bw-b" stroke-linejoin="round"/><ellipse cx="32" cy="21" rx="6" ry="5.5" class="bw-c" /><path d="M12 10 C14 8 18 8 20 10" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/></svg>
       </header>
