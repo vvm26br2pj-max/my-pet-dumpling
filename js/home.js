@@ -24,6 +24,17 @@
   function walkTo(spot, cb) { P.tx = spot.x; P.ty = spot.y; P.walking = true; P.onArrive = cb || null; P.action = null; }
   function wakeIfAsleep() { if (DG.pet().asleep) wake(false); }
 
+  /* EXPERIMENT (easy to undo): trophies as a mini button beside Settings instead of in the bottom bar.
+     Set to false to put the Trophies icon back in the bottom bar and remove the header button. */
+  const TROPHY_IN_HEADER = true;
+  let doorOpen = 0, doorTarget = 0; // the front door swings open when you head out for a walk
+  let lateShown = ''; // the night message shows once, not as a permanent strip
+  const NEED_TIPS = {
+    fullness: (n) => `🍚 <b>Fullness:</b> tap the food bowl to feed ${n}. Rice is always free; other foods come from the Shop.`,
+    happiness: (n) => `💖 <b>Happiness:</b> tap ${n} to give it a pet, or tap the toy basket to play together.`,
+    energy: (n) => `⚡ <b>Energy:</b> tap the bed for a nap. ${n} also goes to bed by itself from 9 PM to 7 AM.`,
+    cleanliness: (n) => `🫧 <b>Cleanliness:</b> tap the bathtub to give ${n} a bubbly scrub.`,
+  };
   const NEED_ITEMS = [['fullness', 'Fullness', '🥟'], ['happiness', 'Happiness', '💖'], ['energy', 'Energy', '⚡'], ['cleanliness', 'Cleanliness', '🫧']];
 
   /** Little portrait of your dumpling sitting in a bamboo steamer, for the top bar. */
@@ -189,33 +200,32 @@
     root = document.getElementById('screen-home');
     root.innerHTML = `
       <header class="hud">
-        <div class="hud-pic" aria-hidden="true"><canvas id="h-pic" width="260" height="240"></canvas><i class="hud-pop"></i></div>
+        <button class="hud-pic" id="h-pic-btn" aria-label="See your dumpling's stats and growth"><canvas id="h-pic" width="260" height="240"></canvas><i class="hud-pop"></i></button>
         <div class="hud-id">
           <div class="pet-name"><span id="h-name"></span><span class="hud-heart" aria-hidden="true">💕</span></div>
           <div class="pet-sub"><span class="badge" id="h-stage"></span> <span id="h-age"></span> · <span id="h-pers"></span></div>
         </div>
         <div class="top-right">
           <div class="coins" title="Dumpling Coins"><span class="coin-ico">🪙</span><b id="h-coins">0</b></div>
+          ${TROPHY_IN_HEADER ? '<button class="icon-btn trophy-btn" id="h-trophy" aria-label="Trophies" title="Trophies"><span></span></button>' : ''}
           <button class="icon-btn" id="h-settings" aria-label="Settings">⚙️</button>
         </div>
         <div class="hud-deco" aria-hidden="true"><span class="sp s1">✦</span><span class="sp s2">✦</span><span class="sp s3">✦</span></div>
         <div class="grow-box" id="h-grow"></div>
         <div class="needs" id="h-needs">${NEED_ITEMS.map(([k, label, icon]) => `
-          <div class="need n-${k}" data-k="${k}"><div class="need-top"><span class="need-name">${k === 'fullness' ? '<canvas class="need-ico" id="h-ico-full" width="96" height="96" aria-hidden="true"></canvas>' : k === 'happiness' ? '<canvas class="need-ico" id="h-ico-happy" width="96" height="96" aria-hidden="true"></canvas>' : `<span class="need-ico">${icon}</span>`}<span class="need-lbl">${label}</span></span><b class="need-val">0</b></div>${DG.ui.bar(0, 100, '#7fd8a6', label)}</div>`).join('')}
+          <div class="need n-${k}" data-k="${k}" role="button" tabindex="0" title="How to keep ${label} up"><div class="need-top"><span class="need-name">${k === 'fullness' ? '<canvas class="need-ico" id="h-ico-full" width="96" height="96" aria-hidden="true"></canvas>' : k === 'happiness' ? '<canvas class="need-ico" id="h-ico-happy" width="96" height="96" aria-hidden="true"></canvas>' : `<span class="need-ico">${icon}</span>`}<span class="need-lbl">${label}</span></span><b class="need-val">0</b></div>${DG.ui.bar(0, 100, '#7fd8a6', label)}</div>`).join('')}
         </div>
         <div class="hud-trim" aria-hidden="true"></div><svg aria-hidden="true" class="hud-bow" viewBox="0 0 64 44"><path d="M32 20 C22 6 6 2 4 12 C2 22 16 28 32 22 Z M32 20 C42 6 58 2 60 12 C62 22 48 28 32 22 Z" class="bw-a" stroke-linejoin="round"/><path d="M29 23 L20 40 L26 37 L28 42 L32 26 Z M35 23 L44 40 L38 37 L36 42 L32 26 Z" class="bw-b" stroke-linejoin="round"/><ellipse cx="32" cy="21" rx="6" ry="5.5" class="bw-c" /><path d="M12 10 C14 8 18 8 20 10" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/></svg>
       </header>
       <div class="room-wrap">
         <canvas id="room-canvas" aria-label="Your dumpling's home. Tap your dumpling to pet it."></canvas>
         <nav class="actions dock glass" aria-label="Actions">
-          <button class="act a-walk" data-a="walk" title="Walk" aria-label="Walk"><span>🌳</span></button>
           <button class="act big train" data-a="train" title="Training" aria-label="Training"><span>🏋️</span></button>
           <button class="act big arena" data-a="arena" id="h-arena" title="Arena" aria-label="Arena"><span>🏟️</span></button>
           <button class="act a-shop" data-a="shop" title="Shop" aria-label="Shop"><span>🛍️</span></button>
           <button class="act a-closet" data-a="closet" title="Closet" aria-label="Closet"><span><svg class="ico-svg" viewBox="0 0 64 64" aria-hidden="true"><path d="M10 14 Q32 3 54 14 L54 18 L10 18 Z" fill="#c98a4f" stroke="#6b3f1e" stroke-width="3" stroke-linejoin="round"/><rect x="12" y="17" width="40" height="38" rx="4" fill="#e6b073" stroke="#6b3f1e" stroke-width="3"/><rect x="16" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><rect x="33" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><circle cx="28" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><circle cx="36" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><path d="M15 55 v5 M49 55 v5" stroke="#6b3f1e" stroke-width="4" stroke-linecap="round"/><path d="M18 24 v10" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"/></svg></span></button>
           <button class="act a-decorate" data-a="decorate" title="Decorate" aria-label="Decorate"><span>🏠</span></button>
-          <button class="act a-stats" data-a="stats" title="Stats" aria-label="Stats"><span>📊</span></button>
-          <button class="act a-trophies" data-a="trophies" title="Trophies" aria-label="Trophies"><span>🏆</span></button>
+          ${TROPHY_IN_HEADER ? '' : '<button class="act a-trophies" data-a="trophies" title="Trophies" aria-label="Trophies"><span>🏆</span></button>'}
         </nav>
         <div class="bonus-chip" id="h-bonus" hidden></div>
         <div class="play-bar" id="h-play" hidden></div>
@@ -225,6 +235,19 @@
     canvas = root.querySelector('#room-canvas');
     ctx = canvas.getContext('2d');
     root.querySelector('#h-settings').onclick = () => DG.Menus.settings();
+    const tb = root.querySelector('#h-trophy'); if (tb) tb.onclick = () => { DG.audio.play('click'); DG.Menus.trophies(); };
+    root.querySelector('#h-pic-btn').onclick = () => { DG.audio.play('click'); DG.Menus.stats(); };
+    askWalk = () => {
+      DG.audio.play('click');
+      DG.ui.modal({
+        title: '🚪 Go for a walk?', html: `<p>Do you want to take <b>${pname()}</b> on a walk to the park?</p>`,
+        buttons: [{ label: 'Not now', cls: 'ghost' }, { label: '🌳 Let\'s go!', cls: 'primary', onClick: () => setTimeout(goWalk, 200) }],
+      });
+    };
+    root.querySelectorAll('#h-needs .need').forEach((el) => {
+      const show = () => { DG.audio.play('pop'); DG.ui.toast(NEED_TIPS[el.dataset.k](pname())); };
+      el.onclick = show; el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(); } };
+    });
     root.querySelectorAll('.act').forEach((b) => (b.onclick = () => { DG.audio.play('click'); action(b.dataset.a); }));
     // On phones the room is shown zoomed in: a swipe pans the view, a tap acts, two fingers pinch to zoom.
     let down = null, pinch = null;
@@ -333,12 +356,14 @@
     sb.innerHTML = p.asleep ? '<span>☀️</span>' : '<span>🛏️</span>';
     sb.title = p.asleep ? 'Wake up' : 'Sleep'; sb.setAttribute('aria-label', sb.title);
     }
-    const hint = root.querySelector('#h-hint');
-    hint.innerHTML = p.asleep && DG.isNight() ? `🌙 It's night (9 PM to 7 AM). ${pname()} is sleeping and will wake up at 7 AM. Waking it now makes its energy drain fast.`
-      : !p.asleep && DG.isNight() ? `🌙 It's late! ${pname()} is up past bedtime, so its energy is draining fast. Tap the bed to tuck it in.`
-      : '';
-    hint.hidden = !hint.innerHTML;
-    hint.classList.toggle('night', DG.isNight());
+    // night reminders pop up once as a message instead of a strip that stretches the page
+    const late = p.asleep && DG.isNight() ? 'asleep' : !p.asleep && DG.isNight() ? 'late' : '';
+    if (late && late !== lateShown && !(lateShown === 'asleep' && late === 'late') && DG.ui.current() === 'home') { // (waking up has its own message)
+      DG.ui.toast(late === 'asleep' ? `🌙 It's night (9 PM to 7 AM). ${pname()} is sleeping and wakes up at 7 AM. Waking it now makes its energy drain fast.`
+        : `🌙 It's late! ${pname()} is up past bedtime, so its energy drains fast. Tap the bed to tuck it in.`, 'night');
+    }
+    lateShown = late;
+    const hint = root.querySelector('#h-hint'); hint.hidden = true;
     if (['home', 'night'].includes(DG.audio.track())) DG.audio.homeTrack();
     const ab = root.querySelector('#h-arena');
     ab.classList.toggle('soft-lock', si < 1);
@@ -356,9 +381,10 @@
     if (DG.pet().asleep) return Math.hypot(pt.x - DG.bedPoint(860, 0).x, pt.y - (DG.bedPoint(0, 440).y - 30)) < 70;
     const b = petBox(); return Math.hypot(pt.x - b.x, pt.y - b.y) < b.r;
   }
+  let askWalk = () => {};
   function onHover(e) {
     const pt = toRoom(e);
-    const over = hitPet(pt) || ['bowl', 'tub', 'bed', 'basket'].some((k) => inRect(pt, R[k])) || !!play;
+    const over = hitPet(pt) || ['bowl', 'tub', 'bed', 'basket', 'door'].some((k) => inRect(pt, R[k])) || !!play;
     canvas.style.cursor = over ? 'pointer' : 'default';
   }
   function onPointer(e) {
@@ -370,6 +396,7 @@
     if (inRect(pt, R.tub)) return openBath();
     if (inRect(pt, R.bed)) return goSleep();
     if (inRect(pt, R.basket)) return DG.Menus.toys();
+    if (inRect(pt, R.door)) return askWalk();
     tapToWalk(pt);
   }
   /** Tap anywhere else in the room and your dumpling waddles over there. */
@@ -525,6 +552,7 @@
     DG.save();
   }
   function playReward(text) {
+    if (!play) return; // playtime already ended (e.g. the ball landed after closing the toy box)
     const p = DG.pet();
     DG.addNeeds({ happiness: 5, energy: -0.8 });
     p.care.plays++; play.count++;
@@ -759,11 +787,17 @@
     if (p.needs.energy < 15) { wakeIfAsleep(); say('Too tired...'); DG.ui.toast(`${pname()} is too tired for a walk. Let it rest first!`); return; }
     wakeIfAsleep();
     busy = true; say(pick(['Walkies!', 'Adventure time!', 'Outside!!']), 1.2); P.hopV = 380; DG.audio.play('squeak');
-    walkTo({ x: R.W - 40, y: 470 }, () => {
-      busy = false;
-      DG.Walk.open();
-      P.x = R.spots.home.x; P.y = R.spots.home.y; P.flip = false;
-    });
+    const door = R.door, dx = door.x + door.w / 2;
+    P.flip = dx < P.x;
+    // squeeze along the back wall, behind the bathtub, to the door in the corner
+    walkTo({ x: Math.max(dx, R.tub.x + R.tub.w + 40), y: 338 }, () => walkTo({ x: dx, y: 338 }, () => {
+      doorTarget = 1; DG.audio.play('whoosh');
+      setTimeout(() => {
+        busy = false; doorTarget = 0;
+        DG.Walk.open();
+        P.x = R.spots.home.x; P.y = R.spots.home.y; P.flip = false;
+      }, 550);
+    }));
   }
 
   /* ---------- Bath ---------- */
@@ -995,7 +1029,7 @@
     const sprites = [];
     if (!p.asleep && !P.inTub) sprites.push({ y: P.y, draw: () => drawPet(p, si, s) });
     if (play && play.toy === 'ball') { const b = play.ball; sprites.push({ y: b.state === 'held' ? P.y + 1 : b.state === 'bounce' ? b.gy : b.state === 'fly' ? b.sy + (b.ey - b.sy) * Math.min(1, b.t) + 20 : b.y, draw: drawBall }); }
-    DG.draw.room(ctx, { t: T, decor: st.equipped.decor, bowlFood, toys: st.inventory.toys, labels: false, home: st.home, top: CAM.E, bottom: CAM.F, sprites });
+    DG.draw.room(ctx, { t: T, doorOpen, decor: st.equipped.decor, bowlFood, toys: st.inventory.toys, labels: false, home: st.home, top: CAM.E, bottom: CAM.F, sprites });
     if (p.asleep) {
       const b = R.spots.bed;
       DG.draw.dumpling(ctx, { type: p.type, look: p.look, x: DG.bedPoint(860, 0).x, y: DG.bedPoint(0, 440).y, size: Math.min(s, 150), t: T, mood: 'sleeping', stage: si, accessory: p.accessory, trait: p.trait,
@@ -1088,6 +1122,7 @@
 
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    doorOpen += (doorTarget - doorOpen) * Math.min(1, dt * 7);
     try { update(dt); draw(); } catch (e) { console.error(e); }
     hudAcc += dt;
     if (hudAcc > 0.5) { hudAcc = 0; renderHud(); }

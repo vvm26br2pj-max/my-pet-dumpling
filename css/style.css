@@ -1046,3 +1046,152 @@ body.touch .a-moves { display: none; }
   #screen-arena .lobby-col > .fine { font-size: 0.7em; margin: 2px 0 0; }
 }
 @media (max-width: 600px) { #screen-home .hud .need-ico { width: 22px; height: 22px; font-size: 17px; line-height: 22px; } }
+/* four starting accessories: 2 x 2 */
+.ad2-accs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; justify-items: center; }
+.ad2-acc { width: 100%; max-width: 96px; }
+@media (max-width: 600px) { .ad2-accs { gap: 5px; } .ad2-acc { padding: 4px; border-radius: 12px; } }
+
+/* ---------- Home: 5-icon bar, door to the park, tappable portrait and needs, mini trophy ---------- */
+@media (max-width: 600px) {
+  .room-wrap .dock.glass { grid-template-columns: repeat(5, 1fr); padding: 3px 4px; }
+  .room-wrap .dock.glass .act span, .room-wrap .dock.glass .act.big span { width: min(62px, 16vw); height: min(62px, 16vw); }
+}
+.toast.night { background: #2f3570; color: #f4f0ff; }
+button.hud-pic { padding: 0; border: none; background: none; cursor: pointer; font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; transition: transform 0.15s; }
+button.hud-pic:active { transform: scale(0.95); }
+.hud .need[data-k] { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 0.12s; }
+.hud .need[data-k]:active { transform: scale(0.96); }
+.hud .trophy-btn span { display: block; width: 78%; height: 78%; margin: auto; background: url('../img/icons.webp?v=8') 100% 0 / 900% 100% no-repeat; }
+.hud .trophy-btn { display: grid; place-items: center; padding: 0; }
+
+/* ---------- Training Grounds menu (art: wooden sign, pastel cards, soft garden backdrop) ---------- */
+.tg { position: relative; max-width: 760px; margin: 0 auto; padding: 14px 14px 18px; border-radius: 26px; overflow: hidden;
+  background:
+    radial-gradient(ellipse 30% 9% at 6% 100%, #9fd68c 60%, transparent 61%),
+    radial-gradient(ellipse 34% 8% at 30% 102%, #b3e09d 60%, transparent 61%),
+    radial-gradient(ellipse 30% 9% at 72% 101%, #9fd68c 60%, transparent 61%),
+    radial-gradient(ellipse 26% 10% at 98% 100%, #b3e09d 60%, transparent 61%),
+    linear-gradient(180deg, #fde3d6 0%, #fbe6dc 45%, #fbeede 80%, #eef6dc 100%);
+  box-shadow: 0 10px 30px rgba(170, 110, 70, 0.18); }
+.tg-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-bottom: 10px; }
+.tg-home, .tg-energy { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 8px 16px; font-weight: 700; font-size: 1.05em; color: #5a3a22;
+  background: linear-gradient(180deg, #fffaf2, #fbecd9); border: 3px solid #f1d8bd; box-shadow: 0 3px 0 #e6c8a6, inset 0 2px 0 #fff; }
+.tg-home { justify-self: start; cursor: pointer; }
+.tg-home:active { transform: translateY(2px); box-shadow: 0 1px 0 #e6c8a6; }
+.tg-home svg { width: 24px; height: 24px; }
+.tg-energy { justify-self: end; background: linear-gradient(180deg, #fffbea, #fff0c4); border-color: #ffe08a; box-shadow: 0 3px 0 #f2cf6a, inset 0 2px 0 #fff; }
+.tg-energy .bolt { width: 16px; height: 22px; }
+.tg-sign { margin: 0; text-align: center; font-size: 1.75em; line-height: 0.98; color: #5a3519; padding: 10px 26px 12px; border-radius: 22px;
+  background: linear-gradient(180deg, #d99a5e, #bf7a40); border: 4px solid #8a5129; box-shadow: 0 5px 0 #7a4520, inset 0 3px 0 rgba(255,230,190,0.6), inset 0 -4px 0 rgba(120,60,20,0.25);
+  text-shadow: 0 2px 0 rgba(255,225,180,0.75); letter-spacing: -0.3px; }
+.tg-info { margin: 0 0 12px; text-align: center; font-size: 0.98em; line-height: 1.35; color: #5a4636; padding: 10px 16px; border-radius: 22px;
+  background: rgba(255, 251, 244, 0.92); border: 3px solid #f4dfc8; box-shadow: 0 3px 0 #ecd2b5; }
+.tg-list { display: flex; flex-direction: column; gap: 10px; }
+.tg-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; border-radius: 24px;
+  background: linear-gradient(180deg, #fffaf3, #fdf0e2); border: 3px solid #f4dfc8; box-shadow: 0 4px 0 #ecd2b5, 0 8px 16px rgba(170,110,70,0.08); }
+.tg-ico { width: 78px; height: 78px; border-radius: 22px; display: grid; place-items: center; box-shadow: inset 0 2px 0 rgba(255,255,255,0.7), 0 2px 6px rgba(150,100,60,0.12); }
+.tg-ico svg { width: 66%; height: 66%; filter: drop-shadow(0 2px 1px rgba(90,50,20,0.18)); }
+.tg-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tg-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tg-row h3 { margin: 0; font-size: 1.25em; color: #5a3519; }
+.tg-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 0.82em; font-weight: 700; color: #fff; padding: 2px 10px; border-radius: 999px;
+  background: var(--c); box-shadow: inset 0 -2px 0 rgba(0,0,0,0.12), inset 0 2px 0 rgba(255,255,255,0.35); text-shadow: 0 1px 0 rgba(0,0,0,0.15); }
+.tg-bar { height: 10px; border-radius: 999px; background: #f0e2d2; overflow: hidden; }
+.tg-bar i { display: block; height: 100%; border-radius: 999px; }
+.tg-diffs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tg-d { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 5px 12px; font-weight: 700; font-size: 0.95em; cursor: pointer; border: 2px solid #efd9c2; background: #fbf1e6; color: #6b5442; }
+.tg-d .bolt { width: 11px; height: 15px; }
+.tg-d .lock { width: 12px; height: 13px; }
+.tg-d.go { background: linear-gradient(180deg, #ff8a78, #f2604f); border-color: #e2503f; color: #fff; box-shadow: 0 3px 0 #c9402f, inset 0 2px 0 rgba(255,255,255,0.35); text-shadow: 0 1px 0 rgba(0,0,0,0.15); }
+.tg-d.go:active { transform: translateY(2px); box-shadow: 0 1px 0 #c9402f; }
+.tg-d.locked { opacity: 0.9; }
+.tg-num { font-weight: 700; font-size: 1.2em; color: #5a3519; }
+.tg-note { margin: 12px auto 0; max-width: 560px; text-align: center; font-size: 0.92em; color: #5a4636; padding: 8px 16px; border-radius: 22px;
+  background: rgba(255, 251, 244, 0.92); border: 3px solid #f4dfc8; box-shadow: 0 3px 0 #ecd2b5; }
+@media (max-width: 600px) {
+  .tg { padding: 8px 8px 12px; border-radius: 20px; }
+  .tg-top { gap: 4px; margin-bottom: 7px; }
+  .tg-home, .tg-energy { padding: 5px 9px; font-size: 0.8em; gap: 4px; border-width: 2px; }
+  .tg-home svg { width: 18px; height: 18px; }
+  .tg-energy .bolt { width: 12px; height: 16px; }
+  .tg-sign { font-size: 1.15em; padding: 6px 12px 7px; border-width: 3px; border-radius: 16px; }
+  .tg-info { font-size: 0.74em; padding: 6px 10px; margin-bottom: 7px; border-width: 2px; border-radius: 16px; }
+  .tg-list { gap: 6px; }
+  .tg-card { gap: 8px; padding: 6px 8px 6px 6px; border-radius: 18px; border-width: 2px; }
+  .tg-ico { width: 56px; height: 56px; border-radius: 16px; }
+  .tg-main { gap: 4px; }
+  .tg-row { gap: 5px; }
+  .tg-row h3 { font-size: 0.92em; }
+  .tg-chip { font-size: 0.66em; padding: 1px 7px; }
+  .tg-bar { height: 7px; }
+  .tg-diffs { gap: 4px; flex-wrap: nowrap; }
+  .tg-d { padding: 3px 7px; font-size: 0.72em; gap: 2px; border-width: 1.5px; }
+  .tg-d .bolt { width: 8px; height: 11px; }
+  .tg-d .lock { width: 9px; height: 10px; }
+  .tg-num { font-size: 0.85em; align-self: start; margin-top: 6px; }
+  .tg-note { font-size: 0.7em; padding: 5px 10px; margin-top: 7px; border-width: 2px; border-radius: 16px; }
+}
+
+/* ---------- Training games: the play area fills the screen; swipe / keyboard controls ---------- */
+#screen-train.playing .t-game { gap: 8px; }
+.t-stage { aspect-ratio: 16 / 9; touch-action: none; user-select: none; -webkit-user-select: none; }
+#t-cv { width: 100%; height: 100%; }
+@media (max-width: 600px) {
+  #screen-train.playing .t-game { height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); gap: 6px; }
+  #screen-train.playing .t-stage { aspect-ratio: auto; flex: 1 1 auto; min-height: 0; border-radius: 18px; }
+  #screen-train.playing .t-top { flex-wrap: nowrap; gap: 6px; padding: 5px 8px; font-size: 0.82em; border-radius: 14px; }
+  #screen-train.playing .t-top .btn.small { padding: 4px 8px; }
+  #screen-train.playing .t-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
+  #screen-train.playing .diff-tag { display: none; }
+  #screen-train.playing .t-score { white-space: nowrap; font-size: 0.9em; }
+  #screen-train.playing .t-time { white-space: nowrap; }
+  #screen-train.playing .ov-card { padding: 14px 16px; font-size: 0.92em; }
+}
+@media (max-width: 600px) { /* use the spare height: slightly bigger cards */
+  .tg-sign { font-size: 1.3em; }
+  .tg-info { font-size: 0.8em; padding: 8px 10px; margin-bottom: 9px; }
+  .tg-list { gap: 9px; }
+  .tg-card { padding: 9px 10px 9px 8px; }
+  .tg-ico { width: 66px; height: 66px; }
+  .tg-main { gap: 6px; }
+  .tg-row h3 { font-size: 1.02em; }
+  .tg-chip { font-size: 0.7em; }
+  .tg-bar { height: 8px; }
+  .tg-d { padding: 5px 8px; font-size: 0.76em; }
+  .tg-note { font-size: 0.76em; padding: 7px 10px; margin-top: 10px; }
+}
+@media (max-width: 600px) {
+  #screen-train.playing .t-top #t-quit { white-space: nowrap; flex: 0 0 auto; }
+  #screen-train.playing .t-name { flex: 1 1 0; font-size: 0.95em; }
+  #screen-train.playing .t-score { margin-left: 0; font-size: 0.85em; }
+}
+
+/* Training Grounds: real art from the design picture */
+.tg-home.img { padding: 0; border: none; background: none; box-shadow: none; }
+.tg-home.img img { display: block; height: 52px; width: auto; filter: drop-shadow(0 3px 4px rgba(150,90,50,0.18)); }
+.tg-home.img:active { transform: translateY(2px) scale(0.97); box-shadow: none; }
+.tg-sign.img { padding: 0; border: none; background: none; box-shadow: none; line-height: 0; }
+.tg-sign.img img { display: block; height: 104px; width: auto; filter: drop-shadow(0 4px 5px rgba(120,60,20,0.25)); }
+.tg-ico.img { background: none; box-shadow: none; width: 96px; height: 84px; border-radius: 0; }
+.tg-ico.img img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(150,100,60,0.15)); }
+.tg-chipimg { height: 30px; width: auto; display: block; }
+.tg-energy { padding: 10px 18px; font-size: 1.15em; }
+.tg { background:
+    radial-gradient(ellipse 12% 22% at 100% 30%, #a9d68f 55%, transparent 57%),
+    radial-gradient(ellipse 9% 16% at 99% 46%, #8fcb78 55%, transparent 57%),
+    radial-gradient(ellipse 8% 14% at 0% 70%, #a9d68f 55%, transparent 57%),
+    radial-gradient(ellipse 30% 9% at 6% 100%, #8fcb78 60%, transparent 61%),
+    radial-gradient(ellipse 34% 8% at 30% 102%, #a9d68f 60%, transparent 61%),
+    radial-gradient(ellipse 30% 9% at 72% 101%, #8fcb78 60%, transparent 61%),
+    radial-gradient(ellipse 26% 10% at 98% 100%, #a9d68f 60%, transparent 61%),
+    linear-gradient(180deg, #fbd9cd 0%, #fbe0d3 35%, #f9e4cc 70%, #f3e2b6 100%); }
+@media (max-width: 600px) {
+  .tg-home.img img { height: 36px; }
+  .tg-sign.img img { height: 66px; }
+  .tg-ico.img { width: 70px; height: 62px; }
+  .tg-chipimg { height: 21px; }
+  .tg-energy { padding: 6px 10px; font-size: 0.85em; }
+}
+.tg-energy { white-space: nowrap; }
+.tilt-btn { margin: 0 auto 6px; display: inline-flex; gap: 4px; }
+.tilt-btn.on { background: #e9ddff; box-shadow: 0 0 0 2px #c49bff; }

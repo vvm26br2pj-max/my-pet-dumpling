@@ -1,6 +1,6 @@
 /* My Pet Dumpling — DEVELOPER CODES (testing only)
  *
- * How to open: tap your dumpling's portrait in the top-left corner 5 times quickly,
+ * How to open: tap the coins counter at the top 5 times quickly,
  * or press Ctrl+Shift+C on a keyboard. Type a code and press Enter. Type HELP for the list.
  *
  * TO REMOVE BEFORE RELEASE: delete this file and the dev.js script line in index.html.
@@ -105,10 +105,10 @@
     });
   }
 
-  // Secret way in on a phone: 5 quick taps on the portrait in the top bar.
+  // Secret way in on a phone: 5 quick taps on the coins counter in the top bar.
   let taps = [];
   document.addEventListener('pointerdown', (e) => {
-    if (!e.target.closest || !e.target.closest('.hud-pic')) return;
+    if (!e.target.closest || !e.target.closest('.hud .coins')) return;
     const now = performance.now();
     taps = taps.filter((t) => now - t < 2000); taps.push(now);
     if (taps.length >= 5) { taps = []; openCodeBox(); }

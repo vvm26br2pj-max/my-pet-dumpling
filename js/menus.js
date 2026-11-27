@@ -65,7 +65,9 @@
 
   const BOW_SVG = '<svg viewBox="0 0 64 48" aria-hidden="true"><path d="M32 22 C22 6 4 4 5 16 C6 28 20 30 32 25 Z M32 22 C42 6 60 4 59 16 C58 28 44 30 32 25 Z" fill="#ff8fb4" stroke="#c94f7c" stroke-width="2.6" stroke-linejoin="round"/><path d="M29 25 L20 42 L26 39 L28 45 L32 28 Z M35 25 L44 42 L38 39 L36 45 L32 28 Z" fill="#ff7aa6" stroke="#c94f7c" stroke-width="2.6" stroke-linejoin="round"/><ellipse cx="32" cy="23" rx="6.5" ry="6" fill="#ff6b9c" stroke="#c94f7c" stroke-width="2.6"/><path d="M12 13 C15 10 19 10 22 13" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".8"/></svg>';
   const VIKING_SVG = '<svg viewBox="0 0 64 48" aria-hidden="true"><path d="M14 30 C6 28 3 18 6 6 C9 16 13 20 19 22 Z" fill="#f6ead2" stroke="#a68858" stroke-width="2.4" stroke-linejoin="round"/><path d="M50 30 C58 28 61 18 58 6 C55 16 51 20 45 22 Z" fill="#f6ead2" stroke="#a68858" stroke-width="2.4" stroke-linejoin="round"/><path d="M13 36 C13 16 51 16 51 36 Z" fill="#c9d2df" stroke="#5f6878" stroke-width="2.6" stroke-linejoin="round"/><path d="M19 24 C23 18 30 17 34 18" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".8"/><rect x="30" y="17" width="5" height="19" fill="#b8875a" stroke="#7a5530" stroke-width="1.6"/><rect x="11" y="33" width="42" height="7" rx="2" fill="#b8875a" stroke="#7a5530" stroke-width="2.4"/><circle cx="18" cy="36.5" r="1.6" fill="#ffd36a"/><circle cx="27" cy="36.5" r="1.6" fill="#ffd36a"/><circle cx="37" cy="36.5" r="1.6" fill="#ffd36a"/><circle cx="46" cy="36.5" r="1.6" fill="#ffd36a"/></svg>';
-  const STARTER_ACC = [['bow', BOW_SVG], ['viking', VIKING_SVG]];
+  const CAP_SVG = '<svg viewBox="0 0 64 48" aria-hidden="true"><path d="M10 34 C10 12 46 10 50 32 Z" fill="#4a88de" stroke="#1f4f96" stroke-width="2.6" stroke-linejoin="round"/><path d="M8 34 C24 38 46 37 60 32 C58 40 30 44 8 38 Z" fill="#2f6cc4" stroke="#1f4f96" stroke-width="2.6" stroke-linejoin="round"/><circle cx="29" cy="14" r="2.6" fill="#2f6cc4" stroke="#1f4f96" stroke-width="1.8"/><path d="M38 19 l1.5 3.2 3.4.4-2.5 2.3.7 3.4-3.1-1.7-3 1.7.6-3.4-2.5-2.3 3.4-.4z" fill="#ffd36a" stroke="#c78a14" stroke-width="1"/><path d="M16 26 C18 20 22 17 26 16" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".7"/></svg>';
+  const PHONES_SVG = '<svg viewBox="0 0 64 48" aria-hidden="true"><path d="M12 32 C10 6 54 6 52 32" fill="none" stroke="#2b2f3a" stroke-width="6.5" stroke-linecap="round"/><path d="M13 30 C12 9 52 9 51 30" fill="none" stroke="#545b6c" stroke-width="2.4" stroke-linecap="round"/><rect x="4" y="25" width="14" height="19" rx="6.5" fill="#3fbf7a" stroke="#1d6e46" stroke-width="2.4"/><rect x="46" y="25" width="14" height="19" rx="6.5" fill="#3fbf7a" stroke="#1d6e46" stroke-width="2.4"/><path d="M8.5 29 v9 M50.5 29 v9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".6"/></svg>';
+  const STARTER_ACC = [['bow', BOW_SVG], ['viking', VIKING_SVG], ['cap', CAP_SVG], ['headphones', PHONES_SVG]];
   function adoptStep2(type) {
     const s = DG.STARTERS[type];
     let acc = 'bow';
@@ -76,7 +78,6 @@
       return `<button class="ad2-sw ${look.color === id ? 'on' : ''}" data-lk="color" data-v="${id}" title="${c.name}" aria-label="${c.name}" style="--c:${col.base};--l:${col.light};--d:${col.line}"></button>`;
     }).join('');
     const pills = (key, table) => Object.entries(table).map(([id, x]) => `<button class="ad2-pill ${look[key] === id ? 'on' : ''}" data-lk="${key}" data-v="${id}">${x.name}</button>`).join('');
-    const flower = '<i class="ad2-fl" aria-hidden="true">🌸</i>';
     const doAdopt = (close) => {
       const name = document.getElementById('ad-name').value.trim() || s.name;
       close(); if (stop) stop();
@@ -101,20 +102,20 @@
     DG.ui.modal({
       cls: 'ad2-modal', wide: true,
       html: `<div class="ad2">
-          <div class="ad2-sign"><span class="ad2-flowers" aria-hidden="true">🌸<b>🌸</b></span><h2>Adopt ${s.name}?</h2><span class="ad2-pop" aria-hidden="true"></span></div>
-          <div class="ad2-stage"><span class="ad2-hearts" aria-hidden="true">💕</span><canvas class="adopt-preview" id="ad-prev"></canvas><span class="ad2-pop small" aria-hidden="true"></span></div>
+          <div class="ad2-sign"><h2>Adopt ${s.name}?</h2></div>
+          <div class="ad2-stage"><canvas class="adopt-preview" id="ad-prev"></canvas></div>
           <label class="ad2-label" for="ad-name">Name your baby dumpling</label>
           <div class="ad2-name"><input id="ad-name" maxlength="14" value="${s.id === 'soup' ? 'Shu' : s.name}" autocomplete="off" enterkeyhint="done"><span aria-hidden="true">✏️</span></div>
           <div class="ad2-grid">
-            <section class="ad2-card"><h4>${flower}Color</h4><div class="ad2-swatches">${swatches}</div></section>
-            <section class="ad2-card"><h4>${flower}Eyes</h4><div class="ad2-pills">${pills('eyes', DG.EYES)}</div></section>
-            <section class="ad2-card"><h4>${flower}Cheeks</h4><div class="ad2-pills">${pills('cheeks', DG.CHEEKS)}</div></section>
-            <section class="ad2-card"><h4>${flower}Starting Accessory</h4><div class="ad2-accs">${STARTER_ACC.map(([a, svg]) => `<button class="ad2-acc ${a === acc ? 'on' : ''}" data-acc="${a}" title="${DG.ACCESSORIES[a].name}" aria-label="${DG.ACCESSORIES[a].name}">${svg}</button>`).join('')}</div></section>
+            <section class="ad2-card"><h4>Color</h4><div class="ad2-swatches">${swatches}</div></section>
+            <section class="ad2-card"><h4>Eyes</h4><div class="ad2-pills">${pills('eyes', DG.EYES)}</div></section>
+            <section class="ad2-card"><h4>Cheeks</h4><div class="ad2-pills">${pills('cheeks', DG.CHEEKS)}</div></section>
+            <section class="ad2-card"><h4>Starting Accessory</h4><div class="ad2-accs">${STARTER_ACC.map(([a, svg]) => `<button class="ad2-acc ${a === acc ? 'on' : ''}" data-acc="${a}" title="${DG.ACCESSORIES[a].name}" aria-label="${DG.ACCESSORIES[a].name}">${svg}</button>`).join('')}</div></section>
           </div>
           <p class="fine ad2-fine">You can change all of this later in the Closet.</p>
           <div class="ad2-foot">
             <button class="ad2-back" id="ad-back"><span>←</span>Back</button>
-            <span class="ad2-leaf" aria-hidden="true">🌸</span><button class="ad2-go" id="ad-go">Adopt!</button><span class="ad2-leaf" aria-hidden="true">🌸</span>
+            <button class="ad2-go" id="ad-go">Adopt!</button>
           </div>
         </div>`,
       onClose() { if (stop) stop(); },
