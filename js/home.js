@@ -980,6 +980,45 @@
       dirt: n.cleanliness < 45 ? dirtSpots(n.cleanliness) : null,
       drum: play && play.toy === 'drum' && !P.walking ? { hit: play.drum.hit, side: play.drum.side } : null,
     });
+    if (n.cleanliness < 35) drawStink(P.x, P.y - P.hop, s, n.cleanliness);
+  }
+  /** Stink lines rising off a dirty dumpling and little flies buzzing around it. */
+  function drawStink(x, y, s, clean) {
+    const k = Math.min(1, (35 - clean) / 25); // 0 just dirty .. 1 filthy
+    const top = y - s * 0.75;
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // wavy stink lines drifting upward
+    const lines = 2 + Math.round(k);
+    for (let i = 0; i < lines; i++) {
+      const ph = ((T * 0.55 + i / lines) % 1), lx = x + (i - (lines - 1) / 2) * s * 0.32, ly = top - ph * s * 0.45;
+      ctx.globalAlpha = (0.35 + 0.45 * k) * Math.sin(ph * Math.PI);
+      ctx.strokeStyle = '#8fa85a'; ctx.lineWidth = Math.max(2.5, s * 0.03);
+      ctx.beginPath();
+      for (let j = 0; j <= 10; j++) {
+        const t = j / 10, yy = ly - t * s * 0.32, xx = lx + Math.sin(t * Math.PI * 2 + T * 3 + i) * s * 0.045;
+        j ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // flies orbiting in loopy figure-eights
+    const flies = clean < 15 ? 3 : 2;
+    for (let i = 0; i < flies; i++) {
+      const a = T * (2.2 + i * 0.4) + i * 2.1;
+      const fx = x + Math.sin(a) * s * 0.7, fy = y - s * 0.6 + Math.sin(a * 2) * s * 0.22 - i * s * 0.08;
+      const dir = Math.cos(a) > 0 ? 1 : -1, flap = Math.sin(T * 60 + i) > 0;
+      ctx.save(); ctx.translate(fx, fy); ctx.scale(1.8, 1.8); ctx.translate(-fx, -fy);
+      ctx.fillStyle = 'rgba(210,235,255,0.85)'; ctx.strokeStyle = 'rgba(90,110,130,0.7)'; ctx.lineWidth = 1;
+      [-1, 1].forEach((w) => { // wings
+        ctx.beginPath(); ctx.ellipse(fx - dir * 1, fy - 4, 4, flap ? 2.5 : 4.5, w * 0.6 - dir * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      });
+      ctx.fillStyle = '#2b2b30'; ctx.beginPath(); ctx.ellipse(fx, fy, 4.5, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(fx + dir * 4.2, fy - 0.5, 2.3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(fx + dir * 5, fy - 1.2, 0.9, 0, Math.PI * 2); ctx.fill();
+      if (Math.sin(a * 3) > 0.92) { ctx.fillStyle = 'rgba(70,70,80,0.6)'; ctx.font = '600 11px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('bzz', fx, fy - 9); }
+      ctx.restore();
+    }
+    ctx.restore();
   }
   const dirtCache = {};
   function dirtSpots(clean) {

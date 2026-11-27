@@ -181,14 +181,19 @@
       crisp.scale.set(b.sx * 0.95, 0.28, b.sz * 0.92); crisp.position.y = 0.24; body.add(crisp);
       topY = 1.55;
     } else {
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.6, 20), mat); cone.position.y = 1.58; body.add(cone);
-      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), mat); knot.position.y = 1.93; body.add(knot);
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * TAU;
-        const ln = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.75, 4), toon(darker));
-        ln.position.set(Math.sin(a) * 0.3, 1.55, Math.cos(a) * 0.3); ln.rotation.set(Math.cos(a) * 0.75, 0, -Math.sin(a) * 0.75); body.add(ln);
+      // shumai: a wrapper wall rising above the body, a frilly rim and an empty open top
+      const wall = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.88, 0.55, 28, 1, true), toon(def.hex, { side: THREE.DoubleSide })); wall.position.y = 1.42; body.add(wall);
+      const inside = new THREE.Mesh(new THREE.CircleGeometry(0.79, 28), toon(new THREE.Color(def.hex).multiplyScalar(0.72).getHex(), { side: THREE.DoubleSide }));
+      inside.rotation.x = -Math.PI / 2; inside.position.y = 1.6; body.add(inside);
+      for (let i = 0; i < 16; i++) { // ruffles around the rim
+        const a = (i / 16) * TAU, rf = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), mat);
+        rf.scale.set(1, 0.6, 0.8); rf.position.set(Math.sin(a) * 0.82, 1.71, Math.cos(a) * 0.82); rf.rotation.y = a; body.add(rf);
       }
-      topY = 2.0;
+      for (let i = 0; i < 10; i++) { // pleat lines down the sides
+        const a = (i / 10) * TAU, ln = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.4, 4), toon(darker));
+        ln.position.set(Math.sin(a) * 0.86, 1.4, Math.cos(a) * 0.86); body.add(ln);
+      }
+      topY = 1.8;
     }
     // face
     const isBao = def.shape === 'bao';

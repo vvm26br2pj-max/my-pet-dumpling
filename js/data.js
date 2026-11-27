@@ -41,7 +41,7 @@ window.DG = window.DG || {};
     bao: {
       id: 'bao', name: 'Bao', kind: 'Steamed Bun',
       desc: 'A round steamed bun with a little swirl on top. Cheerful and cuddly.',
-      strength: 'Balanced strength and stamina',
+      strength: 'Balanced',
       base: { strength: 14, stamina: 14, agility: 10, defense: 10, focus: 10 },
       colors: { base: '#f3e6d2', light: '#ffffff', line: '#d6bf9e', hex: 0xfff4e6 },
       moves: { special: 'steampuff', move2: 'bunslam', ult: 'grandsteamer' },
@@ -55,8 +55,8 @@ window.DG = window.DG || {};
       moves: { special: 'crispydash', move2: 'pleatflurry', ult: 'goldenfry' },
     },
     soup: {
-      id: 'soup', name: 'Soup Dumpling', kind: 'Xiao Long Bao',
-      desc: 'A squishy dumpling with a gathered top. Sleepy and affectionate.',
+      id: 'soup', name: 'Shumai', kind: 'Open-Top Dumpling',
+      desc: 'A frilly little cup of a dumpling with an open top. Sleepy and affectionate.',
       strength: 'Defense and recovery',
       base: { strength: 9, stamina: 12, agility: 8, defense: 18, focus: 11 },
       colors: { base: '#f1e3d3', light: '#fffdf8', line: '#cfb9a0', hex: 0xfbf0e2 },

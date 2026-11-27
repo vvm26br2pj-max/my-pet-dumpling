@@ -18,7 +18,7 @@ Saved automatically to `localStorage` in **this browser** (key `myPetDumpling.sa
 
 ## What's in it
 
-- Adopt Bao, Gyoza or a Soup Dumpling and pick its **name, color, eyes, cheeks and accessory** (all changeable later in the Closet).
+- Adopt Bao, Gyoza or Shumai and pick its **name, color, eyes, cheeks and accessory** (all changeable later in the Closet).
 - Four needs. If any need drops **below 20, growing pauses** until you raise it.
 - **Night time (9 PM to 7 AM):** your dumpling goes to bed by itself and wakes at 7 AM. Waking it at night makes its energy drain fast. Sleep refills energy slowly (about 12 per hour).
 - **Walks** in the park (tap to hop), **8 toys**, and a **Decorate** screen for walls, wallpaper, floors and 12 decorations.

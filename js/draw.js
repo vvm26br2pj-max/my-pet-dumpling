@@ -4,7 +4,7 @@
   const GEO = {
     bao:   { top: -1.36, eyeY: -0.64, eyeDX: 0.37, mid: -0.64 },
     gyoza: { top: -0.9, eyeY: -0.47, eyeDX: 0.34, mid: -0.45 },
-    soup:  { top: -1.3, eyeY: -0.52, eyeDX: 0.32, mid: -0.6 },
+    soup:  { top: -1.32, eyeY: -0.6, eyeDX: 0.31, mid: -0.66 },
   };
   DG.GEO = GEO;
 
@@ -20,14 +20,24 @@
       ctx.moveTo(-1.15 * u, -0.45 * u);
       ctx.bezierCurveTo(-0.9 * u, 0.12 * u, 0.9 * u, 0.12 * u, 1.15 * u, -0.45 * u);
       ctx.bezierCurveTo(0.85 * u, -1.05 * u, -0.85 * u, -1.05 * u, -1.15 * u, -0.45 * u);
-    } else {
-      ctx.moveTo(-1.0 * u, -0.2 * u);
-      ctx.bezierCurveTo(-1.15 * u, -0.95 * u, -0.4 * u, -1.05 * u, -0.13 * u, -1.27 * u);
-      ctx.lineTo(0.13 * u, -1.27 * u);
-      ctx.bezierCurveTo(0.4 * u, -1.05 * u, 1.15 * u, -0.95 * u, 1.0 * u, -0.2 * u);
-      ctx.quadraticCurveTo(0, 0.1 * u, -1.0 * u, -0.2 * u);
+    } else { // shumai: a plump little cup with a frilly, open top
+      ctx.moveTo(-0.8 * u, -0.1 * u);
+      ctx.bezierCurveTo(-0.92 * u, -0.45 * u, -0.84 * u, -0.9 * u, -0.78 * u, -1.14 * u);
+      shumaiRim(ctx, u, Math.PI, 0); // back of the rim, left to right
+      ctx.bezierCurveTo(0.84 * u, -0.9 * u, 0.92 * u, -0.45 * u, 0.8 * u, -0.1 * u);
+      ctx.bezierCurveTo(0.58 * u, 0.07 * u, -0.58 * u, 0.07 * u, -0.8 * u, -0.1 * u);
     }
     ctx.closePath();
+  }
+  /** Frilly scalloped edge along the shumai's rim ellipse, from angle a0 to a1 (lineTo-style, path must be open). */
+  const RIM = { cy: -1.14, rx: 0.78, ry: 0.19, n: 13, bump: 0.055 };
+  function shumaiRim(ctx, u, a0, a1) {
+    const steps = RIM.n, pt = (a, out) => [Math.cos(a) * (RIM.rx + out) * u, (RIM.cy - Math.sin(a) * (RIM.ry + out * 0.5)) * u];
+    for (let k = 0; k < steps; k++) {
+      const t0 = a0 + (a1 - a0) * k / steps, t1 = a0 + (a1 - a0) * (k + 1) / steps, tm = (t0 + t1) / 2;
+      const [mx, my] = pt(tm, RIM.bump), [ex, ey] = pt(t1, 0);
+      ctx.quadraticCurveTo(mx + (mx - (pt(t0, 0)[0] + ex) / 2) * 0.6, my - Math.abs(Math.sin(tm)) * RIM.bump * u * 0.6, ex, ey);
+    }
   }
   function bez(t, a, b, c, d) { const m = 1 - t; return m * m * m * a + 3 * m * m * t * b + 3 * m * t * t * c + t * t * t * d; }
 
@@ -96,10 +106,10 @@
       cg.addColorStop(0, 'rgba(214,150,70,0)'); cg.addColorStop(0.5, 'rgba(214,150,70,0.55)'); cg.addColorStop(1, 'rgba(170,105,40,0.85)');
       ctx.fillStyle = cg; ctx.fillRect(-1.3 * u, -0.35 * u, 2.6 * u, 0.5 * u);
     }
-    if (type === 'soup') {
-      const bg = ctx.createRadialGradient(0, -0.25 * u, 0, 0, -0.25 * u, 0.9 * u);
-      bg.addColorStop(0, 'rgba(240,180,120,0.35)'); bg.addColorStop(1, 'rgba(240,180,120,0)');
-      ctx.fillStyle = bg; ctx.fillRect(-u * 1.2, -u * 1.3, u * 2.4, u * 1.4);
+    if (type === 'soup') { // soft warm shading low on the cup
+      const bg = ctx.createLinearGradient(0, -0.4 * u, 0, 0.05 * u);
+      bg.addColorStop(0, 'rgba(220,170,120,0)'); bg.addColorStop(1, 'rgba(200,150,100,0.25)');
+      ctx.fillStyle = bg; ctx.fillRect(-u * 1.2, -u * 0.45, u * 2.4, u * 0.6);
     }
     if (o.trait === 'defense') drawVest(ctx, u, type);
     if (o.dirt) o.dirt.forEach((d) => {
@@ -129,14 +139,28 @@
         ctx.beginPath(); ctx.moveTo(px, py); ctx.quadraticCurveTo(px * 0.95, py + 0.12 * u, px * 0.9 + 0.04 * u, py + 0.2 * u); ctx.stroke();
       }
     } else {
-      ctx.lineWidth = Math.max(1, 0.035 * u);
-      for (let i = -3; i <= 3; i++) {
-        const sx = i * 0.22 * u, sy = (-0.95 + Math.abs(i) * 0.06) * u;
-        ctx.beginPath(); ctx.moveTo(sx, sy);
-        ctx.quadraticCurveTo(sx * 0.4, -1.12 * u, i * 0.02 * u, -1.27 * u); ctx.stroke();
+      // open top: the empty inside of the wrapper, shaded deeper toward the back
+      const ig = ctx.createLinearGradient(0, (RIM.cy - RIM.ry) * u, 0, (RIM.cy + RIM.ry) * u);
+      ig.addColorStop(0, shade(col.base, 0.78)); ig.addColorStop(1, mix(col.base, col.line, 0.35));
+      ctx.fillStyle = ig; ctx.beginPath(); ctx.ellipse(0, RIM.cy * u, (RIM.rx - 0.1) * u, (RIM.ry - 0.05) * u, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = col.line; ctx.lineWidth = Math.max(1, 0.03 * u); ctx.stroke();
+      // gathered pleats running down from the rim
+      ctx.save(); bodyPath(ctx, 'soup', u); ctx.clip();
+      ctx.strokeStyle = mix(col.base, col.line, 0.6); ctx.globalAlpha = 0.55; ctx.lineWidth = Math.max(1, 0.03 * u);
+      for (let i = -5; i <= 5; i++) {
+        const a = Math.PI / 2 - i * 0.26, x0 = Math.cos(a) * RIM.rx * u, y0 = (RIM.cy + Math.sin(a) * RIM.ry) * u;
+        ctx.beginPath(); ctx.moveTo(x0, y0 + 0.02 * u); ctx.quadraticCurveTo(x0 * 1.02, y0 + 0.14 * u, x0 * 0.98, y0 + (0.24 - Math.abs(i) * 0.012) * u); ctx.stroke();
       }
-      ctx.fillStyle = col.light;
-      ctx.beginPath(); ctx.ellipse(0, -1.32 * u, 0.13 * u, 0.09 * u, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.restore();
+      // frilly front edge of the rim
+      ctx.beginPath(); const [sx0, sy0] = [-RIM.rx * u, RIM.cy * u]; ctx.moveTo(sx0, sy0);
+      shumaiRim(ctx, u, Math.PI, TAU);
+      ctx.lineTo((RIM.rx - 0.1) * u, RIM.cy * u);
+      ctx.ellipse(0, RIM.cy * u, (RIM.rx - 0.1) * u, (RIM.ry - 0.05) * u, 0, 0, Math.PI, false);
+      ctx.closePath();
+      ctx.fillStyle = mix(col.light, col.base, 0.25); ctx.fill();
+      ctx.strokeStyle = col.line; ctx.lineWidth = Math.max(1.2, 0.04 * u);
+      ctx.beginPath(); ctx.moveTo(sx0, sy0); shumaiRim(ctx, u, Math.PI, TAU); ctx.stroke();
     }
 
     // shine for older dumplings

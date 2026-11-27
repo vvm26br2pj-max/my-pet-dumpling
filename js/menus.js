@@ -13,28 +13,33 @@
   function adoptEnter() {
     const root = document.getElementById('screen-adopt');
     adoptStops.forEach((s) => s()); adoptStops = [];
+    const THEME = { bao: 'pink', gyoza: 'orange', soup: 'blue' };
     root.innerHTML = `
-      <div class="adopt">
-        <h1 class="logo">My Pet <span>Dumpling</span></h1>
-        <p class="lead">Three baby dumplings are looking for a home. Who will you adopt?</p>
-        <div class="starter-grid">
+      <div class="title-scr">
+        <img class="title-art" src="img/title.webp?v=2" alt="My Pet Dumpling. Three baby dumplings are looking for a home. Who will you adopt?">
+        <div class="ts-grid">
           ${Object.values(DG.STARTERS).map((s) => `
-            <button class="starter-card" data-type="${s.id}">
-              <canvas class="starter-canvas" data-type="${s.id}"></canvas>
-              <h3>${s.name}</h3><div class="kind">${s.kind}</div>
-              <p>${s.desc}</p>
-              <div class="tag">💪 ${s.strength}</div>
-              <div class="tag special">✨ <b>${DG.MOVES[s.moves.special].name}:</b> ${DG.MOVES[s.moves.special].desc}</div>
+            <button class="ts-card ts-${THEME[s.id]}" data-type="${s.id}">
+              <div class="ts-top"><span class="ts-pop" aria-hidden="true"></span><canvas class="starter-canvas" data-type="${s.id}"></canvas></div>
+              <div class="ts-name"><i aria-hidden="true">✿</i>${s.name}<i aria-hidden="true">✿</i></div>
+              <div class="ts-kind">${s.kind}</div>
+              <p class="ts-desc">${s.desc}</p>
+              <div class="ts-box"><span class="ts-ico" aria-hidden="true">💪</span><span>${s.strength}</span></div>
+              <div class="ts-box"><span class="ts-ico" aria-hidden="true">✨</span><span><b>${DG.MOVES[s.moves.special].name}:</b> ${DG.MOVES[s.moves.special].desc}</span></div>
             </button>`).join('')}
         </div>
-        <p class="fine">All three are equally strong overall — training can improve any weaker area.</p>
-        <p class="save-note">💾 Your dumpling is saved in <b>this browser</b> on this device. Clearing browser data or switching browsers starts a new save.</p>
+        <div class="ts-note"><canvas class="ts-note-pet" width="160" height="130" aria-hidden="true"></canvas><p>All three are equally strong overall — training can improve any weaker area.</p></div>
       </div>`;
+    { // the little happy bao in the bottom note
+      const nc = root.querySelector('.ts-note-pet').getContext('2d');
+      DG.draw.dumpling(nc, { type: 'bao', x: 80, y: 118, size: 92, mood: 'joy', stage: 1, shadow: false, t: 0 });
+      nc.fillStyle = '#ff7f9e'; [[22, 30, 9], [138, 22, 7], [30, 62, 6]].forEach(([x, y, s]) => { nc.beginPath(); nc.moveTo(x, y + s * 0.6); nc.bezierCurveTo(x - s * 1.2, y - s * 0.2, x - s * 0.5, y - s * 1.1, x, y - s * 0.35); nc.bezierCurveTo(x + s * 0.5, y - s * 1.1, x + s * 1.2, y - s * 0.2, x, y + s * 0.6); nc.fill(); });
+    }
     root.querySelectorAll('.starter-canvas').forEach((cv) => {
       const type = cv.dataset.type;
-      adoptStops.push(DG.ui.previewLoop(cv, (t) => Object.assign({ type, stage: 0, size: 120 }, PREVIEW_STYLE[type](t)), 240, 170));
+      adoptStops.push(DG.ui.previewLoop(cv, (t) => Object.assign({ type, stage: 0, size: 150, shadow: false }, PREVIEW_STYLE[type](t)), 240, 170));
     });
-    root.querySelectorAll('.starter-card').forEach((b) => (b.onclick = () => { DG.audio.unlock(); DG.audio.play('babysqueak'); adoptStep2(b.dataset.type); }));
+    root.querySelectorAll('.ts-card').forEach((b) => (b.onclick = () => { DG.audio.unlock(); DG.audio.play('babysqueak'); adoptStep2(b.dataset.type); }));
   }
   /* Shared color / eyes / cheeks picker (adoption + closet) */
   function lookPickerHtml(type, look) {
@@ -69,7 +74,7 @@
           <canvas class="adopt-preview" id="ad-prev"></canvas>
           <div class="adopt-form">
             <label class="lbl" for="ad-name">Name your baby dumpling</label>
-            <input id="ad-name" class="text-in" maxlength="14" value="${s.name === 'Soup Dumpling' ? 'Soupy' : s.name}" autocomplete="off" enterkeyhint="done">
+            <input id="ad-name" class="text-in" maxlength="14" value="${s.id === 'soup' ? 'Shu' : s.name}" autocomplete="off" enterkeyhint="done">
             ${lookPickerHtml(type, look)}
             <div class="lbl">Starting accessory</div>
             <div class="acc-pick">${Object.keys(DG.ACCESSORIES).filter((k) => DG.ACCESSORIES[k].starter).map((a) => `<button class="chip-btn ${a === acc ? 'on' : ''}" data-acc="${a}">${DG.ACCESSORIES[a].icon} ${DG.ACCESSORIES[a].name}</button>`).join('')}</div>
@@ -368,7 +373,7 @@
         </div>
         <details class="howto"><summary>❓ How to play</summary>
           <ul class="nice-list small">
-            <li><b>Care:</b> tap your dumpling to pet it. Tap the food bowl, toy basket, bath and bed (or the Sleep button) to keep its four needs up. Tap anywhere else in the room and it walks there.</li>
+            <li><b>Care:</b> tap your dumpling to pet it. Tap the food bowl, toy basket, bath and bed to keep its four needs up. Tap anywhere else in the room and it walks there.</li>
             <li><b>Grow:</b> your dumpling grows with real time — 1 day to Medium, 3 days to Large, 7 days to Giant. Growing <b>pauses</b> while any need is below 20.</li>
             <li><b>Night:</b> from 9 PM to 7 AM your dumpling sleeps in bed. Waking it up makes its energy drain fast. Sleeping refills energy slowly (about 8 hours from empty to full).</li>
             <li><b>Walk:</b> take your dumpling to the park. Tap to hop over puddles and grab coins.</li>
@@ -378,8 +383,10 @@
             <li><b>Battle tricks:</b> block just before a hit to <b>Parry</b>, or dodge at the last moment for a <b>Perfect Dodge</b>. Both slow time and make your next hit critical. A fully charged Smash breaks through blocks.</li>
             <li><b>Battle (phone):</b> drag anywhere on the left to move; tap the big buttons on the right. Turn your phone sideways for a bigger arena.</li>
             <li><b>Rewards:</b> earn Dumpling Coins from training, battles and care challenges; spend them in the Shop.</li>
+            <li><b>Start over:</b> the 🐣 button at the bottom of Settings lets you adopt a brand new baby dumpling.</li>
           </ul></details>
-        <p class="save-note">💾 Your save lives in <b>this browser</b> on this device and is saved automatically. Clearing browser data or using a different browser starts fresh.</p>`,
+        <p class="save-note">💾 Your save lives in <b>this browser</b> on this device and is saved automatically. Clearing browser data or using a different browser starts fresh.</p>
+        ${DG.pet() ? '<button class="btn ghost start-over" id="st-restart">🐣 Start over with a new baby dumpling</button>' : ''}`,
       buttons: [{ label: 'Done', cls: 'primary' }],
       onOpen(el) {
         el.querySelector('#st-touch').value = s.touch || 'auto';
@@ -387,7 +394,29 @@
         el.querySelector('#st-music').onchange = (e) => { s.music = e.target.checked; DG.save(); DG.audio.syncMusic(); };
         el.querySelector('#st-big').onchange = (e) => { s.bigText = e.target.checked; document.body.classList.toggle('big-text', s.bigText); DG.save(); };
         el.querySelector('#st-touch').onchange = (e) => { s.touch = e.target.value; DG.save(); };
+        const rs = el.querySelector('#st-restart');
+        if (rs) rs.onclick = () => { el.closest('.modal-wrap').querySelector('.modal-x')?.click(); setTimeout(startOver, 220); };
       },
+    });
+  }
+
+  /** Say goodbye to the current dumpling and adopt a new baby. Keeps sound/music/text settings. */
+  function startOver() {
+    const p = DG.pet(); if (!p) return;
+    DG.ui.modal({
+      title: '🐣 Start over?',
+      html: `<p>Say goodbye to <b>${esc(p.name)}</b> and adopt a brand new baby dumpling?</p>
+        <p class="fine">This erases ${esc(p.name)}, your coins, items, decorations and trophies. It can't be undone.</p>`,
+      buttons: [{ label: 'Keep ' + esc(p.name), cls: 'ghost' }, {
+        label: '🐣 Start over', cls: 'danger', onClick() {
+          const keep = Object.assign({}, DG.state.settings);
+          if (DG.ui.current() === 'home' && DG.Home) DG.Home.exit();
+          DG.resetSave();
+          DG.state.settings = Object.assign(DG.state.settings, keep);
+          DG.save();
+          DG.ui.show('adopt');
+        },
+      }],
     });
   }
 
@@ -526,5 +555,5 @@
     clearInterval(el._t); el._t = setInterval(() => { if (!el.hidden && !el.contains(document.activeElement)) render(); }, 2000);
   }
 
-  DG.Menus = { feed, toys, shop, closet, decorate, stats, trophies, settings, checkMilestones, celebrateStage, traitPick, welcomeBack, devPanel, buy };
+  DG.Menus = { startOver, feed, toys, shop, closet, decorate, stats, trophies, settings, checkMilestones, celebrateStage, traitPick, welcomeBack, devPanel, buy };
 })(window.DG);

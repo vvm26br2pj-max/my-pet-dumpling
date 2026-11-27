@@ -34,6 +34,12 @@ def inline(m):
 
 html = re.sub(r'<script src="(js/[a-z]+\.js)\?v=\d+"></script>', inline, html)
 assert 'src="js/' not in html and 'css/style' not in html
+# images referenced from the page or scripts (e.g. src="img/title.webp?v=1") are embedded too
+def embed_ref(m):
+    path = root / 'img' / m.group(2)
+    mime = {'webp': 'image/webp', 'png': 'image/png', 'jpg': 'image/jpeg', 'svg': 'image/svg+xml'}[path.suffix[1:]]
+    return m.group(1) + 'data:%s;base64,%s' % (mime, base64.b64encode(path.read_bytes()).decode())
+html = re.sub(r'(src=")img/([\w.-]+?)(?:\?v=\d+)?(?=")', embed_ref, html)
 html = esc_html(html)  # only touches what is left outside the escaped code (none, normally)
 out = root / 'my-pet-dumpling-single.html'
 out.write_text(html, encoding='ascii')
