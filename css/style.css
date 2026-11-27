@@ -1195,3 +1195,88 @@ button.hud-pic:active { transform: scale(0.95); }
 .tg-energy { white-space: nowrap; }
 .tilt-btn { margin: 0 auto 6px; display: inline-flex; gap: 4px; }
 .tilt-btn.on { background: #e9ddff; box-shadow: 0 0 0 2px #c49bff; }
+
+/* ---------- Home, cozy look (phones): full top panel like the design, 2x2 labelled need cards ---------- */
+@media (max-width: 600px) {
+  #screen-home .hud {
+    grid-template-columns: auto 1fr auto; grid-template-areas: "pic name right" "pic sub sub" "grow grow grow" "needs needs needs";
+    column-gap: 8px; row-gap: 0; padding: 12px 12px 16px; margin: 0 0 34px; border-radius: 24px; border-width: 3px;
+    background:
+      radial-gradient(circle at 50% 0, #fde3cc 11px, transparent 12px) 0 -3px / 34px 20px repeat-x,
+      linear-gradient(180deg, #fff8ef 0%, #fff1e2 100%);
+    box-shadow: 0 4px 0 var(--hud-shadow, #f3c9a6), 0 10px 20px rgba(190, 120, 70, 0.16), inset 0 2px 0 #fff;
+  }
+  #screen-home .hud .pet-sub, #screen-home .hud-trim, #screen-home .hud-bow, #screen-home .hud::after, #screen-home .hud-pop, #screen-home .hud .need-lbl { display: revert; }
+  #screen-home .hud .pet-sub { display: block; grid-area: sub; align-self: start; font-size: 0.82em; margin-top: 2px; line-height: 1.5; }
+  #screen-home .hud .pet-name { grid-area: name; font-size: 1.6em; align-self: end; }
+  #screen-home .hud-pic { width: 84px; height: 78px; margin: -4px 0 -2px -4px; }
+  #screen-home .hud-pop { display: block; transform: rotate(-20deg) scale(0.75); left: -6px; top: 0; }
+  #screen-home .hud .top-right { gap: 5px; align-self: start; }
+  #screen-home .hud .coins { font-size: 1.05em; padding: 3px 10px 3px 5px; border-width: 2px; box-shadow: 0 2px 0 #f0bb3a, inset 0 2px 0 #fffbe8; }
+  #screen-home .hud .icon-btn { width: 36px; height: 36px; font-size: 1.05em; border-width: 2px; }
+  #screen-home .hud .grow-box { margin-top: 8px; }
+  #screen-home .hud .grow-label:not(.paused) { display: block; font-size: 0.78em; margin-bottom: 3px; }
+  #screen-home .hud .grow-box .bar { height: 10px; }
+  #screen-home .hud .needs { grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  #screen-home .hud .need { padding: 8px 10px 9px; border-radius: 18px; border-width: 3px; box-shadow: 0 0 0 2px var(--e), 0 3px 0 var(--e); }
+  #screen-home .hud .need-top { font-size: 0.95em; margin-bottom: 6px; }
+  #screen-home .hud .need-name { gap: 6px; }
+  #screen-home .hud .need-ico { width: 26px; height: 26px; font-size: 20px; line-height: 26px; }
+  #screen-home .hud .need-val { padding: 0 7px; min-width: 32px; border-radius: 10px; font-size: 0.95em; }
+  #screen-home .hud .need .bar { height: 12px; border-width: 2px; }
+  #screen-home .hud-trim { bottom: -14px; height: 20px; }
+  #screen-home .hud-bow { bottom: -26px; width: 48px; height: 33px; }
+}
+/* string of warm fairy lights hanging under the top panel (all sizes) */
+.hud-lights { position: absolute; left: 6px; right: 6px; bottom: -30px; height: 18px; pointer-events: none; z-index: 1;
+  background:
+    radial-gradient(circle at 50% 70%, #fff8c8 0 3px, #ffd86b 3.5px 5px, rgba(255, 210, 100, 0.35) 6px, transparent 10px) 12px 0 / 44px 18px repeat-x,
+    radial-gradient(ellipse 26px 9px at 50% 0, transparent 8px, rgba(120, 90, 60, 0.45) 8.5px 9.5px, transparent 10px) 0 0 / 44px 18px repeat-x; }
+.hud-lights { animation: twinkle 2.4s ease-in-out infinite; }
+@keyframes twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.78; } }
+@media (max-width: 600px) { .hud-lights { bottom: -26px; } }
+/* bottom bar: a soft cream panel with a label under each icon (like the cozy design) */
+.room-wrap .dock.glass.labelled {
+  background: linear-gradient(180deg, rgba(255, 250, 243, 0.97), rgba(251, 239, 226, 0.97));
+  border: 3px solid #f4dfc8; box-shadow: 0 4px 0 #ecd2b5, 0 10px 20px rgba(150, 90, 50, 0.18), inset 0 2px 0 #fff;
+  -webkit-backdrop-filter: none; backdrop-filter: none; }
+.room-wrap .dock.glass.labelled::before { display: none; }
+.dock.glass.labelled .act { display: flex; flex-direction: column; align-items: center; gap: 0; position: relative; }
+.dock.glass.labelled .act + .act::after { content: ''; display: block; position: absolute; left: 0; top: 16%; bottom: 16%; width: 1.5px; background: #ecd8c2; border-radius: 2px; }
+.act-lbl { display: none; }
+.dock.glass.labelled .act-lbl { display: block; font-style: normal; font-weight: 700; color: #5a3519; font-size: 1.05em; line-height: 1.1; margin-top: -2px; padding: 1px 10px 2px; border-radius: 999px; white-space: nowrap; }
+@media (max-width: 600px) {
+  .room-wrap .dock.glass.labelled { padding: 4px 4px 6px; border-radius: 20px; border-width: 2px; }
+  .dock.glass.labelled .act-lbl { font-size: 0.72em; padding: 1px 6px 2px; }
+  .room-wrap .dock.glass.labelled .act span, .room-wrap .dock.glass.labelled .act.big span { width: min(54px, 14vw); height: min(54px, 14vw); }
+}
+@media (max-width: 600px) {
+  #screen-home .hud .pers-sep { display: none; }
+  #screen-home .hud .pers-line { display: block; font-weight: 700; color: #4a2c1a; }
+  #screen-home .hud .pers-line::before { content: '🌳 '; }
+}
+@media (max-width: 600px) { .decor-prev { max-height: 210px; width: auto; max-width: 100%; margin: 0 auto 6px; object-fit: contain; } }
+
+/* ---------- Cozy look: gloss, depth and shimmer ---------- */
+@media (max-width: 600px) {
+  #screen-home .hud .grow-box { display: none; } /* growth details live in the Stats screen (tap the portrait) */
+  #screen-home .hud { grid-template-areas: "pic name right" "pic sub sub" "needs needs needs"; }
+}
+.hud { overflow: visible; }
+.hud::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.55) 45%, transparent 60%) -200% 0 / 200% 100% no-repeat;
+  animation: hudSheen 7s ease-in-out infinite; }
+@keyframes hudSheen { 0%, 70% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.hud .need { background: linear-gradient(180deg, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0) 55%), var(--t); position: relative; }
+.hud .need::after { content: ''; position: absolute; left: 10%; right: 10%; top: 3px; height: 30%; border-radius: 999px; background: linear-gradient(rgba(255,255,255,0.6), rgba(255,255,255,0)); pointer-events: none; }
+.hud .coins { box-shadow: 0 3px 0 #f0bb3a, inset 0 2px 0 #fffbe8, 0 4px 10px rgba(240,180,60,0.35); }
+.hud .icon-btn { box-shadow: 0 3px 0 #ead6c3, inset 0 2px 0 #fff, 0 4px 10px rgba(180,120,80,0.18); }
+.room-wrap { box-shadow: 0 6px 0 rgba(220,170,130,0.45), 0 14px 30px rgba(170,100,60,0.22); }
+.room-wrap .dock.glass.labelled::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0) 40%); }
+body { background:
+  radial-gradient(circle at 12% 6%, rgba(255,255,255,0.8) 0 2px, transparent 3px),
+  radial-gradient(circle at 86% 12%, rgba(255,255,255,0.8) 0 2px, transparent 3px),
+  radial-gradient(ellipse 22% 6% at 78% 3%, rgba(255,255,255,0.6), transparent 70%),
+  radial-gradient(ellipse 18% 5% at 20% 2%, rgba(255,255,255,0.55), transparent 70%),
+  linear-gradient(180deg, #fbdcd2 0%, #fbe3d6 40%, #fae6d6 100%) fixed; }

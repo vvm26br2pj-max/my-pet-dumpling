@@ -147,7 +147,10 @@
   function layoutRoom() {
     const phone = window.matchMedia('(max-width: 600px)').matches;
     const dockEl = root.querySelector('.dock');
-    placeProps(phone);
+    if (DG.setRoomLayout(phone ? 'tall' : 'wide')) { // switched arrangement: put the dumpling back on its spot
+      CAM.init = false;
+      if (!busy && !play) { P.x = R.spots.home.x; P.y = R.spots.home.y; P.walking = false; }
+    }
     if (!phone) { // whole room visible, with a strip of extra floor under it for the button bar
       const k = (canvas.clientWidth || R.W) / R.W;
       Object.assign(CAM, { on: false, E: 0, x: 0, vw: R.W, measured: true, F: ((dockEl ? dockEl.offsetHeight : 70) + 16) / k });
@@ -164,7 +167,7 @@
     // zoom = how much of the room's width is shown; players change it by pinching (remembered in settings)
     const sMin = Math.max(cssW / R.W, (cssH - dockPx) / (R.H - 40 + TOP_WALL + 18 + 400)); // most zoomed out
     CAM.zoomMax = cssW / sMin; CAM.zoomMin = 260;
-    const zoom = Math.max(CAM.zoomMin, Math.min(CAM.zoomMax, (DG.state.settings && DG.state.settings.roomZoom) || 430));
+    const zoom = Math.max(CAM.zoomMin, Math.min(CAM.zoomMax, (DG.state.settings && DG.state.settings.roomZoomTall) || R.W)); // whole room by default
     let s = Math.max(cssW / zoom, sMin);
     const vw = Math.min(R.W, cssW / s), vh = cssH / s;
     const dockL = dockPx / s;
@@ -177,17 +180,8 @@
   }
   function setRoomZoom(z) {
     const st = DG.state.settings || (DG.state.settings = {});
-    st.roomZoom = Math.max(CAM.zoomMin || 260, Math.min(CAM.zoomMax || 900, z));
+    st.roomZoomTall = Math.max(CAM.zoomMin || 260, Math.min(CAM.zoomMax || 900, z));
     layoutRoom();
-  }
-  /** On tall phone screens the bowl and toy basket sit further forward on the floor, so the
-      furniture isn't all in one line. Their tap areas and the eating spot move with them. */
-  const PROP_HOME = { bowl: R.bowl.y, basket: R.basket.y, eat: R.spots.bowl.y };
-  const PHONE_DROP = { bowl: 120, basket: 48 };
-  function placeProps(phone) {
-    R.bowl.y = PROP_HOME.bowl + (phone ? PHONE_DROP.bowl : 0);
-    R.basket.y = PROP_HOME.basket + (phone ? PHONE_DROP.basket : 0);
-    R.spots.bowl.y = PROP_HOME.eat + (phone ? PHONE_DROP.bowl : 0);
   }
   function toRoom(e) {
     if (!CAM.on) return DG.ui.toLogical(canvas, e, R.W);
@@ -203,7 +197,7 @@
         <button class="hud-pic" id="h-pic-btn" aria-label="See your dumpling's stats and growth"><canvas id="h-pic" width="260" height="240"></canvas><i class="hud-pop"></i></button>
         <div class="hud-id">
           <div class="pet-name"><span id="h-name"></span><span class="hud-heart" aria-hidden="true">💕</span></div>
-          <div class="pet-sub"><span class="badge" id="h-stage"></span> <span id="h-age"></span> · <span id="h-pers"></span></div>
+          <div class="pet-sub"><span class="badge" id="h-stage"></span> <span id="h-age"></span><span class="pers-sep"> · </span><span class="pers-line"><span id="h-pers"></span></span></div>
         </div>
         <div class="top-right">
           <div class="coins" title="Dumpling Coins"><span class="coin-ico">🪙</span><b id="h-coins">0</b></div>
@@ -215,16 +209,16 @@
         <div class="needs" id="h-needs">${NEED_ITEMS.map(([k, label, icon]) => `
           <div class="need n-${k}" data-k="${k}" role="button" tabindex="0" title="How to keep ${label} up"><div class="need-top"><span class="need-name">${k === 'fullness' ? '<canvas class="need-ico" id="h-ico-full" width="96" height="96" aria-hidden="true"></canvas>' : k === 'happiness' ? '<canvas class="need-ico" id="h-ico-happy" width="96" height="96" aria-hidden="true"></canvas>' : `<span class="need-ico">${icon}</span>`}<span class="need-lbl">${label}</span></span><b class="need-val">0</b></div>${DG.ui.bar(0, 100, '#7fd8a6', label)}</div>`).join('')}
         </div>
-        <div class="hud-trim" aria-hidden="true"></div><svg aria-hidden="true" class="hud-bow" viewBox="0 0 64 44"><path d="M32 20 C22 6 6 2 4 12 C2 22 16 28 32 22 Z M32 20 C42 6 58 2 60 12 C62 22 48 28 32 22 Z" class="bw-a" stroke-linejoin="round"/><path d="M29 23 L20 40 L26 37 L28 42 L32 26 Z M35 23 L44 40 L38 37 L36 42 L32 26 Z" class="bw-b" stroke-linejoin="round"/><ellipse cx="32" cy="21" rx="6" ry="5.5" class="bw-c" /><path d="M12 10 C14 8 18 8 20 10" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/></svg>
+        <div class="hud-lights" aria-hidden="true"></div><div class="hud-trim" aria-hidden="true"></div><svg aria-hidden="true" class="hud-bow" viewBox="0 0 64 44"><path d="M32 20 C22 6 6 2 4 12 C2 22 16 28 32 22 Z M32 20 C42 6 58 2 60 12 C62 22 48 28 32 22 Z" class="bw-a" stroke-linejoin="round"/><path d="M29 23 L20 40 L26 37 L28 42 L32 26 Z M35 23 L44 40 L38 37 L36 42 L32 26 Z" class="bw-b" stroke-linejoin="round"/><ellipse cx="32" cy="21" rx="6" ry="5.5" class="bw-c" /><path d="M12 10 C14 8 18 8 20 10" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/></svg>
       </header>
       <div class="room-wrap">
         <canvas id="room-canvas" aria-label="Your dumpling's home. Tap your dumpling to pet it."></canvas>
-        <nav class="actions dock glass" aria-label="Actions">
-          <button class="act big train" data-a="train" title="Training" aria-label="Training"><span>🏋️</span></button>
-          <button class="act big arena" data-a="arena" id="h-arena" title="Arena" aria-label="Arena"><span>🏟️</span></button>
-          <button class="act a-shop" data-a="shop" title="Shop" aria-label="Shop"><span>🛍️</span></button>
-          <button class="act a-closet" data-a="closet" title="Closet" aria-label="Closet"><span><svg class="ico-svg" viewBox="0 0 64 64" aria-hidden="true"><path d="M10 14 Q32 3 54 14 L54 18 L10 18 Z" fill="#c98a4f" stroke="#6b3f1e" stroke-width="3" stroke-linejoin="round"/><rect x="12" y="17" width="40" height="38" rx="4" fill="#e6b073" stroke="#6b3f1e" stroke-width="3"/><rect x="16" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><rect x="33" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><circle cx="28" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><circle cx="36" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><path d="M15 55 v5 M49 55 v5" stroke="#6b3f1e" stroke-width="4" stroke-linecap="round"/><path d="M18 24 v10" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"/></svg></span></button>
-          <button class="act a-decorate" data-a="decorate" title="Decorate" aria-label="Decorate"><span>🏠</span></button>
+        <nav class="actions dock glass labelled" aria-label="Actions">
+          <button class="act big train" data-a="train" title="Training" aria-label="Training"><span>🏋️</span><em class="act-lbl">Train</em></button>
+          <button class="act big arena" data-a="arena" id="h-arena" title="Arena" aria-label="Arena"><span>🏟️</span><em class="act-lbl">Arena</em></button>
+          <button class="act a-shop" data-a="shop" title="Shop" aria-label="Shop"><span>🛍️</span><em class="act-lbl">Shop</em></button>
+          <button class="act a-closet" data-a="closet" title="Closet" aria-label="Closet"><span><svg class="ico-svg" viewBox="0 0 64 64" aria-hidden="true"><path d="M10 14 Q32 3 54 14 L54 18 L10 18 Z" fill="#c98a4f" stroke="#6b3f1e" stroke-width="3" stroke-linejoin="round"/><rect x="12" y="17" width="40" height="38" rx="4" fill="#e6b073" stroke="#6b3f1e" stroke-width="3"/><rect x="16" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><rect x="33" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><circle cx="28" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><circle cx="36" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><path d="M15 55 v5 M49 55 v5" stroke="#6b3f1e" stroke-width="4" stroke-linecap="round"/><path d="M18 24 v10" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"/></svg></span><em class="act-lbl">Wardrobe</em></button>
+          <button class="act a-decorate" data-a="decorate" title="Decorate" aria-label="Decorate"><span>🏠</span><em class="act-lbl">House</em></button>
           ${TROPHY_IN_HEADER ? '' : '<button class="act a-trophies" data-a="trophies" title="Trophies" aria-label="Trophies"><span>🏆</span></button>'}
         </nav>
         <div class="bonus-chip" id="h-bonus" hidden></div>
@@ -367,7 +361,7 @@
     if (['home', 'night'].includes(DG.audio.track())) DG.audio.homeTrack();
     const ab = root.querySelector('#h-arena');
     ab.classList.toggle('soft-lock', si < 1);
-    ab.innerHTML = '<span>🏟️</span>';
+    ab.innerHTML = '<span>🏟️</span><em class="act-lbl">Arena</em>';
     ab.title = si < 1 ? 'Arena (friend battles only until Small)' : 'Arena'; ab.setAttribute('aria-label', ab.title);
   }
 
@@ -1032,7 +1026,7 @@
     DG.draw.room(ctx, { t: T, doorOpen, decor: st.equipped.decor, bowlFood, toys: st.inventory.toys, labels: false, home: st.home, top: CAM.E, bottom: CAM.F, sprites });
     if (p.asleep) {
       const b = R.spots.bed;
-      DG.draw.dumpling(ctx, { type: p.type, look: p.look, x: DG.bedPoint(860, 0).x, y: DG.bedPoint(0, 440).y, size: Math.min(s, 150), t: T, mood: 'sleeping', stage: si, accessory: p.accessory, trait: p.trait,
+      DG.draw.dumpling(ctx, { type: p.type, look: p.look, x: DG.bedPoint(860, 0).x, y: DG.bedPoint(0, 440).y, size: Math.min(s, 150 * DG.bedScale()), t: T, mood: 'sleeping', stage: si, accessory: p.accessory, trait: p.trait,
         squash: Math.sin(T * 1.6) * 0.03, shadow: false });
       DG.draw.bedBlanket(ctx, true);
     } else if (P.inTub) {
@@ -1142,6 +1136,7 @@
     feed, startPlay, openBath, renderHud, say, bedtime,
     celebrate(text) { P.hopV = 450; P.mood = 'joy'; P.moodT = 2.5; say(text, 3); DG.draw.confetti(parts, P.x, P.y - 120, 40); hearts(6); DG.audio.play('fanfare'); },
     isBusy: () => busy || !!play,
+    _probe: (cx, cy) => toRoom({ clientX: cx, clientY: cy }), // test hook: screen point -> room point
   };
   DG.ui.register('home', DG.Home);
 })(window.DG);
