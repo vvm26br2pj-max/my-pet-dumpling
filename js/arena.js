@@ -4,7 +4,7 @@
   const rand = (a, b) => a + Math.random() * (b - a);
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const sfx = (n) => DG.audio.play(n);
+  const sfx = (n) => { DG.audio.play(n); netFx('sfx', [n]); };
   const STAGE_SCALE = { 1: 1, 2: 1.2, 3: 1.6 };
   const ARENA_R = { 1: 9, 2: 10.5, 3: 14 };
   const MATCH_TIME = 90;
@@ -39,20 +39,12 @@
             <p>Try battling right away! ${DG.ui.esc(p.name)} becomes a <b>temporary grown-up</b> with its special and second move. No rewards, no snack bonus used — just practice.</p>
             <div class="chip-row">${['charger', 'blocker', 'dodger'].map((s) => `<button class="btn small" data-practice="${s}" ${hasThree ? '' : 'disabled'}>${DG.STYLES[s].icon} vs ${DG.STYLES[s].name}</button>`).join('')}</div>
           </div>
-          <div class="card controls-card">
-            <h3>🎮 Controls</h3>
-            <ul class="nice-list small">
-              ${DG.ui.isTouch() ? `<li>👈 <b>Left side:</b> put your thumb down anywhere and drag to move.</li>
-              <li>👉 <b>Right side:</b> big 👊 <b>Attack</b> (tap for combos, hold to Smash), hold 🛡️ <b>Block</b>, tap 💨 <b>Dodge</b>, and ✨ <b>Special</b> when it glows.</li>
-              <li>📱 Turn your phone sideways for a bigger arena. Attacks reach a little farther on touch screens.</li>` : `<li><kbd>WASD</kbd>/<kbd>Arrows</kbd> move · <kbd>Space</kbd> dodge (uses stamina)</li>
-              <li><kbd>J</kbd> attack (tap 3 times for a combo) · hold <kbd>J</kbd> to charge a <b>Smash</b> · <kbd>K</kbd> hold to block</li>
-              <li><kbd>L</kbd> special (½ meter) · <kbd>I</kbd> second move · <kbd>O</kbd> ultimate (full meter)</li>`}
-              <li>✨ <b>Parry:</b> raise your guard just before a hit lands. <b>Perfect dodge:</b> dodge at the last moment. Both slow time and make your next hit <b>critical</b>.</li>
-              <li>💥 A fully charged Smash crushes the opponent's guard.</li>
-              <li>Watch for the <b style="color:#e8453c">red ring and "!"</b> — that's an attack wind-up. Dodge or block!</li>
-              <li>Blocking only stops hits from the front, and a tired guard breaks.</li>
-            </ul>
+          <div class="card practice friend-card">
+            <h3>👥 Battle a Friend</h3>
+            <p>Battle a friend's dumpling on another phone or computer. You both need to be on the <b>same Wi‑Fi</b>. Just for fun: no coins or rewards.</p>
+            <div class="chip-row"><button class="btn small primary" id="a-host" ${hasThree ? '' : 'disabled'}>📡 Host a battle</button><button class="btn small" id="a-join" ${hasThree ? '' : 'disabled'}>🔑 Join with a code</button></div>
           </div>
+          <button class="btn controls-btn" id="a-controls">🎮 Controls</button>
         </div>
         <div class="lobby-col">
           <h3 class="col-title">Opponents</h3>
@@ -74,10 +66,27 @@
         </div>
       </div>`;
     root.querySelector('#a-home').onclick = () => { DG.audio.play('click'); DG.ui.show('home'); };
+    root.querySelector('#a-controls').onclick = () => { DG.audio.play('click'); DG.ui.modal({ title: '🎮 Controls', html: controlsHtml(), buttons: [{ label: 'Got it', cls: 'primary' }] }); };
     const stop = DG.ui.previewLoop(root.querySelector('#a-prev'), (t) => ({ type: p.type, look: p.look, stage: si, size: 90, accessory: p.accessory, trait: p.trait, mood: 'joy', hop: Math.max(0, Math.sin(t * 4)) * 8 }), 140, 120);
     root._stop = stop;
     root.querySelectorAll('[data-fight]').forEach((b) => (b.onclick = () => { DG.audio.unlock(); startMatch({ opp: +b.dataset.fight }); }));
     root.querySelectorAll('[data-practice]').forEach((b) => (b.onclick = () => { DG.audio.unlock(); startMatch({ practice: b.dataset.practice }); }));
+    root.querySelector('#a-host').onclick = () => { DG.audio.unlock(); hostGame(); };
+    root.querySelector('#a-join').onclick = () => { DG.audio.unlock(); joinGame(); };
+  }
+
+  function controlsHtml() {
+    return `<ul class="nice-list small">
+              ${DG.ui.isTouch() ? `<li>👈 <b>Left side:</b> put your thumb down anywhere and drag to move.</li>
+              <li>👉 <b>Right side:</b> big 👊 <b>Attack</b> (tap for combos, hold to Smash), hold 🛡️ <b>Block</b>, tap 💨 <b>Dodge</b>, and ✨ <b>Special</b> when it glows.</li>
+              <li>📱 Turn your phone sideways for a bigger arena. Attacks reach a little farther on touch screens.</li>` : `<li><kbd>WASD</kbd>/<kbd>Arrows</kbd> move · <kbd>Space</kbd> dodge (uses stamina)</li>
+              <li><kbd>J</kbd> attack (tap 3 times for a combo) · hold <kbd>J</kbd> to charge a <b>Smash</b> · <kbd>K</kbd> hold to block</li>
+              <li><kbd>L</kbd> special (½ meter) · <kbd>I</kbd> second move · <kbd>O</kbd> ultimate (full meter)</li>`}
+              <li>✨ <b>Parry:</b> raise your guard just before a hit lands. <b>Perfect dodge:</b> dodge at the last moment. Both slow time and make your next hit <b>critical</b>.</li>
+              <li>💥 A fully charged Smash crushes the opponent's guard.</li>
+              <li>Watch for the <b style="color:#e8453c">red ring and "!"</b> — that's an attack wind-up. Dodge or block!</li>
+              <li>Blocking only stops hits from the front, and a tired guard breaks.</li>
+            </ul>`;
   }
 
   /* ===================== Fighter setup ===================== */
@@ -329,7 +338,7 @@
     const bubble = new THREE.Mesh(new THREE.SphereGeometry(1.75, 24, 16), new THREE.MeshBasicMaterial({ color: 0x9fe0ff, transparent: true, opacity: 0.28 }));
     bubble.position.y = 0.9; bubble.visible = false; g.add(bubble);
     // facing marker for the player
-    if (def.isPlayer) {
+    if (def.isMe != null ? def.isMe : def.isPlayer) {
       const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.45, 3), new THREE.MeshBasicMaterial({ color: 0x4cc58a }));
       arrow.rotation.x = Math.PI / 2; arrow.position.set(0, 0.06, 1.65); g.add(arrow);
     }
@@ -448,12 +457,14 @@
   }
   /** Comic-style impact starburst. */
   function burst3d(pos, size, tint, y) {
+    netFx('burst3d', [pos, size, tint, y]);
     const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: burstTexture(), color: tint || 0xffffff, transparent: true, depthTest: false }));
     m.position.set(pos.x, (y || 1) * match.S, pos.z); m.material.rotation = Math.random() * TAU;
     addFx(m, 0.24, (e, k) => { const sc = size * match.S * (0.6 + k * 0.8); m.scale.set(sc, sc, 1); m.material.opacity = 1 - k * k; });
   }
   /** White crescent swipe in front of an attacker. */
   function slashFx(f, big) {
+    netFx('slashFx', [f, big]);
     const S = match.S, grp = new THREE.Group();
     const m = new THREE.Mesh(new THREE.RingGeometry(1.0, big ? 1.6 : 1.35, 24, 1, -Math.PI / 2 - 1.0, 2.0),
       new THREE.MeshBasicMaterial({ color: big ? 0xffe39a : 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
@@ -474,11 +485,13 @@
     el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
     if (dur) { clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove(cls), dur * 1000); }
   }
-  const flashScreen = () => overlay('.a-flash', 'go');
-  function speedLines(d) { match.speedT = Math.max(match.speedT || 0, d); }
+  const flashScreen = () => { overlay('.a-flash', 'go'); netFx('flashScreen', []); };
+  function speedLines(d) {
+    netFx('speedLines', [d]); match.speedT = Math.max(match.speedT || 0, d); }
   function cutIn(f, text) {
+    netFx('cutIn', [f, text]);
     const el = stageEl && stageEl.querySelector('.a-cutin'); if (!el) return;
-    el.className = 'a-cutin' + (f.isPlayer ? '' : ' enemy');
+    el.className = 'a-cutin' + (f === meF() ? '' : ' enemy');
     el.innerHTML = `<canvas width="220" height="190"></canvas><b>${DG.ui.esc(text)}!</b>`;
     const c = el.querySelector('canvas').getContext('2d');
     DG.draw.dumpling(c, { type: f.shape, look: f.look, colors: f.colors2d || undefined, x: 110, y: 182, size: 150, mood: 'grumpy', stage: f.stageIdx,
@@ -491,11 +504,13 @@
     overlay('.a-combo', 'show', 1.4);
   }
   function ring(pos, color, maxR, dur) {
+    netFx('ring', [pos, color, maxR, dur]);
     const m = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
     m.rotation.x = -Math.PI / 2; m.position.set(pos.x, 0.08, pos.z);
     addFx(m, dur, (e, k) => { const s = 0.3 + maxR * k; m.scale.set(s, s, s); m.material.opacity = 0.85 * (1 - k); });
   }
   function puffs(pos, n, color, spread, y) {
+    netFx('puffs', [pos, n, color, spread, y]);
     for (let i = 0; i < n; i++) {
       const m = new THREE.Mesh(new THREE.SphereGeometry(rand(0.3, 0.6) * match.S, 10, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 }));
       const a = Math.random() * TAU, v = new THREE.Vector3(Math.cos(a), rand(0.1, 0.6), Math.sin(a)).multiplyScalar(spread * rand(1.2, 2));
@@ -504,6 +519,7 @@
     }
   }
   function sparks(pos, color) {
+    netFx('sparks', [pos, color]);
     for (let i = 0; i < 10; i++) {
       const m = new THREE.Mesh(new THREE.SphereGeometry(0.09 * match.S, 6, 4), new THREE.MeshBasicMaterial({ color: color || 0xffd36a, transparent: true }));
       const v = new THREE.Vector3(rand(-1, 1), rand(0.5, 1.8), rand(-1, 1)).multiplyScalar(6 * match.S);
@@ -522,6 +538,7 @@
     }
   }
   function floatText(f, text, color, big) {
+    netFx('floatText', [f, text, color, big]);
     const el = document.createElement('div');
     el.className = 'ftext' + (big ? ' big' : '');
     el.textContent = text; el.style.color = color || '#fff';
@@ -529,6 +546,7 @@
     floats.push({ el, pos: new THREE.Vector3(f.pos.x + rand(-0.4, 0.4), (f.mesh.topY + 0.6) * match.S, f.pos.z), life: 1.0 });
   }
   function banner(html, dur) {
+    netFx('banner', [html, dur]);
     const b = stageEl.querySelector('.a-banner');
     b.innerHTML = html; b.classList.add('show');
     clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('show'), (dur || 1.2) * 1000);
@@ -584,7 +602,8 @@
       match.shake = Math.max(match.shake, (big ? 0.3 : 0.12) * S);
       if (big) flashScreen();
       att.chain++; att.chainT = 1.6; def.chain = 0;
-      if (att.isPlayer) { match.stats.maxCombo = Math.max(match.stats.maxCombo, att.chain); if (att.chain >= 2) comboText(att.chain); }
+      if (att === meF()) { match.stats.maxCombo = Math.max(match.stats.maxCombo, att.chain); if (att.chain >= 2) comboText(att.chain); }
+      else if (match.net && att.chain >= 2) netSendFx('comboText', [att.chain]);
     }
     d = Math.max(1, Math.round(d));
     def.hp = Math.max(0, def.hp - d);
@@ -631,7 +650,7 @@
     loser.hp = 0; setState(loser, 'ko'); loser.mv = null; loser.blocking = false; loser.bubble = 0;
     sfx('thud'); cheer(1.5); match.shake = 0.3 * match.S;
     match.hitstop = 0.18; match.slow = 1.1; speedLines(1.1); flashScreen(); burst3d(loser.pos, 5, 0xffffff);
-    endMatch(winner.isPlayer ? 'win' : 'lose', 'ko');
+    endMatch(winner === F[0] ? 'win' : 'lose', 'ko');
   }
 
   /* ---------- Special moves ---------- */
@@ -974,13 +993,14 @@
     if (!window.THREE) { DG.ui.toast('3D library not loaded — check your internet connection and reload.'); return; }
     if (root._stop) root._stop();
     DG.audio.setTrack('battle');
-    const practice = opts.practice || null;
-    const pDef = playerDef(!!practice);
-    const opp = practice ? null : DG.OPPONENTS[opts.opp];
-    const oDef = oppDef(opp, pDef, practice);
-    const si = pDef.stageIdx;
+    const practice = opts.net ? null : opts.practice || null;
+    const pDef = opts.net ? Object.assign({}, opts.net.hostDef, { isMe: net.me === 0 }) : playerDef(!!practice);
+    const opp = practice || opts.net ? null : DG.OPPONENTS[opts.opp];
+    const oDef = opts.net ? Object.assign({}, opts.net.guestDef, { isMe: net.me === 1 }) : oppDef(opp, pDef, practice);
+    const myDef = opts.net && net.me === 1 ? oDef : pDef;
+    const si = opts.net ? Math.max(pDef.stageIdx, oDef.stageIdx) : pDef.stageIdx;
     const S = STAGE_SCALE[si] || 1.2, R = ARENA_R[si] || 10.5;
-    match = { stats: { maxCombo: 0, perfect: 0, parries: 0, smashes: 0 }, hitstop: 0, slow: 0, speedT: 0, practice, opp, S, R, si, time: MATCH_TIME, phase: 'intro', phaseT: 0, over: false, endT: 0, shake: 0, cheer: 0.6, paused: false, winner: null };
+    match = { net: !!opts.net, stats: { maxCombo: 0, perfect: 0, parries: 0, smashes: 0 }, hitstop: 0, slow: 0, speedT: 0, practice, opp, S, R, si, time: MATCH_TIME, phase: 'intro', phaseT: 0, over: false, endT: 0, shake: 0, cheer: 0.6, paused: false, winner: null };
     root.innerHTML = `
       <div class="arena-stage" id="a-stage">
         <div class="a-hud">
@@ -988,7 +1008,7 @@
           <div class="a-timer" id="a-timer">90</div>
           <div class="a-side right" id="a-p2"></div>
         </div>
-        <div class="a-sub">${practice ? '🥋 Practice match — no rewards' : DG.pet().foodBonus ? `${DG.FOODS[DG.pet().foodBonus.food].icon} Snack bonus: ${DG.pet().foodBonus.label}` : ''}</div>
+        <div class="a-sub">${opts.net ? '👥 Friend battle — just for fun' : practice ? '🥋 Practice match — no rewards' : DG.pet().foodBonus ? `${DG.FOODS[DG.pet().foodBonus.food].icon} Snack bonus: ${DG.pet().foodBonus.label}` : ''}</div>
         <div class="a-moves" id="a-moves"></div>
         <div class="a-speed"></div>
         <div class="a-flash"></div>
@@ -1006,9 +1026,9 @@
             <button data-t="attack" class="t-att" aria-label="Attack">👊<small>Attack</small></button>
             <button data-t="block" class="t-blk" aria-label="Block (hold)">🛡️<small>Block</small></button>
             <button data-t="dodge" class="t-dge" aria-label="Dodge">💨<small>Dodge</small></button>
-            <button data-t="special" class="t-sp ${pDef.canSpecial ? '' : 'off'}" aria-label="Special">✨<small>${pDef.canSpecial ? 'Special' : '🔒'}</small></button>
-            ${pDef.canMove2 ? '<button data-t="move2" class="t-m2" aria-label="Move 2">🌀<small>Move 2</small></button>' : ''}
-            ${pDef.canUlt ? '<button data-t="ult" class="t-ult" aria-label="Ultimate">🌟<small>Ultimate</small></button>' : ''}
+            <button data-t="special" class="t-sp ${myDef.canSpecial ? '' : 'off'}" aria-label="Special">✨<small>${myDef.canSpecial ? 'Special' : '🔒'}</small></button>
+            ${myDef.canMove2 ? '<button data-t="move2" class="t-m2" aria-label="Move 2">🌀<small>Move 2</small></button>' : ''}
+            ${myDef.canUlt ? '<button data-t="ult" class="t-ult" aria-label="Ultimate">🌟<small>Ultimate</small></button>' : ''}
           </div>
         </div>
         <div class="a-rotate" id="a-rotate" hidden>🔄 Turn your phone sideways for a bigger arena <button aria-label="Dismiss">✕</button></div>
@@ -1026,8 +1046,8 @@
     F[0].pos.set(0, 0, R * 0.45); F[1].pos.set(0, 0, -R * 0.45);
     F[0].facing = Math.PI; F[1].facing = 0;
     F[0].hopY = (si === 3 ? 30 : 12) * S; F[1].hopY = 0;
-    camera.position.set(0, R * 1.2, R * 2.2); camera.lookAt(0, 0, 0);
-    if (si === 3) camera.position.set(0, R * 2, R * 3.2);
+    camera.position.set(0, R * 1.2, R * 2.2 * camSide()); camera.lookAt(0, 0, 0);
+    if (si === 3) camera.position.set(0, R * 2, R * 3.2 * camSide());
     renderHud(true);
     wireControls();
     banner(si === 3 ? `🌟 GIANT ${DG.ui.esc(pDef.name)} ENTERS! 🌟` : `${DG.ui.esc(pDef.name)} <span class="vs">VS</span> ${DG.ui.esc(oDef.name)}`, si === 3 ? 2.6 : 1.8);
@@ -1079,7 +1099,7 @@
     if (!stageEl) return;
     const side = (f, el) => {
       if (full || !el.firstChild) {
-        el.innerHTML = `<div class="a-name">${DG.ui.esc(f.name)} <small>${f.isPlayer ? DG.STAGES[f.stageIdx].name : DG.STYLES[f.style].name}</small></div>
+        el.innerHTML = `<div class="a-name">${DG.ui.esc(f.name)} <small>${match.net ? (f === meF() ? 'You' : 'Friend') : f.isPlayer ? DG.STAGES[f.stageIdx].name : DG.STYLES[f.style].name}</small></div>
           <div class="a-bar hp"><i></i><em></em></div><div class="a-bar sta"><i></i></div>${f.canSpecial ? '<div class="a-bar sp"><i></i><b></b></div>' : ''}`;
       }
       const hpPct = (f.hp / f.maxHp) * 100;
@@ -1090,10 +1110,11 @@
       const sp = el.querySelector('.sp');
       if (sp) { sp.querySelector('i').style.width = f.special + '%'; sp.classList.toggle('ready', f.special >= 50); sp.querySelector('b').textContent = f.special >= 100 && f.canUlt ? 'ULTIMATE!' : f.special >= 50 ? 'SPECIAL READY' : ''; }
     };
-    side(F[0], stageEl.querySelector('#a-p1'));
-    side(F[1], stageEl.querySelector('#a-p2'));
+    const me = meF(), them = F[0] === me ? F[1] : F[0];
+    side(me, stageEl.querySelector('#a-p1'));
+    side(them, stageEl.querySelector('#a-p2'));
     stageEl.querySelector('#a-timer').textContent = Math.ceil(match.time);
-    const p = F[0];
+    const p = me;
     const chip = (key, label, ok, extra) => `<span class="mchip ${ok ? 'ok' : ''}"><kbd>${key}</kbd>${label}${extra || ''}</span>`;
     stageEl.querySelector('#a-moves').innerHTML =
       chip('J', 'Attack ×3', true) + chip('Hold J', 'Smash', p.sta >= 6) + chip('K', 'Block / Parry', p.sta > 0) + chip('Space', 'Dodge', p.sta >= p.dodgeCost) +
@@ -1106,6 +1127,7 @@
 
   function pause(on) {
     if (!match || match.over) return;
+    if (match.net) { if (on && !DG.ui.anyModal()) netLeavePrompt(); return; }
     if (on && match.paused) return;
     match.paused = on;
     if (!on) return;
@@ -1126,15 +1148,21 @@
     F.forEach((f) => { f.blocking = false; f.bubble = 0; f.spin = false; f.hopY = 0; f.mv = null; if (f !== loser) setState(f, 'idle'); });
     const txt = how === 'forfeit' ? 'Match over' : how === 'time' ? "Time's up!" : 'Flop!';
     banner(result === 'win' ? `${txt} — <b>${DG.ui.esc(F[0].name)} wins!</b> 🏆` : result === 'lose' ? `${txt} — ${DG.ui.esc(F[1].name)} wins!` : `${txt} — It's a draw!`, 2.4);
-    if (result === 'win') { sfx('cheer'); setTimeout(() => sfx('fanfare'), 300); confetti3d(); }
-    else if (result === 'lose') sfx('sad');
-    else sfx('good');
+    endSounds(result);
     if (how === 'forfeit') showResults();
   }
 
+  /** Win/lose sounds from this device's point of view (the guest flips the host's result). */
+  function endSounds(result) {
+    const mine = match.net && net && net.me === 1 ? ({ win: 'lose', lose: 'win' }[result] || result) : result;
+    if (mine === 'win') { DG.audio.play('cheer'); setTimeout(() => DG.audio.play('fanfare'), 300); confetti3d(); }
+    else if (mine === 'lose') DG.audio.play('sad');
+    else DG.audio.play('good');
+  }
   function showResults() {
     if (match.resultsShown) return;
     match.resultsShown = true;
+    if (match.net) return netResults();
     const p = DG.pet(), st = DG.state, c = st.counters, result = match.result;
     let coins = 0, lines = [];
     if (match.practice) {
@@ -1169,6 +1197,251 @@
     });
   }
 
+
+  /* ===================== Friend battles (same Wi‑Fi) =====================
+     One device hosts and shows a 4-letter code; the other joins with it. PeerJS's public server only
+     introduces the two devices; with no STUN/TURN servers the connection itself can only be made
+     directly across the local network. The host runs the battle and sends snapshots ~30 times a
+     second plus the effects to replay; the guest sends its button presses back. */
+  const NET_PREFIX = 'mypetdumpling-v1-';
+  let net = null;
+  const meF = () => (match && match.net && net ? F[net.me] : F[0]);
+  const camSide = () => (match && match.net && net && net.me === 1 ? -1 : 1);
+  function netFx(name, args) {
+    if (!net || net.role !== 'host' || !match || !match.net || net.replaying) return;
+    net.out.push([name, args.map(packArg)]);
+  }
+  function netSendFx(name, args) { if (net && net.role === 'host') net.out.push([name, args.map(packArg)]); }
+  function packArg(a) {
+    if (a && a.mesh && F.includes(a)) return { F: F.indexOf(a) };
+    if (a && typeof a === 'object' && 'x' in a && 'z' in a) return { V: [a.x, a.y || 0, a.z] };
+    return a === undefined ? null : a;
+  }
+  function unpackArg(a) {
+    if (a && typeof a === 'object' && 'F' in a) return F[a.F];
+    if (a && typeof a === 'object' && 'V' in a) return new THREE.Vector3(a.V[0], a.V[1], a.V[2]);
+    return a === null ? undefined : a;
+  }
+  const FX = { sfx: (n) => DG.audio.play(n), floatText, banner, burst3d, slashFx, speedLines, cutIn, ring, puffs, sparks, flashScreen, comboText };
+  function netDef() { const d = playerDef(true); d.bonus = null; d.cozy = false; d.isPlayer = true; return d; }
+  function newCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = ''; for (let i = 0; i < 4; i++) c += A[Math.floor(Math.random() * A.length)]; return c; }
+  function needPeer() {
+    if (window.Peer) return true;
+    DG.ui.toast('Friend battles need an internet connection to load. Please reload the page and try again.'); return false;
+  }
+  const PEER_OPTS = { debug: 0, config: { iceServers: [] } }; // local network only
+  function netClose() {
+    if (!net) return;
+    try { if (net.conn) net.conn.close(); } catch (e) { /* ignore */ }
+    try { if (net.peer) net.peer.destroy(); } catch (e) { /* ignore */ }
+    clearTimeout(net.timer); net = null;
+  }
+  function netSend(msg) { try { if (net && net.conn && net.conn.open) net.conn.send(msg); } catch (e) { /* ignore */ } }
+  function waitingModal(title, html, onCancel) {
+    let closeFn = null;
+    closeFn = DG.ui.modal({ title, html, dismissable: false, buttons: [{ label: 'Cancel', cls: 'ghost', onClick: onCancel }] });
+    return closeFn;
+  }
+  function setNetStatus(t) { const el = document.getElementById('net-status'); if (el) el.innerHTML = t; }
+
+  function hostGame() {
+    if (!needPeer()) return;
+    netClose();
+    const code = newCode();
+    net = { role: 'host', me: 0, code, out: [], acc: 0, remote: { move: { x: 0, z: 0 } }, edges: {} };
+    net.close = waitingModal('📡 Host a battle', `<p>Ask your friend to tap <b>Join with a code</b> and type:</p>
+      <div class="net-code">${code}</div><p class="fine" id="net-status">Getting ready…</p>
+      <p class="fine">Both devices need to be on the same Wi‑Fi.</p>`, () => netClose());
+    const peer = new window.Peer(NET_PREFIX + code, PEER_OPTS);
+    net.peer = peer;
+    peer.on('open', () => setNetStatus('Waiting for your friend to join…'));
+    peer.on('error', (e) => {
+      if (!net) return;
+      if (e.type === 'unavailable-id') { net.close && net.close(); netClose(); hostGame(); return; }
+      setNetStatus(e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' ? '⚠️ Can\'t reach the matchmaking server. Check your internet and try again.' : '⚠️ Something went wrong (' + e.type + ').');
+    });
+    peer.on('connection', (conn) => {
+      if (!net || net.conn) { conn.close(); return; }
+      net.conn = conn; wireConn(conn);
+      conn.on('open', () => setNetStatus('Friend found! Starting…'));
+    });
+  }
+  function joinGame() {
+    if (!needPeer()) return;
+    netClose();
+    DG.ui.modal({
+      title: '🔑 Join a battle',
+      html: `<p>Type the code shown on your friend's screen:</p>
+        <input id="net-in" class="text-in net-in" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" placeholder="ABCD">
+        <p class="fine">Both devices need to be on the same Wi‑Fi.</p>`,
+      buttons: [{ label: 'Cancel', cls: 'ghost' }, { label: 'Join', cls: 'primary', onClick() { connectTo(document.getElementById('net-in').value); } }],
+      onOpen(el, close) {
+        const inp = el.querySelector('#net-in'); setTimeout(() => inp.focus(), 50);
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const v = inp.value; close(); setTimeout(() => connectTo(v), 150); } });
+      },
+    });
+  }
+  function connectTo(raw) {
+    const code = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length !== 4) { DG.ui.toast('The code has 4 letters or numbers.'); return; }
+    net = { role: 'guest', me: 1, code, out: [], acc: 0, pend: {}, snap: null };
+    net.close = waitingModal('🔑 Joining…', `<div class="net-code">${code}</div><p class="fine" id="net-status">Looking for your friend's battle…</p>`, () => netClose());
+    const peer = new window.Peer(undefined, PEER_OPTS);
+    net.peer = peer;
+    peer.on('open', () => {
+      if (!net) return;
+      const conn = peer.connect(NET_PREFIX + code, { reliable: true });
+      net.conn = conn; wireConn(conn);
+      conn.on('open', () => { setNetStatus('Connected! Waiting for the battle to start…'); netSend({ t: 'hello', def: netDef() }); });
+      net.timer = setTimeout(() => { if (net && !(net.conn && net.conn.open)) setNetStatus('⚠️ Couldn\'t connect. Check the code, and that you\'re both on the <b>same Wi‑Fi</b>.'); }, 12000);
+    });
+    peer.on('error', (e) => {
+      if (!net) return;
+      setNetStatus(e.type === 'peer-unavailable' ? '⚠️ No battle found with that code. Check the letters and try again.'
+        : e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' ? '⚠️ Can\'t reach the matchmaking server. Check your internet and try again.' : '⚠️ Something went wrong (' + e.type + ').');
+    });
+  }
+  function wireConn(conn) {
+    conn.on('data', onNet);
+    conn.on('close', onNetClose);
+    conn.on('error', () => {});
+  }
+  function onNetClose() {
+    if (!net) return;
+    const n = net; net = null;
+    try { n.peer && n.peer.destroy(); } catch (e) { /* ignore */ }
+    if (match && match.net && !match.over) {
+      DG.ui.toast('👋 Your friend left the battle.');
+      net = { role: n.role, me: n.me, out: [], dead: true };
+      if (n.role === 'host') endMatch('win', 'forfeit');
+      else { match.over = true; match.result = 'lose'; match.how = 'forfeit'; match.left = true; showResults(); }
+      net = null;
+    } else if (!match) { if (n.close) n.close(); setNetStatus(''); DG.ui.toast('👋 Connection closed.'); }
+  }
+  function startNetMatch(hostDef, guestDef) {
+    document.querySelectorAll('.modal-wrap').forEach((m) => m.remove());
+    net.close = null;
+    startMatch({ net: { hostDef, guestDef } });
+  }
+  function onNet(msg) {
+    if (!net || !msg) return;
+    if (net.role === 'host') {
+      if (msg.t === 'hello') {
+        net.guestDef = msg.def; net.hostDef = netDef();
+        netSend({ t: 'start', hostDef: net.hostDef, guestDef: net.guestDef });
+        startNetMatch(net.hostDef, net.guestDef);
+      } else if (msg.t === 'in') {
+        net.remote = msg;
+        ['attack', 'dodge', 'special', 'move2', 'ult'].forEach((k) => { if (msg[k]) net.edges[k] = true; });
+      } else if (msg.t === 'leave') onNetClose();
+    } else {
+      if (msg.t === 'start') { net.snap = null; startNetMatch(msg.hostDef, msg.guestDef); }
+      else if (msg.t === 's' && match && match.net) applySnapshot(msg);
+      else if (msg.t === 'leave') onNetClose();
+    }
+  }
+  function remoteIntents() {
+    const r = net ? net.remote : null, e = net ? net.edges : {};
+    if (!r) return { move: { x: 0, z: 0 } };
+    const it = { move: r.move || { x: 0, z: 0 }, block: !!r.block, attackHeld: !!r.attackHeld,
+      attack: !!e.attack, dodge: !!e.dodge, special: !!e.special, move2: !!e.move2, ult: !!e.ult };
+    net.edges = {};
+    return it;
+  }
+  const FIELDS = ['facing', 'hopY', 'state', 'stT', 'hp', 'sta', 'special', 'blocking', 'bubble', 'spin', 'flash', 'invuln', 'crit', 'stunDur', 'cd2', 'heavy'];
+  function netTick(dt) {
+    if (!net || !net.conn || !net.conn.open) return;
+    net.acc += dt;
+    if (net.acc < 1 / 30) return;
+    net.acc = 0;
+    if (net.role === 'host') {
+      netSend({
+        t: 's',
+        m: { time: match.time, phase: match.phase, over: match.over, result: match.result || null, how: match.how || null, shake: match.shake, slow: match.slow > 0 },
+        f: F.map((f) => { const o = { x: f.pos.x, z: f.pos.z, vx: f.vel.x, vz: f.vel.z, mvT: f.mv && f.mv.t ? f.mv.t() : -1 }; FIELDS.forEach((k) => (o[k] = f[k])); return o; }),
+        p: projs.map((pr) => [pr.pos.x, pr.pos.z, pr.dir.x, pr.dir.z]),
+        e: net.out,
+      });
+      net.out = [];
+    } else {
+      const it = playerIntents();
+      const msg = { t: 'in', move: it.move, block: it.block, attackHeld: it.attackHeld };
+      ['attack', 'dodge', 'special', 'move2', 'ult'].forEach((k) => { msg[k] = !!(it[k] || net.pend[k]); });
+      net.pend = {};
+      netSend(msg);
+    }
+  }
+  function applySnapshot(s) {
+    net.snap = s;
+    // replay the host's effects
+    net.replaying = true;
+    (s.e || []).forEach(([name, args]) => { const fn = FX[name]; if (fn) try { fn.apply(null, args.map(unpackArg)); } catch (err) { /* ignore */ } });
+    net.replaying = false;
+    // projectiles: keep one simple mesh per projectile the host has
+    while (projs.length < s.p.length) { const m = projMesh(); scene.add(m); projs.push({ m, pos: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, 1), dist: 0 }); }
+    while (projs.length > s.p.length) { const pr = projs.pop(); scene.remove(pr.m); }
+    s.p.forEach(([x, z, dx, dz], i) => { const pr = projs[i]; pr.pos.set(x, 0, z); pr.dir.set(dx, 0, dz); pr.m.position.set(x, 0.2, z); pr.m.rotation.y = Math.atan2(dx, dz) + Math.PI / 2; });
+    const m = s.m;
+    match.time = m.time; match.shake = Math.max(match.shake, m.shake || 0);
+    if (m.phase !== match.phase) { match.phase = m.phase; match.phaseT = 0; }
+    if (m.over && !match.over) {
+      match.over = true; match.result = m.result; match.how = m.how; match.endT = 0;
+      match.winner = m.result === 'win' ? F[0] : m.result === 'lose' ? F[1] : null;
+      endSounds(m.result);
+      if (m.how === 'forfeit') showResults();
+    }
+  }
+  function guestStep(dt) {
+    // keep any one-shot presses until the next send
+    ['attack', 'dodge', 'special', 'move2', 'ult'].forEach((k) => { if (edges[{ attack: 'KeyJ', dodge: 'Space', special: 'KeyL', move2: 'KeyI', ult: 'KeyO' }[k]] || touch.edge[k]) net.pend[k] = true; });
+    const s = net.snap; if (!s) return;
+    s.f.forEach((o, i) => {
+      const f = F[i]; if (!f) return;
+      const k = Math.min(1, dt * 18);
+      f.pos.x += (o.x - f.pos.x) * k; f.pos.z += (o.z - f.pos.z) * k;
+      f.vel.set(o.vx, 0, o.vz);
+      FIELDS.forEach((key) => { if (key === 'facing') { let d = o.facing - f.facing; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; f.facing += d * k; } else f[key] = o[key]; });
+      f.mv = o.mvT >= 0 ? { t: () => o.mvT } : null;
+    });
+    if (match.over) { match.endT += dt; if (match.endT > 3.2 && !match.resultsShown) showResults(); }
+  }
+  function projMesh() {
+    const m = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.25, 8, 20, Math.PI), new THREE.MeshToonMaterial({ color: 0xf2b46b, transparent: true, opacity: 0.85 }));
+    m.scale.setScalar(match.S); return m;
+  }
+  function netLeavePrompt() {
+    DG.ui.modal({
+      title: '👥 Leave the battle?', html: '<p>Your friend will win if you leave now.</p>',
+      buttons: [{ label: 'Keep battling', cls: 'primary' }, { label: 'Leave', cls: 'ghost', onClick() {
+        netSend({ t: 'leave' });
+        if (net && net.role === 'host') { endMatch('lose', 'forfeit'); }
+        else if (match) { match.over = true; match.result = 'win'; match.how = 'forfeit'; showResults(); }
+        setTimeout(netClose, 300);
+      } }],
+    });
+  }
+  function netResults() {
+    const meIdx = net ? net.me : (match.result === 'win' ? 0 : 1);
+    let mine = match.result;
+    if (net && net.me === 1) mine = { win: 'lose', lose: 'win' }[match.result] || match.result;
+    if (match.left) mine = 'win';
+    const me = F[net ? net.me : 0] || F[0], them = me === F[0] ? F[1] : F[0];
+    const titles = { win: '🏆 You win!', lose: '💫 Your friend wins!', draw: '🤝 It\'s a draw!' };
+    const stillConnected = !!(net && net.conn && net.conn.open);
+    const isHost = net && net.role === 'host';
+    DG.ui.modal({
+      title: titles[mine], dismissable: false,
+      html: `<p>${DG.ui.esc(me.name)} ${Math.round((me.hp / me.maxHp) * 100)}% health · ${DG.ui.esc(them.name)} ${Math.round((them.hp / them.maxHp) * 100)}% health${match.how === 'time' ? ' (time ran out — higher health % wins)' : ''}</p>
+        ${match.how === 'forfeit' ? '<p class="fine">The battle ended early.</p>' : ''}
+        <p class="fine">Friend battles are just for fun — no coins, and everyone is fully healed.</p>
+        ${stillConnected && !isHost ? '<p class="fine" id="net-status">Waiting for your friend to start a rematch…</p>' : ''}`,
+      buttons: [
+        ...(stillConnected && isHost ? [{ label: '🔁 Rematch', cls: 'primary', onClick: () => { netSend({ t: 'start', hostDef: net.hostDef, guestDef: net.guestDef }); startNetMatch(net.hostDef, net.guestDef); } }] : []),
+        { label: 'Leave', cls: stillConnected && isHost ? 'ghost' : 'primary', onClick: () => { netSend({ t: 'leave' }); netClose(); lobby(); } },
+      ],
+    });
+  }
+
   /* ===================== Loop ===================== */
   function update(dt) {
     match.phaseT += dt;
@@ -1199,7 +1472,7 @@
         }
       }
       const i0 = match.over ? { move: { x: 0, z: 0 } } : playerIntents();
-      const i1 = match.over ? { move: { x: 0, z: 0 } } : aiIntents(F[1], F[0], dt);
+      const i1 = match.over ? { move: { x: 0, z: 0 } } : match.net ? remoteIntents() : aiIntents(F[1], F[0], dt);
       stepFighter(F[0], F[1], i0, dt);
       stepFighter(F[1], F[0], i1, dt);
       // separation
@@ -1243,7 +1516,7 @@
     const sep = Math.hypot(a.x - b.x, a.z - b.z);
     const aspect = camera.aspect || 1;
     const dist = clamp(sep * (aspect < 1 ? 1.6 : 1.1) + 10 * match.S, 13 * match.S, match.R * 2.6);
-    const want = new THREE.Vector3(mid.x * 0.6, dist * 0.76, mid.z * 0.6 + dist * 0.74);
+    const want = new THREE.Vector3(mid.x * 0.6, dist * 0.76, mid.z * 0.6 + dist * 0.74 * camSide());
     camera.position.lerp(want, Math.min(1, realDt * (match.phase === 'intro' ? 1.5 : 4)));
     if (match.shake > 0) {
       camera.position.x += rand(-1, 1) * match.shake; camera.position.y += rand(-1, 1) * match.shake;
@@ -1273,7 +1546,11 @@
       if (match.speedT > 0) match.speedT -= dt;
       const sp = stageEl.querySelector('.a-speed'); if (sp) sp.classList.toggle('on', match.speedT > 0);
       T += gdt;
-      try { update(gdt); render(gdt, dt); } catch (e) { console.error(e); }
+      try {
+        if (match.net && net && net.role === 'guest') { guestStep(dt); render(dt, dt); }
+        else { update(gdt); render(gdt, dt); }
+        if (match.net && net) netTick(dt);
+      } catch (e) { console.error(e); }
       hudAcc += dt;
       if (hudAcc > 0.06) { hudAcc = 0; renderHud(false); }
     }
@@ -1295,7 +1572,7 @@
   }
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 250));
-  document.addEventListener('visibilitychange', () => { if (document.hidden && match && match.phase === 'fight' && !match.over && !DG.ui.anyModal()) pause(true); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && match && !match.net && match.phase === 'fight' && !match.over && !DG.ui.anyModal()) pause(true); });
 
   function cleanupMatch() {
     cancelAnimationFrame(raf);
@@ -1317,11 +1594,11 @@
     keys[e.code] = true;
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
-  window.addEventListener('blur', () => { Object.keys(keys).forEach((k) => (keys[k] = false)); if (match && match.phase === 'fight' && !match.over && !DG.ui.anyModal()) pause(true); });
+  window.addEventListener('blur', () => { Object.keys(keys).forEach((k) => (keys[k] = false)); if (match && !match.net && match.phase === 'fight' && !match.over && !DG.ui.anyModal()) pause(true); });
 
   DG.Arena = {
     enter() { root = document.getElementById('screen-arena'); lobby(); },
-    exit() { if (root && root._stop) root._stop(); cleanupMatch(); if (root) root.innerHTML = ''; },
+    exit() { if (root && root._stop) root._stop(); netClose(); cleanupMatch(); if (root) root.innerHTML = ''; },
     // test hooks
     _debug: () => ({ match, F }),
     _forceEnd: (r) => { if (match) { endMatch(r, 'ko'); match.endT = 99; } },

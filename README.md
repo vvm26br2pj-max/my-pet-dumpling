@@ -55,3 +55,4 @@ Press **Ctrl+Shift+D** or add `?dev=1` to the URL. It can add a day of age, prev
 - `js/arena.js`: the three.js battle arena, AI and touch controls
 - `js/draw.js`: anime-style art (cel shading, ink outlines, anime eyes and expressions), also used for the 3D fighters' faces
 - `js/audio.js`, `js/ui.js`, `js/main.js`: art, synthesized sound, UI helpers, boot
+- **Friend battles:** in the Arena, one player taps *Host a battle* and shares the 4-letter code; the other taps *Join with a code*. Both devices must be on the same Wi-Fi (PeerJS only introduces them; with no STUN/TURN servers the connection is local-network only). The host runs the battle and streams it to the guest. No rewards.

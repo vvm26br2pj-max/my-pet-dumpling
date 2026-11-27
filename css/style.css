@@ -851,3 +851,8 @@ body.touch .a-moves { display: none; }
 .ts-box { align-self: stretch; align-items: center; }
 .btn.danger { background: linear-gradient(180deg, #ff8a7a, #e8604c); color: #fff; box-shadow: 0 3px 0 #c44a38; }
 .settings + .howto ~ .start-over, .start-over { display: block; width: 100%; margin-top: 12px; }
+.controls-btn { display: block; width: 100%; margin-top: 4px; }
+/* friend battles */
+.net-code { font-size: 2.6em; font-weight: 700; letter-spacing: 0.25em; text-align: center; color: #5a3a24; background: #fff6e6; border-radius: 16px; padding: 8px 0 8px 0.25em; margin: 8px 0; box-shadow: inset 0 0 0 3px #f3dcb8; }
+.net-in { font-size: 2em; text-align: center; letter-spacing: 0.3em; text-transform: uppercase; }
+.friend-card .chip-row { gap: 8px; }
