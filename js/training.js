@@ -6,8 +6,8 @@
   const sfx = (n) => DG.audio.play(n);
   const DIFFS = [
     { name: 'Easy', cost: 5, stage: 0 },
-    { name: 'Medium', cost: 6, stage: 1 },
-    { name: 'Hard', cost: 8, stage: 2, tag: 'Advanced' },
+    { name: 'Medium', cost: 6, stage: 2 },
+    { name: 'Hard', cost: 8, stage: 3, tag: 'Advanced' },
   ];
 
   let root, canvas, ctx, raf = 0, last = 0, T = 0;

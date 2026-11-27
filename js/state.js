@@ -30,7 +30,7 @@
 
   function defaults() {
     return {
-      version: 1,
+      version: 2,
       pet: null,
       coins: 25,
       inventory: {
@@ -70,6 +70,13 @@
     if (p) { // upgrade older saves
       if (p.growMs == null) p.growMs = Math.max(0, (p.lastUpdate || DG.now()) - p.adoptedAt);
       if (!p.look) p.look = { color: 'classic', eyes: 'round', cheeks: 'blush' };
+      if ((s && s.version || 1) < 2) { // a Small stage was added: keep each pet at the stage it already reached
+        const OLD_AT = [0, 24, 72, 168].map((h) => h * DG.HOUR), MAP = [0, 2, 3, 4];
+        let old = 0; OLD_AT.forEach((at, i) => { if ((p.growMs || 0) >= at) old = i; });
+        p.growMs = Math.max(p.growMs || 0, DG.STAGES[MAP[old]].at);
+        p.lastStageSeen = MAP[Math.min(3, p.lastStageSeen || 0)];
+        DG.state.version = 2;
+      }
       // Party Flags were removed: refund them
       const inv = DG.state.inventory;
       if (inv.decor.includes('bunting')) { inv.decor = inv.decor.filter((d) => d !== 'bunting'); DG.state.coins += 20; }

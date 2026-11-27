@@ -94,10 +94,10 @@
             DG.ui.modal({
               title: `Welcome home, ${pname()}! 🎉`,
               html: `<p>Your baby dumpling grows in <b>real time</b> — even when the game is closed:</p>
-                <ul class="nice-list"><li>🌱 <b>Medium</b> after 1 day — unlocks arena battles</li><li>🌿 <b>Large</b> after 3 days — advanced training & a second move</li><li>🌳 <b>Giant</b> after 7 days — an ultimate move!</li></ul>
+                <ul class="nice-list"><li>🌱 <b>Small</b> after 1 hour — unlocks arena battles</li><li>🌿 <b>Medium</b> after 1 day — a special move</li><li>🌳 <b>Large</b> after 7 days — advanced training & a second move</li><li>🏔️ <b>Giant</b> after 1 month — an ultimate move!</li></ul>
                 <p>Keep ${pname()} fed, happy, rested and clean. If any need drops below <b>20</b>, growing <b>pauses</b> until you raise it again. Dumplings never lose progress.</p>
                 <p>🌙 From <b>9 PM to 7 AM</b>, ${pname()} goes to bed on its own.</p>
-                <p>Want to try a battle now? Visit the <b>Arena</b> for a <b>Practice Match</b>.</p>`,
+                <p>Want to battle right away? In the <b>Arena</b> you can battle a friend on the same Wi‑Fi.</p>`,
               buttons: [{ label: "Let's go!", cls: 'primary' }],
             });
           }, 400);
@@ -337,7 +337,7 @@
             <li>❤️ Health ${bs.maxHp}</li><li>🔋 Stamina ${bs.maxSta}</li><li>👊 Attack ${bs.dmg.toFixed(1)}</li>
             <li>💨 Speed ${bs.speed.toFixed(1)}</li><li>🛡️ Block ${Math.round(bs.blockRed * 100)}%</li><li>🎯 Special charge ${bs.charge.toFixed(1)}/s</li></ul></div>
           <div><div class="lbl">Moves</div><ul class="nice-list small">
-            <li>✅ <b>Basic attack</b>, block and dodge</li>${moveLine('special', 1, 'Special')}${moveLine('move2', 2, 'Move 2')}${moveLine('ult', 3, 'Ultimate')}</ul></div>
+            <li>✅ <b>Basic attack</b>, block and dodge</li>${moveLine('special', 2, 'Special')}${moveLine('move2', 3, 'Move 2')}${moveLine('ult', 4, 'Ultimate')}</ul></div>
         </div>
         <p>⭐ Favorite food: <b>${p.favoriteKnown ? DG.FOODS[p.favoriteFood].icon + ' ' + DG.FOODS[p.favoriteFood].name : '??? — try different foods!'}</b>
         ${p.foodBonus ? `<br>🍱 Next battle: <b>${p.foodBonus.label}</b>` : ''}
@@ -374,7 +374,7 @@
         <details class="howto"><summary>❓ How to play</summary>
           <ul class="nice-list small">
             <li><b>Care:</b> tap your dumpling to pet it. Tap the food bowl, toy basket, bath and bed to keep its four needs up. Tap anywhere else in the room and it walks there.</li>
-            <li><b>Grow:</b> your dumpling grows with real time — 1 day to Medium, 3 days to Large, 7 days to Giant. Growing <b>pauses</b> while any need is below 20.</li>
+            <li><b>Grow:</b> your dumpling grows with real time — 1 hour to Small, 1 day to Medium, 7 days to Large, 1 month to Giant. Growing <b>pauses</b> while any need is below 20.</li>
             <li><b>Night:</b> from 9 PM to 7 AM your dumpling sleeps in bed. Waking it up makes its energy drain fast. Sleeping refills energy slowly (about 8 hours from empty to full).</li>
             <li><b>Walk:</b> take your dumpling to the park. Tap to hop over puddles and grab coins.</li>
             <li><b>Decorate:</b> change wall colors, wallpaper, floors and decorations for free.</li>
@@ -430,23 +430,23 @@
       p.lastStageSeen = real;
       DG.save();
       celebrateStage(real, from);
-    } else if (real >= 2 && !p.trait) traitPick();
+    } else if (real >= 3 && !p.trait) traitPick();
   }
   function celebrateStage(idx, from, preview) {
     const p = DG.pet(), st = DG.STAGES[idx];
     const unlocks = [];
     for (let i = (from || 0) + 1; i <= idx; i++) {
       DG.STAGES[i].unlocks.forEach((u) => unlocks.push(u));
-      if (!preview) DG.unlock(['', 'grownMedium', 'grownLarge', 'fullyGrown'][i]);
+      if (!preview) DG.unlock(['', '', 'grownMedium', 'grownLarge', 'fullyGrown'][i]);
     }
     const mv = DG.STARTERS[p.type].moves;
-    const moveName = idx === 1 ? DG.MOVES[mv.special].name : idx === 2 ? DG.MOVES[mv.move2].name : idx === 3 ? DG.MOVES[mv.ult].name : '';
+    const moveName = idx === 2 ? DG.MOVES[mv.special].name : idx === 3 ? DG.MOVES[mv.move2].name : idx === 4 ? DG.MOVES[mv.ult].name : '';
     let stop = null;
     DG.audio.play('levelup');
     DG.ui.modal({
       title: `🎉 ${pname()} grew into a ${st.name} dumpling!`, wide: true, cls: 'celebrate',
       html: `<canvas class="celebrate-canvas" id="cel-cv"></canvas>
-        <p>${idx === 3 ? `Look how HUGE and lovable ${pname()} is! 🌳` : `${pname()} is bigger, bouncier and more coordinated!`}</p>
+        <p>${idx === 4 ? `Look how HUGE and lovable ${pname()} is! 🌳` : `${pname()} is bigger, bouncier and more coordinated!`}</p>
         <div class="lbl">Unlocked</div>
         <ul class="nice-list">${unlocks.map((u) => `<li>✨ ${u}${u.includes('move') && moveName ? `: <b>${moveName}</b>` : ''}</li>`).join('')}</ul>`,
       buttons: [{ label: 'Hooray!', cls: 'primary' }],

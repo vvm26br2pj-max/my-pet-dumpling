@@ -895,14 +895,16 @@ window.DG = window.DG || {};
   DG.DAY = 24 * H;
 
   DG.STAGES = [
-    { id: 'baby',   name: 'Baby',   at: 0,       scale: 0.62, cap: 40,
-      unlocks: ['Basic care', 'Gentle (Easy) training', 'Practice battles'] },
-    { id: 'medium', name: 'Medium', at: 24 * H,  scale: 0.8,  cap: 60,
-      unlocks: ['Arena battles', 'Starter special move', 'Medium training'] },
-    { id: 'large',  name: 'Large',  at: 72 * H,  scale: 1.0,  cap: 80,
-      unlocks: ['Advanced (Hard) training', 'A second battle move', 'A new look based on training'] },
-    { id: 'giant',  name: 'Giant',  at: 168 * H, scale: 1.32, cap: 100,
-      unlocks: ['Ultimate move', 'Grand arena entrance', 'The Giant arena'] },
+    { id: 'baby',   name: 'Baby',   at: 0,        scale: 0.62, cap: 40,
+      unlocks: ['Basic care', 'Gentle (Easy) training', 'Friend battles'] },
+    { id: 'small',  name: 'Small',  at: 1 * H,    scale: 0.7,  cap: 50,
+      unlocks: ['Arena battles', 'The first two challengers'] },
+    { id: 'medium', name: 'Medium', at: 24 * H,   scale: 0.8,  cap: 60,
+      unlocks: ['Starter special move', 'Medium training', 'Two new challengers'] },
+    { id: 'large',  name: 'Large',  at: 7 * 24 * H,  scale: 1.0,  cap: 80,
+      unlocks: ['Advanced (Hard) training', 'A second battle move', 'A new look based on training', 'A tough new challenger'] },
+    { id: 'giant',  name: 'Giant',  at: 30 * 24 * H, scale: 1.32, cap: 100,
+      unlocks: ['Ultimate move', 'Grand arena entrance', 'The Giant arena', 'The final challengers'] },
   ];
 
   DG.STAT_KEYS = ['strength', 'stamina', 'agility', 'defense', 'focus'];
@@ -1124,11 +1126,11 @@ window.DG = window.DG || {};
   DG.OPPONENTS = [
     { id: 'chili',    name: 'Chili Wonton',      shape: 'gyoza', color: '#ffb08a', hex: 0xffb08a, style: 'charger', tier: 0, minStage: 1, acc: 'headband' },
     { id: 'shumai',   name: 'Sir Shumai',        shape: 'soup',  color: '#ffe08a', hex: 0xffe08a, style: 'blocker', tier: 1, minStage: 1, acc: 'tinyhat' },
-    { id: 'hargow',   name: 'Zippy Har Gow',     shape: 'gyoza', color: '#ffd3df', hex: 0xffd3df, style: 'dodger',  tier: 2, minStage: 1, acc: 'bow' },
+    { id: 'hargow',   name: 'Zippy Har Gow',     shape: 'gyoza', color: '#ffd3df', hex: 0xffd3df, style: 'dodger',  tier: 2, minStage: 2, acc: 'bow' },
     { id: 'pierogi',  name: 'Big Pierogi',       shape: 'gyoza', color: '#f2d7a6', hex: 0xf2d7a6, style: 'charger', tier: 3, minStage: 2, acc: 'beret' },
-    { id: 'momo',     name: 'Momo the Wall',     shape: 'soup',  color: '#d4ecc4', hex: 0xd4ecc4, style: 'blocker', tier: 4, minStage: 2, acc: 'chef' },
-    { id: 'mandu',    name: 'Mandu Flash',       shape: 'gyoza', color: '#c9dbf5', hex: 0xc9dbf5, style: 'dodger',  tier: 5, minStage: 3, acc: 'glasses' },
-    { id: 'champion', name: 'Grand Bao Champion',shape: 'bao',   color: '#ffd76a', hex: 0xffd76a, style: 'mixed',   tier: 6, minStage: 3, acc: 'crown' },
+    { id: 'momo',     name: 'Momo the Wall',     shape: 'soup',  color: '#d4ecc4', hex: 0xd4ecc4, style: 'blocker', tier: 4, minStage: 3, acc: 'chef' },
+    { id: 'mandu',    name: 'Mandu Flash',       shape: 'gyoza', color: '#c9dbf5', hex: 0xc9dbf5, style: 'dodger',  tier: 5, minStage: 4, acc: 'glasses' },
+    { id: 'champion', name: 'Grand Bao Champion',shape: 'bao',   color: '#ffd76a', hex: 0xffd76a, style: 'mixed',   tier: 6, minStage: 4, acc: 'crown' },
   ];
 
   DG.ACHIEVEMENTS = {
@@ -1141,7 +1143,6 @@ window.DG = window.DG || {};
     firstTrain:   { name: 'Warm-Up',            icon: '\u{1f3cb}\u{fe0f}', desc: 'Finish a training session.', coins: 5 },
     tenPerfect:   { name: 'Ten Perfect Jumps',  icon: '\u{1faa2}', desc: 'Land 10 perfect jumps in Jump Rope.', coins: 15 },
     allTraining:  { name: 'Well-Rounded',       icon: '\u{1f308}', desc: 'Try all five training games.', coins: 15 },
-    practice:     { name: 'Practice Makes Perfect', icon: '\u{1f94b}', desc: 'Finish a practice match.', coins: 5 },
     firstWin:     { name: 'First Arena Win',    icon: '\u{1f3c6}', desc: 'Win an arena battle.', coins: 20 },
     champion:     { name: 'Steamer Champion',   icon: '\u{1f451}', desc: 'Defeat every arena opponent.', coins: 100 },
     grownMedium:  { name: 'Growing Up',         icon: '\u{1f331}', desc: 'Reach the Medium stage.', coins: 10 },
@@ -1187,7 +1188,7 @@ window.DG = window.DG || {};
 
   function defaults() {
     return {
-      version: 1,
+      version: 2,
       pet: null,
       coins: 25,
       inventory: {
@@ -1227,6 +1228,13 @@ window.DG = window.DG || {};
     if (p) { // upgrade older saves
       if (p.growMs == null) p.growMs = Math.max(0, (p.lastUpdate || DG.now()) - p.adoptedAt);
       if (!p.look) p.look = { color: 'classic', eyes: 'round', cheeks: 'blush' };
+      if ((s && s.version || 1) < 2) { // a Small stage was added: keep each pet at the stage it already reached
+        const OLD_AT = [0, 24, 72, 168].map((h) => h * DG.HOUR), MAP = [0, 2, 3, 4];
+        let old = 0; OLD_AT.forEach((at, i) => { if ((p.growMs || 0) >= at) old = i; });
+        p.growMs = Math.max(p.growMs || 0, DG.STAGES[MAP[old]].at);
+        p.lastStageSeen = MAP[Math.min(3, p.lastStageSeen || 0)];
+        DG.state.version = 2;
+      }
       // Party Flags were removed: refund them
       const inv = DG.state.inventory;
       if (inv.decor.includes('bunting')) { inv.decor = inv.decor.filter((d) => d !== 'bunting'); DG.state.coins += 20; }
@@ -1806,7 +1814,7 @@ window.DG = window.DG || {};
     }
 
     // shine for older dumplings
-    if ((o.stage || 0) >= 2 && !isBao) {
+    if ((o.stage || 0) >= 3 && !isBao) {
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.beginPath(); ctx.ellipse(-0.5 * u, (g.mid - 0.25) * u, 0.13 * u, 0.07 * u, -0.6, 0, TAU); ctx.fill();
     }
@@ -1816,7 +1824,7 @@ window.DG = window.DG || {};
     if (o.trait === 'strength') drawPowerBand(ctx, u, g, t, type);
     if (o.trait === 'agility') drawScarf(ctx, u, g, t);
     if (o.accessory) accessory(ctx, o.accessory, u, g, t, type);
-    if ((o.stage || 0) >= 3) {
+    if ((o.stage || 0) >= 4) {
       for (let i = 0; i < 3; i++) {
         const a = t * 1.5 + i * 2.1;
         sparkle(ctx, Math.cos(a) * 1.25 * u, (g.mid - 0.2) * u + Math.sin(a * 1.3) * 0.6 * u, 0.08 * u * (0.6 + 0.4 * Math.sin(t * 4 + i)), '#ffd75a');
@@ -3288,7 +3296,7 @@ window.DG = window.DG || {};
     c.fillStyle = '#b9783c'; c.beginPath(); c.ellipse(cx, by, bw, rim, 0, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#8d5426'; c.beginPath(); c.ellipse(cx, by + 3, bw * 0.88, rim * 0.72, 0, 0, Math.PI * 2); c.fill();
     const mood = p.asleep ? 'sleeping' : DG.mood();
-    DG.draw.dumpling(c, { type: p.type, look: p.look, x: cx, y: by + bh * 0.5, size: W * 0.56, t: T, stage: Math.min(2, DG.stageIndex()),
+    DG.draw.dumpling(c, { type: p.type, look: p.look, x: cx, y: by + bh * 0.5, size: W * 0.56, t: T, stage: Math.min(3, DG.stageIndex()),
       mood: mood === 'happy' ? 'joy' : mood, accessory: p.accessory, trait: null, shadow: false, blink: !p.asleep && (T % 4) < 0.15 });
     // basket front band
     c.save();
@@ -3536,7 +3544,7 @@ window.DG = window.DG || {};
     const ab = root.querySelector('#h-arena');
     ab.classList.toggle('soft-lock', si < 1);
     ab.innerHTML = '<span>\u{1f3df}\u{fe0f}</span>';
-    ab.title = si < 1 ? 'Arena (practice only)' : 'Arena'; ab.setAttribute('aria-label', ab.title);
+    ab.title = si < 1 ? 'Arena (friend battles only until Small)' : 'Arena'; ab.setAttribute('aria-label', ab.title);
   }
 
   /* ---------- Interactions ---------- */
@@ -4402,10 +4410,10 @@ window.DG = window.DG || {};
             DG.ui.modal({
               title: `Welcome home, ${pname()}! \u{1f389}`,
               html: `<p>Your baby dumpling grows in <b>real time</b> \u{2014} even when the game is closed:</p>
-                <ul class="nice-list"><li>\u{1f331} <b>Medium</b> after 1 day \u{2014} unlocks arena battles</li><li>\u{1f33f} <b>Large</b> after 3 days \u{2014} advanced training & a second move</li><li>\u{1f333} <b>Giant</b> after 7 days \u{2014} an ultimate move!</li></ul>
+                <ul class="nice-list"><li>\u{1f331} <b>Small</b> after 1 hour \u{2014} unlocks arena battles</li><li>\u{1f33f} <b>Medium</b> after 1 day \u{2014} a special move</li><li>\u{1f333} <b>Large</b> after 7 days \u{2014} advanced training & a second move</li><li>\u{1f3d4}\u{fe0f} <b>Giant</b> after 1 month \u{2014} an ultimate move!</li></ul>
                 <p>Keep ${pname()} fed, happy, rested and clean. If any need drops below <b>20</b>, growing <b>pauses</b> until you raise it again. Dumplings never lose progress.</p>
                 <p>\u{1f319} From <b>9 PM to 7 AM</b>, ${pname()} goes to bed on its own.</p>
-                <p>Want to try a battle now? Visit the <b>Arena</b> for a <b>Practice Match</b>.</p>`,
+                <p>Want to battle right away? In the <b>Arena</b> you can battle a friend on the same Wi\u{2011}Fi.</p>`,
               buttons: [{ label: "Let's go!", cls: 'primary' }],
             });
           }, 400);
@@ -4645,7 +4653,7 @@ window.DG = window.DG || {};
             <li>\u{2764}\u{fe0f} Health ${bs.maxHp}</li><li>\u{1f50b} Stamina ${bs.maxSta}</li><li>\u{1f44a} Attack ${bs.dmg.toFixed(1)}</li>
             <li>\u{1f4a8} Speed ${bs.speed.toFixed(1)}</li><li>\u{1f6e1}\u{fe0f} Block ${Math.round(bs.blockRed * 100)}%</li><li>\u{1f3af} Special charge ${bs.charge.toFixed(1)}/s</li></ul></div>
           <div><div class="lbl">Moves</div><ul class="nice-list small">
-            <li>\u{2705} <b>Basic attack</b>, block and dodge</li>${moveLine('special', 1, 'Special')}${moveLine('move2', 2, 'Move 2')}${moveLine('ult', 3, 'Ultimate')}</ul></div>
+            <li>\u{2705} <b>Basic attack</b>, block and dodge</li>${moveLine('special', 2, 'Special')}${moveLine('move2', 3, 'Move 2')}${moveLine('ult', 4, 'Ultimate')}</ul></div>
         </div>
         <p>\u{2b50} Favorite food: <b>${p.favoriteKnown ? DG.FOODS[p.favoriteFood].icon + ' ' + DG.FOODS[p.favoriteFood].name : '??? \u{2014} try different foods!'}</b>
         ${p.foodBonus ? `<br>\u{1f371} Next battle: <b>${p.foodBonus.label}</b>` : ''}
@@ -4682,7 +4690,7 @@ window.DG = window.DG || {};
         <details class="howto"><summary>\u{2753} How to play</summary>
           <ul class="nice-list small">
             <li><b>Care:</b> tap your dumpling to pet it. Tap the food bowl, toy basket, bath and bed to keep its four needs up. Tap anywhere else in the room and it walks there.</li>
-            <li><b>Grow:</b> your dumpling grows with real time \u{2014} 1 day to Medium, 3 days to Large, 7 days to Giant. Growing <b>pauses</b> while any need is below 20.</li>
+            <li><b>Grow:</b> your dumpling grows with real time \u{2014} 1 hour to Small, 1 day to Medium, 7 days to Large, 1 month to Giant. Growing <b>pauses</b> while any need is below 20.</li>
             <li><b>Night:</b> from 9 PM to 7 AM your dumpling sleeps in bed. Waking it up makes its energy drain fast. Sleeping refills energy slowly (about 8 hours from empty to full).</li>
             <li><b>Walk:</b> take your dumpling to the park. Tap to hop over puddles and grab coins.</li>
             <li><b>Decorate:</b> change wall colors, wallpaper, floors and decorations for free.</li>
@@ -4738,23 +4746,23 @@ window.DG = window.DG || {};
       p.lastStageSeen = real;
       DG.save();
       celebrateStage(real, from);
-    } else if (real >= 2 && !p.trait) traitPick();
+    } else if (real >= 3 && !p.trait) traitPick();
   }
   function celebrateStage(idx, from, preview) {
     const p = DG.pet(), st = DG.STAGES[idx];
     const unlocks = [];
     for (let i = (from || 0) + 1; i <= idx; i++) {
       DG.STAGES[i].unlocks.forEach((u) => unlocks.push(u));
-      if (!preview) DG.unlock(['', 'grownMedium', 'grownLarge', 'fullyGrown'][i]);
+      if (!preview) DG.unlock(['', '', 'grownMedium', 'grownLarge', 'fullyGrown'][i]);
     }
     const mv = DG.STARTERS[p.type].moves;
-    const moveName = idx === 1 ? DG.MOVES[mv.special].name : idx === 2 ? DG.MOVES[mv.move2].name : idx === 3 ? DG.MOVES[mv.ult].name : '';
+    const moveName = idx === 2 ? DG.MOVES[mv.special].name : idx === 3 ? DG.MOVES[mv.move2].name : idx === 4 ? DG.MOVES[mv.ult].name : '';
     let stop = null;
     DG.audio.play('levelup');
     DG.ui.modal({
       title: `\u{1f389} ${pname()} grew into a ${st.name} dumpling!`, wide: true, cls: 'celebrate',
       html: `<canvas class="celebrate-canvas" id="cel-cv"></canvas>
-        <p>${idx === 3 ? `Look how HUGE and lovable ${pname()} is! \u{1f333}` : `${pname()} is bigger, bouncier and more coordinated!`}</p>
+        <p>${idx === 4 ? `Look how HUGE and lovable ${pname()} is! \u{1f333}` : `${pname()} is bigger, bouncier and more coordinated!`}</p>
         <div class="lbl">Unlocked</div>
         <ul class="nice-list">${unlocks.map((u) => `<li>\u{2728} ${u}${u.includes('move') && moveName ? `: <b>${moveName}</b>` : ''}</li>`).join('')}</ul>`,
       buttons: [{ label: 'Hooray!', cls: 'primary' }],
@@ -5105,8 +5113,8 @@ window.DG = window.DG || {};
   const sfx = (n) => DG.audio.play(n);
   const DIFFS = [
     { name: 'Easy', cost: 5, stage: 0 },
-    { name: 'Medium', cost: 6, stage: 1 },
-    { name: 'Hard', cost: 8, stage: 2, tag: 'Advanced' },
+    { name: 'Medium', cost: 6, stage: 2 },
+    { name: 'Hard', cost: 8, stage: 3, tag: 'Advanced' },
   ];
 
   let root, canvas, ctx, raf = 0, last = 0, T = 0;
@@ -5780,8 +5788,9 @@ window.DG = window.DG || {};
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const sfx = (n) => { DG.audio.play(n); netFx('sfx', [n]); };
-  const STAGE_SCALE = { 1: 1, 2: 1.2, 3: 1.6 };
-  const ARENA_R = { 1: 9, 2: 10.5, 3: 14 };
+  const STAGE_SCALE = { 0: 0.9, 1: 0.95, 2: 1, 3: 1.2, 4: 1.6 };
+  const ARENA_R = { 0: 8.5, 1: 9, 2: 9, 3: 10.5, 4: 14 };
+  const GIANT = 4;
   const MATCH_TIME = 90;
 
   let root, stageEl, renderer, scene, camera, raf = 0, last = 0, T = 0;
@@ -5809,11 +5818,6 @@ window.DG = window.DG || {};
             ${p.foodBonus ? `<p class="bonus-chip inline">${DG.FOODS[p.foodBonus.food].icon} Snack bonus ready: <b>${p.foodBonus.label}</b><br><small>Used up after your next real battle.</small></p>` : '<p class="fine">Tip: eat Tofu Bites or a Noodle Nest before a battle for a one-time boost.</p>'}
             ${DG.cozy() ? '<p class="fine">\u{1f3e0} Cozy bonus active: +10% special charge.</p>' : ''}</div>
           </div>
-          <div class="card practice">
-            <h3>\u{1f94b} Practice Match</h3>
-            <p>Try battling right away! ${DG.ui.esc(p.name)} becomes a <b>temporary grown-up</b> with its special and second move. No rewards, no snack bonus used \u{2014} just practice.</p>
-            <div class="chip-row">${['charger', 'blocker', 'dodger'].map((s) => `<button class="btn small" data-practice="${s}" ${hasThree ? '' : 'disabled'}>${DG.STYLES[s].icon} vs ${DG.STYLES[s].name}</button>`).join('')}</div>
-          </div>
           <div class="card practice friend-card">
             <h3>\u{1f465} Battle a Friend</h3>
             <p>Battle a friend's dumpling on another phone or computer. You both need to be on the <b>same Wi\u{2011}Fi</b>. Just for fun: no coins or rewards.</p>
@@ -5823,12 +5827,12 @@ window.DG = window.DG || {};
         </div>
         <div class="lobby-col">
           <h3 class="col-title">Opponents</h3>
-          ${si < 1 ? `<p class="note">\u{1f331} Real arena battles unlock when ${DG.ui.esc(p.name)} reaches the <b>Medium</b> stage${nx ? ` \u{2014} in <b>${DG.fmtDuration(nx.msLeft)}</b>` : ''}. Try a Practice Match meanwhile!</p>` : ''}
+          ${si < 1 ? `<p class="note">\u{1f331} Arena battles unlock when ${DG.ui.esc(p.name)} reaches the <b>Small</b> stage${nx ? ` \u{2014} in <b>${DG.fmtDuration(nx.msLeft)}</b>` : ''}. You can still battle a friend!</p>` : ''}
           <div class="opp-list">${DG.OPPONENTS.map((o, i) => {
             const prev = DG.OPPONENTS[i - 1];
             const beaten = st.beaten[o.id];
             let lock = '';
-            if (si < 1) lock = 'Medium stage';
+            if (si < 1) lock = 'Small stage';
             else if (si < o.minStage) lock = `Reach ${DG.STAGES[o.minStage].name} stage`;
             else if (prev && !st.beaten[prev.id]) lock = `Beat ${prev.name} first`;
             return `<div class="opp ${lock ? 'locked' : ''}">
@@ -5845,7 +5849,6 @@ window.DG = window.DG || {};
     const stop = DG.ui.previewLoop(root.querySelector('#a-prev'), (t) => ({ type: p.type, look: p.look, stage: si, size: 90, accessory: p.accessory, trait: p.trait, mood: 'joy', hop: Math.max(0, Math.sin(t * 4)) * 8 }), 140, 120);
     root._stop = stop;
     root.querySelectorAll('[data-fight]').forEach((b) => (b.onclick = () => { DG.audio.unlock(); startMatch({ opp: +b.dataset.fight }); }));
-    root.querySelectorAll('[data-practice]').forEach((b) => (b.onclick = () => { DG.audio.unlock(); startMatch({ practice: b.dataset.practice }); }));
     root.querySelector('#a-host').onclick = () => { DG.audio.unlock(); hostGame(); };
     root.querySelector('#a-join').onclick = () => { DG.audio.unlock(); joinGame(); };
   }
@@ -5867,14 +5870,14 @@ window.DG = window.DG || {};
   /* ===================== Fighter setup ===================== */
   function playerDef(practice) {
     const p = DG.pet(), real = DG.stageIndex();
-    const stageIdx = practice ? Math.max(2, real) : real;
+    const stageIdx = practice ? Math.max(3, real) : real; // friend battles: a temporary Large
     const stats = {};
     DG.STAT_KEYS.forEach((k) => (stats[k] = practice ? Math.max(p.stats[k], 30) : p.stats[k]));
     const moves = DG.STARTERS[p.type].moves;
     return {
       isPlayer: true, name: p.name, shape: p.type, hex: DG.lookColors(p.type, p.look).hex, accessory: p.accessory, trait: p.trait, look: p.look, colors2d: null,
       stats, stageIdx, bonus: practice ? null : p.foodBonus && p.foodBonus.type, cozy: DG.cozy(), moves,
-      canSpecial: stageIdx >= 1, canMove2: stageIdx >= 2, canUlt: stageIdx >= 3,
+      canSpecial: stageIdx >= 2, canMove2: stageIdx >= 3, canUlt: stageIdx >= 4,
     };
   }
   function oppDef(opp, pDef, practiceStyle) {
@@ -5898,7 +5901,7 @@ window.DG = window.DG || {};
     return {
       isPlayer: false, name, shape, hex, accessory: acc, trait: null, stats, stageIdx: si, style, skill, bonus: null,
       look: { eyes: { charger: 'lash', blocker: 'round', dodger: 'sparkle', mixed: 'wide' }[style] || 'round', cheeks: 'blush' }, colors2d: DG.draw.colorsFromHex(hex),
-      moves: DG.STARTERS[shape].moves, canSpecial: si >= 1, canMove2: si >= 2, canUlt: si >= 3,
+      moves: DG.STARTERS[shape].moves, canSpecial: si >= 2, canMove2: si >= 3, canUlt: si >= 4,
     };
   }
 
@@ -6820,13 +6823,13 @@ window.DG = window.DG || {};
     F = [makeFighter(pDef, S), makeFighter(oDef, S)];
     F[0].pos.set(0, 0, R * 0.45); F[1].pos.set(0, 0, -R * 0.45);
     F[0].facing = Math.PI; F[1].facing = 0;
-    F[0].hopY = (si === 3 ? 30 : 12) * S; F[1].hopY = 0;
+    F[0].hopY = (si === GIANT ? 30 : 12) * S; F[1].hopY = 0;
     camera.position.set(0, R * 1.2, R * 2.2 * camSide()); camera.lookAt(0, 0, 0);
-    if (si === 3) camera.position.set(0, R * 2, R * 3.2 * camSide());
+    if (si === GIANT) camera.position.set(0, R * 2, R * 3.2 * camSide());
     renderHud(true);
     wireControls();
-    banner(si === 3 ? `\u{1f31f} GIANT ${DG.ui.esc(pDef.name)} ENTERS! \u{1f31f}` : `${DG.ui.esc(pDef.name)} <span class="vs">VS</span> ${DG.ui.esc(oDef.name)}`, si === 3 ? 2.6 : 1.8);
-    match.introLen = si === 3 ? 3.2 : 2.0;
+    banner(si === GIANT ? `\u{1f31f} GIANT ${DG.ui.esc(pDef.name)} ENTERS! \u{1f31f}` : `${DG.ui.esc(pDef.name)} <span class="vs">VS</span> ${DG.ui.esc(oDef.name)}`, si === GIANT ? 2.6 : 1.8);
+    match.introLen = si === GIANT ? 3.2 : 2.0;
     last = performance.now(); T = 0;
     cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
   }
@@ -7224,11 +7227,11 @@ window.DG = window.DG || {};
       const k = Math.min(1, match.phaseT / (match.introLen * 0.6));
       const f0 = F[0];
       if (f0.hopY > 0) {
-        f0.hopY = Math.max(0, (match.si === 3 ? 30 : 12) * match.S * (1 - k * k));
+        f0.hopY = Math.max(0, (match.si === GIANT ? 30 : 12) * match.S * (1 - k * k));
         if (f0.hopY === 0) {
-          sfx('thud'); match.shake = (match.si === 3 ? 0.6 : 0.2) * match.S; ring(f0.pos, 0xffffff, (match.si === 3 ? 8 : 3) * match.S, 0.7);
-          puffs(f0.pos, match.si === 3 ? 30 : 10, 0xffffff, 2 * match.S, 0.2); cheer(1.5);
-          if (match.si === 3) { confetti3d(); sfx('cheer'); }
+          sfx('thud'); match.shake = (match.si === GIANT ? 0.6 : 0.2) * match.S; ring(f0.pos, 0xffffff, (match.si === GIANT ? 8 : 3) * match.S, 0.7);
+          puffs(f0.pos, match.si === GIANT ? 30 : 10, 0xffffff, 2 * match.S, 0.2); cheer(1.5);
+          if (match.si === GIANT) { confetti3d(); sfx('cheer'); }
         }
       }
       F[1].hopY = Math.abs(Math.sin(match.phaseT * 6)) * 0.6 * match.S;

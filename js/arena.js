@@ -5,8 +5,9 @@
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const sfx = (n) => { DG.audio.play(n); netFx('sfx', [n]); };
-  const STAGE_SCALE = { 1: 1, 2: 1.2, 3: 1.6 };
-  const ARENA_R = { 1: 9, 2: 10.5, 3: 14 };
+  const STAGE_SCALE = { 0: 0.9, 1: 0.95, 2: 1, 3: 1.2, 4: 1.6 };
+  const ARENA_R = { 0: 8.5, 1: 9, 2: 9, 3: 10.5, 4: 14 };
+  const GIANT = 4;
   const MATCH_TIME = 90;
 
   let root, stageEl, renderer, scene, camera, raf = 0, last = 0, T = 0;
@@ -34,11 +35,6 @@
             ${p.foodBonus ? `<p class="bonus-chip inline">${DG.FOODS[p.foodBonus.food].icon} Snack bonus ready: <b>${p.foodBonus.label}</b><br><small>Used up after your next real battle.</small></p>` : '<p class="fine">Tip: eat Tofu Bites or a Noodle Nest before a battle for a one-time boost.</p>'}
             ${DG.cozy() ? '<p class="fine">🏠 Cozy bonus active: +10% special charge.</p>' : ''}</div>
           </div>
-          <div class="card practice">
-            <h3>🥋 Practice Match</h3>
-            <p>Try battling right away! ${DG.ui.esc(p.name)} becomes a <b>temporary grown-up</b> with its special and second move. No rewards, no snack bonus used — just practice.</p>
-            <div class="chip-row">${['charger', 'blocker', 'dodger'].map((s) => `<button class="btn small" data-practice="${s}" ${hasThree ? '' : 'disabled'}>${DG.STYLES[s].icon} vs ${DG.STYLES[s].name}</button>`).join('')}</div>
-          </div>
           <div class="card practice friend-card">
             <h3>👥 Battle a Friend</h3>
             <p>Battle a friend's dumpling on another phone or computer. You both need to be on the <b>same Wi‑Fi</b>. Just for fun: no coins or rewards.</p>
@@ -48,12 +44,12 @@
         </div>
         <div class="lobby-col">
           <h3 class="col-title">Opponents</h3>
-          ${si < 1 ? `<p class="note">🌱 Real arena battles unlock when ${DG.ui.esc(p.name)} reaches the <b>Medium</b> stage${nx ? ` — in <b>${DG.fmtDuration(nx.msLeft)}</b>` : ''}. Try a Practice Match meanwhile!</p>` : ''}
+          ${si < 1 ? `<p class="note">🌱 Arena battles unlock when ${DG.ui.esc(p.name)} reaches the <b>Small</b> stage${nx ? ` — in <b>${DG.fmtDuration(nx.msLeft)}</b>` : ''}. You can still battle a friend!</p>` : ''}
           <div class="opp-list">${DG.OPPONENTS.map((o, i) => {
             const prev = DG.OPPONENTS[i - 1];
             const beaten = st.beaten[o.id];
             let lock = '';
-            if (si < 1) lock = 'Medium stage';
+            if (si < 1) lock = 'Small stage';
             else if (si < o.minStage) lock = `Reach ${DG.STAGES[o.minStage].name} stage`;
             else if (prev && !st.beaten[prev.id]) lock = `Beat ${prev.name} first`;
             return `<div class="opp ${lock ? 'locked' : ''}">
@@ -70,7 +66,6 @@
     const stop = DG.ui.previewLoop(root.querySelector('#a-prev'), (t) => ({ type: p.type, look: p.look, stage: si, size: 90, accessory: p.accessory, trait: p.trait, mood: 'joy', hop: Math.max(0, Math.sin(t * 4)) * 8 }), 140, 120);
     root._stop = stop;
     root.querySelectorAll('[data-fight]').forEach((b) => (b.onclick = () => { DG.audio.unlock(); startMatch({ opp: +b.dataset.fight }); }));
-    root.querySelectorAll('[data-practice]').forEach((b) => (b.onclick = () => { DG.audio.unlock(); startMatch({ practice: b.dataset.practice }); }));
     root.querySelector('#a-host').onclick = () => { DG.audio.unlock(); hostGame(); };
     root.querySelector('#a-join').onclick = () => { DG.audio.unlock(); joinGame(); };
   }
@@ -92,14 +87,14 @@
   /* ===================== Fighter setup ===================== */
   function playerDef(practice) {
     const p = DG.pet(), real = DG.stageIndex();
-    const stageIdx = practice ? Math.max(2, real) : real;
+    const stageIdx = practice ? Math.max(3, real) : real; // friend battles: a temporary Large
     const stats = {};
     DG.STAT_KEYS.forEach((k) => (stats[k] = practice ? Math.max(p.stats[k], 30) : p.stats[k]));
     const moves = DG.STARTERS[p.type].moves;
     return {
       isPlayer: true, name: p.name, shape: p.type, hex: DG.lookColors(p.type, p.look).hex, accessory: p.accessory, trait: p.trait, look: p.look, colors2d: null,
       stats, stageIdx, bonus: practice ? null : p.foodBonus && p.foodBonus.type, cozy: DG.cozy(), moves,
-      canSpecial: stageIdx >= 1, canMove2: stageIdx >= 2, canUlt: stageIdx >= 3,
+      canSpecial: stageIdx >= 2, canMove2: stageIdx >= 3, canUlt: stageIdx >= 4,
     };
   }
   function oppDef(opp, pDef, practiceStyle) {
@@ -123,7 +118,7 @@
     return {
       isPlayer: false, name, shape, hex, accessory: acc, trait: null, stats, stageIdx: si, style, skill, bonus: null,
       look: { eyes: { charger: 'lash', blocker: 'round', dodger: 'sparkle', mixed: 'wide' }[style] || 'round', cheeks: 'blush' }, colors2d: DG.draw.colorsFromHex(hex),
-      moves: DG.STARTERS[shape].moves, canSpecial: si >= 1, canMove2: si >= 2, canUlt: si >= 3,
+      moves: DG.STARTERS[shape].moves, canSpecial: si >= 2, canMove2: si >= 3, canUlt: si >= 4,
     };
   }
 
@@ -1045,13 +1040,13 @@
     F = [makeFighter(pDef, S), makeFighter(oDef, S)];
     F[0].pos.set(0, 0, R * 0.45); F[1].pos.set(0, 0, -R * 0.45);
     F[0].facing = Math.PI; F[1].facing = 0;
-    F[0].hopY = (si === 3 ? 30 : 12) * S; F[1].hopY = 0;
+    F[0].hopY = (si === GIANT ? 30 : 12) * S; F[1].hopY = 0;
     camera.position.set(0, R * 1.2, R * 2.2 * camSide()); camera.lookAt(0, 0, 0);
-    if (si === 3) camera.position.set(0, R * 2, R * 3.2 * camSide());
+    if (si === GIANT) camera.position.set(0, R * 2, R * 3.2 * camSide());
     renderHud(true);
     wireControls();
-    banner(si === 3 ? `🌟 GIANT ${DG.ui.esc(pDef.name)} ENTERS! 🌟` : `${DG.ui.esc(pDef.name)} <span class="vs">VS</span> ${DG.ui.esc(oDef.name)}`, si === 3 ? 2.6 : 1.8);
-    match.introLen = si === 3 ? 3.2 : 2.0;
+    banner(si === GIANT ? `🌟 GIANT ${DG.ui.esc(pDef.name)} ENTERS! 🌟` : `${DG.ui.esc(pDef.name)} <span class="vs">VS</span> ${DG.ui.esc(oDef.name)}`, si === GIANT ? 2.6 : 1.8);
+    match.introLen = si === GIANT ? 3.2 : 2.0;
     last = performance.now(); T = 0;
     cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
   }
@@ -1449,11 +1444,11 @@
       const k = Math.min(1, match.phaseT / (match.introLen * 0.6));
       const f0 = F[0];
       if (f0.hopY > 0) {
-        f0.hopY = Math.max(0, (match.si === 3 ? 30 : 12) * match.S * (1 - k * k));
+        f0.hopY = Math.max(0, (match.si === GIANT ? 30 : 12) * match.S * (1 - k * k));
         if (f0.hopY === 0) {
-          sfx('thud'); match.shake = (match.si === 3 ? 0.6 : 0.2) * match.S; ring(f0.pos, 0xffffff, (match.si === 3 ? 8 : 3) * match.S, 0.7);
-          puffs(f0.pos, match.si === 3 ? 30 : 10, 0xffffff, 2 * match.S, 0.2); cheer(1.5);
-          if (match.si === 3) { confetti3d(); sfx('cheer'); }
+          sfx('thud'); match.shake = (match.si === GIANT ? 0.6 : 0.2) * match.S; ring(f0.pos, 0xffffff, (match.si === GIANT ? 8 : 3) * match.S, 0.7);
+          puffs(f0.pos, match.si === GIANT ? 30 : 10, 0xffffff, 2 * match.S, 0.2); cheer(1.5);
+          if (match.si === GIANT) { confetti3d(); sfx('cheer'); }
         }
       }
       F[1].hopY = Math.abs(Math.sin(match.phaseT * 6)) * 0.6 * match.S;

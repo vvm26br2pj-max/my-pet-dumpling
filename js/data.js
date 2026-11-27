@@ -6,14 +6,16 @@ window.DG = window.DG || {};
   DG.DAY = 24 * H;
 
   DG.STAGES = [
-    { id: 'baby',   name: 'Baby',   at: 0,       scale: 0.62, cap: 40,
-      unlocks: ['Basic care', 'Gentle (Easy) training', 'Practice battles'] },
-    { id: 'medium', name: 'Medium', at: 24 * H,  scale: 0.8,  cap: 60,
-      unlocks: ['Arena battles', 'Starter special move', 'Medium training'] },
-    { id: 'large',  name: 'Large',  at: 72 * H,  scale: 1.0,  cap: 80,
-      unlocks: ['Advanced (Hard) training', 'A second battle move', 'A new look based on training'] },
-    { id: 'giant',  name: 'Giant',  at: 168 * H, scale: 1.32, cap: 100,
-      unlocks: ['Ultimate move', 'Grand arena entrance', 'The Giant arena'] },
+    { id: 'baby',   name: 'Baby',   at: 0,        scale: 0.62, cap: 40,
+      unlocks: ['Basic care', 'Gentle (Easy) training', 'Friend battles'] },
+    { id: 'small',  name: 'Small',  at: 1 * H,    scale: 0.7,  cap: 50,
+      unlocks: ['Arena battles', 'The first two challengers'] },
+    { id: 'medium', name: 'Medium', at: 24 * H,   scale: 0.8,  cap: 60,
+      unlocks: ['Starter special move', 'Medium training', 'Two new challengers'] },
+    { id: 'large',  name: 'Large',  at: 7 * 24 * H,  scale: 1.0,  cap: 80,
+      unlocks: ['Advanced (Hard) training', 'A second battle move', 'A new look based on training', 'A tough new challenger'] },
+    { id: 'giant',  name: 'Giant',  at: 30 * 24 * H, scale: 1.32, cap: 100,
+      unlocks: ['Ultimate move', 'Grand arena entrance', 'The Giant arena', 'The final challengers'] },
   ];
 
   DG.STAT_KEYS = ['strength', 'stamina', 'agility', 'defense', 'focus'];
@@ -235,11 +237,11 @@ window.DG = window.DG || {};
   DG.OPPONENTS = [
     { id: 'chili',    name: 'Chili Wonton',      shape: 'gyoza', color: '#ffb08a', hex: 0xffb08a, style: 'charger', tier: 0, minStage: 1, acc: 'headband' },
     { id: 'shumai',   name: 'Sir Shumai',        shape: 'soup',  color: '#ffe08a', hex: 0xffe08a, style: 'blocker', tier: 1, minStage: 1, acc: 'tinyhat' },
-    { id: 'hargow',   name: 'Zippy Har Gow',     shape: 'gyoza', color: '#ffd3df', hex: 0xffd3df, style: 'dodger',  tier: 2, minStage: 1, acc: 'bow' },
+    { id: 'hargow',   name: 'Zippy Har Gow',     shape: 'gyoza', color: '#ffd3df', hex: 0xffd3df, style: 'dodger',  tier: 2, minStage: 2, acc: 'bow' },
     { id: 'pierogi',  name: 'Big Pierogi',       shape: 'gyoza', color: '#f2d7a6', hex: 0xf2d7a6, style: 'charger', tier: 3, minStage: 2, acc: 'beret' },
-    { id: 'momo',     name: 'Momo the Wall',     shape: 'soup',  color: '#d4ecc4', hex: 0xd4ecc4, style: 'blocker', tier: 4, minStage: 2, acc: 'chef' },
-    { id: 'mandu',    name: 'Mandu Flash',       shape: 'gyoza', color: '#c9dbf5', hex: 0xc9dbf5, style: 'dodger',  tier: 5, minStage: 3, acc: 'glasses' },
-    { id: 'champion', name: 'Grand Bao Champion',shape: 'bao',   color: '#ffd76a', hex: 0xffd76a, style: 'mixed',   tier: 6, minStage: 3, acc: 'crown' },
+    { id: 'momo',     name: 'Momo the Wall',     shape: 'soup',  color: '#d4ecc4', hex: 0xd4ecc4, style: 'blocker', tier: 4, minStage: 3, acc: 'chef' },
+    { id: 'mandu',    name: 'Mandu Flash',       shape: 'gyoza', color: '#c9dbf5', hex: 0xc9dbf5, style: 'dodger',  tier: 5, minStage: 4, acc: 'glasses' },
+    { id: 'champion', name: 'Grand Bao Champion',shape: 'bao',   color: '#ffd76a', hex: 0xffd76a, style: 'mixed',   tier: 6, minStage: 4, acc: 'crown' },
   ];
 
   DG.ACHIEVEMENTS = {
@@ -252,7 +254,6 @@ window.DG = window.DG || {};
     firstTrain:   { name: 'Warm-Up',            icon: '🏋️', desc: 'Finish a training session.', coins: 5 },
     tenPerfect:   { name: 'Ten Perfect Jumps',  icon: '🪢', desc: 'Land 10 perfect jumps in Jump Rope.', coins: 15 },
     allTraining:  { name: 'Well-Rounded',       icon: '🌈', desc: 'Try all five training games.', coins: 15 },
-    practice:     { name: 'Practice Makes Perfect', icon: '🥋', desc: 'Finish a practice match.', coins: 5 },
     firstWin:     { name: 'First Arena Win',    icon: '🏆', desc: 'Win an arena battle.', coins: 20 },
     champion:     { name: 'Steamer Champion',   icon: '👑', desc: 'Defeat every arena opponent.', coins: 100 },
     grownMedium:  { name: 'Growing Up',         icon: '🌱', desc: 'Reach the Medium stage.', coins: 10 },

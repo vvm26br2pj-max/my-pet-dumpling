@@ -164,7 +164,7 @@
     }
 
     // shine for older dumplings
-    if ((o.stage || 0) >= 2 && !isBao) {
+    if ((o.stage || 0) >= 3 && !isBao) {
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.beginPath(); ctx.ellipse(-0.5 * u, (g.mid - 0.25) * u, 0.13 * u, 0.07 * u, -0.6, 0, TAU); ctx.fill();
     }
@@ -174,7 +174,7 @@
     if (o.trait === 'strength') drawPowerBand(ctx, u, g, t, type);
     if (o.trait === 'agility') drawScarf(ctx, u, g, t);
     if (o.accessory) accessory(ctx, o.accessory, u, g, t, type);
-    if ((o.stage || 0) >= 3) {
+    if ((o.stage || 0) >= 4) {
       for (let i = 0; i < 3; i++) {
         const a = t * 1.5 + i * 2.1;
         sparkle(ctx, Math.cos(a) * 1.25 * u, (g.mid - 0.2) * u + Math.sin(a * 1.3) * 0.6 * u, 0.08 * u * (0.6 + 0.4 * Math.sin(t * 4 + i)), '#ffd75a');

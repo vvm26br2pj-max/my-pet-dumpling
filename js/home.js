@@ -36,7 +36,7 @@
     c.fillStyle = '#b9783c'; c.beginPath(); c.ellipse(cx, by, bw, rim, 0, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#8d5426'; c.beginPath(); c.ellipse(cx, by + 3, bw * 0.88, rim * 0.72, 0, 0, Math.PI * 2); c.fill();
     const mood = p.asleep ? 'sleeping' : DG.mood();
-    DG.draw.dumpling(c, { type: p.type, look: p.look, x: cx, y: by + bh * 0.5, size: W * 0.56, t: T, stage: Math.min(2, DG.stageIndex()),
+    DG.draw.dumpling(c, { type: p.type, look: p.look, x: cx, y: by + bh * 0.5, size: W * 0.56, t: T, stage: Math.min(3, DG.stageIndex()),
       mood: mood === 'happy' ? 'joy' : mood, accessory: p.accessory, trait: null, shadow: false, blink: !p.asleep && (T % 4) < 0.15 });
     // basket front band
     c.save();
@@ -284,7 +284,7 @@
     const ab = root.querySelector('#h-arena');
     ab.classList.toggle('soft-lock', si < 1);
     ab.innerHTML = '<span>🏟️</span>';
-    ab.title = si < 1 ? 'Arena (practice only)' : 'Arena'; ab.setAttribute('aria-label', ab.title);
+    ab.title = si < 1 ? 'Arena (friend battles only until Small)' : 'Arena'; ab.setAttribute('aria-label', ab.title);
   }
 
   /* ---------- Interactions ---------- */
