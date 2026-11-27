@@ -20,50 +20,64 @@
     const p = DG.pet(), si = DG.stageIndex(), st = DG.state;
     const hasThree = !!window.THREE;
     const nx = DG.nextStage();
+    const OPP_IMG = { chili: 'img/ar_opp_chili.webp?v=1', shumai: 'img/ar_opp_shumai.webp?v=1', hargow: 'img/ar_opp_hargow.webp?v=1', pierogi: 'img/ar_opp_pierogi.webp?v=1', momo: 'img/ar_opp_momo.webp?v=1', mandu: 'img/ar_opp_mandu.webp?v=1', champion: 'img/ar_opp_champion.webp?v=1' };
+    const STYLE_IMG = { charger: 'img/ar_style_charger.webp?v=1', blocker: 'img/ar_style_blocker.webp?v=1', dodger: 'img/ar_style_dodger.webp?v=1', mixed: 'img/ar_style_champion.webp?v=1' };
+    const STYLE_TINT = { charger: '#ffe2cf', blocker: '#fff0c4', dodger: '#e3ecff', mixed: '#fff0b8' };
+    const useViking = p.accessory === 'viking';
     root.innerHTML = `
-      <header class="topbar slim">
-        <button class="btn ghost" id="a-home">🏠 Home</button>
-        <h2 class="screen-title">🏟️ Steamer Arena</h2>
-        <div class="coins">🪙 <b>${st.coins}</b></div>
-      </header>
-      ${hasThree ? '' : '<p class="note warn">The 3D arena needs the three.js library, which loads from the internet. Please connect once and reload the page.</p>'}
-      <div class="lobby">
-        <div class="lobby-col">
-          <div class="card fighter-card">
-            <canvas id="a-prev"></canvas>
-            <div><h3>${DG.ui.esc(p.name)} <small>${DG.STAGES[si].name}</small></h3>
-            ${p.foodBonus ? `<p class="bonus-chip inline">${DG.FOODS[p.foodBonus.food].icon} Snack bonus ready: <b>${p.foodBonus.label}</b><br><small>Used up after your next real battle.</small></p>` : '<p class="fine">Tip: eat Tofu Bites or a Noodle Nest before a battle for a one-time boost.</p>'}
-            ${DG.cozy() ? '<p class="fine">🏠 Cozy bonus active: +10% special charge.</p>' : ''}</div>
-          </div>
-          <div class="card practice friend-card">
-            <h3>👥 Battle a Friend</h3>
-            <p>Battle a friend's dumpling on another phone or computer. You both need to be on the <b>same Wi‑Fi</b>. Just for fun: no coins or rewards.</p>
-            <div class="chip-row"><button class="btn small primary" id="a-host" ${hasThree ? '' : 'disabled'}>📡 Host a battle</button><button class="btn small" id="a-join" ${hasThree ? '' : 'disabled'}>🔑 Join with a code</button></div>
-          </div>
-          <button class="btn controls-btn" id="a-controls">🎮 Controls</button>
+      <div class="ar">
+        <div class="ar-hero">
+          <img class="ar-scene" src="img/ar_scene.webp?v=1" alt="">
+          <header class="ar-top">
+            <button class="ar-pill" id="a-home"><span aria-hidden="true">🏠</span> Home</button>
+            <h2 class="ar-pill ar-title"><span aria-hidden="true">🏟️</span> Steamer Arena</h2>
+            <div class="ar-pill ar-coins"><span aria-hidden="true">🪙</span> <b>${st.coins}</b></div>
+          </header>
         </div>
-        <div class="lobby-col">
-          <h3 class="col-title">Opponents</h3>
-          ${si < 1 ? `<p class="note">🌱 Arena battles unlock when ${DG.ui.esc(p.name)} reaches the <b>Small</b> stage${nx ? ` — in <b>${DG.fmtDuration(nx.msLeft)}</b>` : ''}. You can still battle a friend!</p>` : ''}
-          <div class="opp-list">${DG.OPPONENTS.map((o, i) => {
+        ${hasThree ? '' : '<p class="note warn">The 3D arena needs the three.js library, which loads from the internet. Please connect once and reload the page.</p>'}
+        <div class="ar-card ar-me">
+          ${useViking ? '<img class="ar-me-pic" src="img/ar_viking.webp?v=1" alt="">' : '<canvas id="a-prev" class="ar-me-pic"></canvas>'}
+          <div class="ar-me-txt">
+            <h3>${DG.ui.esc(p.name)} <span>${DG.STAGES[si].name}</span></h3>
+            ${p.foodBonus ? `<p>${DG.FOODS[p.foodBonus.food].icon} Snack bonus ready: <b>${p.foodBonus.label}</b><br><small>Used up after your next real battle.</small></p>` : '<p>Tip: eat Tofu Bites or a Noodle Nest before a battle for a one-time boost.</p>'}
+            ${DG.cozy() ? '<p>🏠 Cozy bonus active: +10% special charge.</p>' : ''}
+          </div>
+        </div>
+        <div class="ar-section">
+          <img class="ar-ribbon" src="img/ar_rib_opp.webp?v=1" alt="Opponents">
+          ${si < 1 ? `<p class="ar-note">🌱 Arena battles unlock when ${DG.ui.esc(p.name)} reaches the <b>Small</b> stage${nx ? ` — in <b>${DG.fmtDuration(nx.msLeft)}</b>` : ''}. You can still battle a friend!</p>` : ''}
+          <div class="ar-opps">${DG.OPPONENTS.map((o, i) => {
             const prev = DG.OPPONENTS[i - 1];
             const beaten = st.beaten[o.id];
             let lock = '';
             if (si < o.minStage) lock = `${DG.STAGES[o.minStage].name} stage`;
-            else if (prev && !st.beaten[prev.id]) lock = `Beat ${prev.name} first`;
-            return `<div class="opp ${lock ? 'locked' : ''}">
-              <div class="opp-ico" style="background:${o.color}">${DG.STYLES[o.style].icon}</div>
-              <div class="opp-info"><b>${o.name}</b> ${beaten ? '<span class="won">✓ Beaten</span>' : ''}<small>${DG.STYLES[o.style].name} · ${'★'.repeat(o.tier + 1)}</small><small class="tip">${DG.STYLES[o.style].tip}</small></div>
-              ${lock ? `<span class="lock-tag">🔒 ${lock}</span>` : `<button class="btn primary small" data-fight="${i}" ${hasThree ? '' : 'disabled'}>Fight!</button>`}
+            else if (prev && !st.beaten[prev.id]) lock = `Beat ${prev.name}`;
+            return `<div class="ar-opp ${lock ? 'locked' : ''}" style="--tint:${STYLE_TINT[o.style]}" title="${DG.ui.esc(DG.STYLES[o.style].tip)}">
+              <img class="ar-style" src="${STYLE_IMG[o.style]}" alt="${DG.STYLES[o.style].name}">
+              <img class="ar-face" src="${OPP_IMG[o.id]}" alt="">
+              <div class="ar-opp-txt"><b>${o.name}${beaten ? ' <span class="won">✓</span>' : ''}</b><small>${DG.STYLES[o.style].name} · <i>${'★'.repeat(o.tier + 1)}</i></small></div>
+              ${lock ? `<span class="ar-lock">🔒 ${lock}</span>` : `<button class="ar-fight" data-fight="${i}" ${hasThree ? '' : 'disabled'}>Fight!</button>`}
             </div>`;
           }).join('')}</div>
-          <p class="fine">Opponents match your stage and training. Win to unlock the next challenger. You earn coins even if you lose!</p>
+          <p class="ar-fine">Win to unlock the next challenger. You earn coins even if you lose!</p>
+        </div>
+        <div class="ar-section">
+          <img class="ar-ribbon" src="img/ar_rib_mp.webp?v=1" alt="Multiplayer">
+          <div class="ar-mp">
+            <img class="ar-friends" src="img/ar_friends.webp?v=1" alt="">
+            <div><h3>Battle a Friend</h3><p>Battle a friend's dumpling on another phone or computer. You both need to be on the <b>same Wi‑Fi</b>. Just for fun: no coins or rewards.</p></div>
+          </div>
+          <div class="ar-mp-btns">
+            <button class="ar-btn host" id="a-host" ${hasThree ? '' : 'disabled'}>⚔️ Host a Battle</button>
+            <button class="ar-btn join" id="a-join" ${hasThree ? '' : 'disabled'}>🔑 Join with a Code</button>
+          </div>
+          <button class="ar-controls" id="a-controls">🎮 Controls</button>
         </div>
       </div>`;
     root.querySelector('#a-home').onclick = () => { DG.audio.play('click'); DG.ui.show('home'); };
     root.querySelector('#a-controls').onclick = () => { DG.audio.play('click'); DG.ui.modal({ title: '🎮 Controls', html: controlsHtml(), buttons: [{ label: 'Got it', cls: 'primary' }] }); };
-    const stop = DG.ui.previewLoop(root.querySelector('#a-prev'), (t) => ({ type: p.type, look: p.look, stage: si, size: 90, accessory: p.accessory, trait: p.trait, mood: 'joy', hop: Math.max(0, Math.sin(t * 4)) * 8 }), 140, 120);
-    root._stop = stop;
+    const pv = root.querySelector('#a-prev');
+    root._stop = pv ? DG.ui.previewLoop(pv, (t) => ({ type: p.type, look: p.look, stage: si, size: 90, accessory: p.accessory, trait: p.trait, mood: 'joy', hop: Math.max(0, Math.sin(t * 4)) * 8 }), 140, 120) : null;
     root.querySelectorAll('[data-fight]').forEach((b) => (b.onclick = () => { DG.audio.unlock(); startMatch({ opp: +b.dataset.fight }); }));
     root.querySelector('#a-host').onclick = () => { DG.audio.unlock(); hostGame(); };
     root.querySelector('#a-join').onclick = () => { DG.audio.unlock(); joinGame(); };
