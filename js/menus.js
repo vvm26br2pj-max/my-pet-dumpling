@@ -257,14 +257,23 @@
         const poke = () => { pokeT = el._t || 0; DG.save(); };
         wireLookPicker(el, p.look, poke);
         const nameIn = el.querySelector('#cl-name');
-        const rename = () => {
+        // the name updates as you type (so closing the closet never loses it); Rename / Enter confirms it
+        let announced = p.name;
+        const live = () => {
           const v = nameIn.value.trim().slice(0, 14);
-          if (!v) { nameIn.value = p.name; return; }
-          if (v === p.name) return;
-          p.name = v; DG.save(); DG.audio.play('good'); poke();
-          DG.ui.toast(`✏️ Your dumpling is now called <b>${esc(v)}</b>!`);
+          if (!v || v === p.name) return;
+          p.name = v; DG.save();
           if (DG.Home) DG.Home.renderHud();
         };
+        const rename = () => {
+          live();
+          if (!nameIn.value.trim()) nameIn.value = p.name;
+          if (p.name === announced) return;
+          announced = p.name; DG.audio.play('good'); poke();
+          DG.ui.toast(`✏️ Your dumpling is now called <b>${esc(p.name)}</b>!`);
+        };
+        nameIn.addEventListener('input', live);
+        nameIn.addEventListener('blur', live);
         el.querySelector('#cl-rename').onclick = rename;
         nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { rename(); nameIn.blur(); } });
         el.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => {
