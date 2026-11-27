@@ -848,23 +848,23 @@
   const LAYOUTS = {
     wide: {
       W: 900,
-      tub: { x: 25, y: 362, w: 158, h: 107 }, bowl: { x: 300, y: 430, w: 89, h: 58 },
+      tub: { x: 25, y: 362, w: 158, h: 107 }, bowl: { x: 286, y: 444, w: 89, h: 58 },
       basket: { x: 520, y: 420, w: 102, h: 83 }, bed: { x: 690, y: 300, w: 182, h: 171 },
       door: { x: 14, y: 77, w: 144, h: 239 },
-      spots: { home: { x: 450, y: 455 }, bowl: { x: 414, y: 476 }, bed: { x: 781, y: 490 }, tub: { x: 104, y: 450 } },
+      spots: { home: { x: 450, y: 455 }, bowl: { x: 400, y: 490 }, bed: { x: 781, y: 490 }, tub: { x: 104, y: 450 } },
       bedO: [636, 312], bedK: 0.207,
-      pos: { door: [14, 77], mat: [32, 322], pot: [162, 222], lantern: [205, 28], window: [283, 76], painting: [470, 72],
+      pos: { door: [14, 77], mat: [29, 313], pot: [162, 222], lantern: [205, 28], window: [281, 72], painting: [470, 91],
         poster: [566, 140], clock: [810, 58], shelf: [680, 128], fish: [494, 253], plant: [580, 251] },
       deco: { beanbag: [396, 346, 1, 420, 346], rug: [450, 450, 1, 450, 450] },
     },
     tall: {
       W: 560,
-      tub: { x: 14, y: 412, w: 158, h: 107 }, bowl: { x: 206, y: 502, w: 89, h: 58 },
+      tub: { x: 14, y: 412, w: 158, h: 107 }, bowl: { x: 190, y: 524, w: 89, h: 58 },
       basket: { x: 444, y: 548, w: 102, h: 83 }, bed: { x: 368, y: 320, w: 182, h: 171 },
       door: { x: 5, y: 77, w: 144, h: 239 },
-      spots: { home: { x: 270, y: 462 }, bowl: { x: 250, y: 494 }, bed: { x: 458, y: 500 }, tub: { x: 93, y: 496 } },
+      spots: { home: { x: 270, y: 462 }, bowl: { x: 234, y: 516 }, bed: { x: 458, y: 500 }, tub: { x: 93, y: 496 } },
       bedO: [339, 345], bedK: 0.172,
-      pos: { door: [5, 77], mat: [23, 322], pot: [144, 222], lantern: [131, 28], window: [179, 76], painting: [354, 72],
+      pos: { door: [5, 77], mat: [20, 313], pot: [144, 222], lantern: [131, 28], window: [177, 72], painting: [354, 91],
         poster: [354, 154], clock: [480, 61], shelf: [431, 114], fish: [312, 253], plant: [364, 251] },
       deco: { beanbag: [222, 340, 0.72, 420, 346], rug: [262, 525, 0.86, 450, 450] },
     },
@@ -884,16 +884,27 @@
   DG.bedScale = () => BEDK / 0.207;
   /* Painted room pieces, cut from the cozy room design picture. Sizes are in room units (picture px x SPR_K). */
   const SPR_K = 0.6565;
-  const SPR_PX = { door: [219, 364], window: [253, 255], lantern: [100, 215], painting: [112, 110], poster: [113, 132], clock: [98, 97],
-    shelf: [185, 218], fish: [89, 129], plant: [140, 140], pot: [97, 127], mat: [172, 43], bath: [240, 163], bowl: [136, 88], basket: [156, 126], bed: [278, 261] };
+  const SPR_PX = { door: [219, 364], window: [262, 263], window_tint: [262, 263], door_tint: [219, 364], lantern: [100, 215], painting: [112, 81], poster: [113, 132], clock: [98, 97],
+    shelf: [185, 218], fish: [89, 129], plant: [140, 140], pot: [97, 127], mat: [172, 43], bath: [240, 163], bowl: [136, 88], basket: [156, 126], bed: [279, 258] };
   const SPR = {};
   if (typeof Image !== 'undefined') Object.keys(SPR_PX).forEach((n) => {
-    const im = new Image(); im.decoding = 'async'; im.src = `img/rm_${n}.webp?v=2`;
+    const im = new Image(); im.decoding = 'async'; im.src = `img/rm_${n}.webp?v=4`;
     SPR[n] = { im, w: SPR_PX[n][0] * SPR_K, h: SPR_PX[n][1] * SPR_K };
   });
   const sprReady = () => Object.keys(SPR).length && Object.values(SPR).every((o) => o.im.complete && o.im.naturalWidth);
   function spr(ctx, n, x, y) { const o = SPR[n]; if (o) ctx.drawImage(o.im, x, y, o.w, o.h); }
   function sprAt(ctx, n) { const p = ROOM.pos[n]; spr(ctx, n, p[0], p[1]); }
+  /** A cream part (curtains, door frame) recoloured toward the wall colour; cached per colour. */
+  const TINTS = {};
+  function tinted(n, color) {
+    const key = n + color; if (TINTS[key]) return TINTS[key];
+    const o = SPR[n], c = document.createElement('canvas'); c.width = o.im.naturalWidth; c.height = o.im.naturalHeight;
+    const x = c.getContext('2d');
+    x.drawImage(o.im, 0, 0); x.globalCompositeOperation = 'multiply'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(o.im, 0, 0);
+    return (TINTS[key] = c);
+  }
+  function tintAt(ctx, n, at, color) { const p = ROOM.pos[at], o = SPR[n]; ctx.drawImage(tinted(n, color), p[0], p[1], o.w, o.h); }
   /** Soft contact shadow so pieces sit on the floor. */
   function floorShadow(ctx, cx, y, rx, ry, a) {
     const g = ctx.createRadialGradient(cx, y, 1, cx, y, rx);
@@ -1189,10 +1200,11 @@
       ctx.fillStyle = wl; ctx.fillRect(0, -E, W, floorY + E);
       const sk = ctx.createLinearGradient(0, floorY - 16, 0, floorY); sk.addColorStop(0, '#fffaf2'); sk.addColorStop(1, '#f1dcc4');
       ctx.fillStyle = sk; ctx.fillRect(0, floorY - 16, W, 16); ctx.fillStyle = 'rgba(150,90,50,0.15)'; ctx.fillRect(0, floorY - 17, W, 2);
-      sprAt(ctx, 'window');
+      const trimCol = mix(wall.a, '#ffffff', 0.5); // curtains and the door frame follow the wall colour
+      sprAt(ctx, 'window'); tintAt(ctx, 'window_tint', 'window', trimCol);
       if (night) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgba(70,80,170,0.5)'; ctx.fillRect(wp[0] + 20, wp[1] + 8, SPR.window.w - 40, SPR.window.h - 26); ctx.restore(); }
       // the door, with the garden showing through as it swings open
-      const dp = ROOM.pos.door; sprAt(ctx, 'door');
+      const dp = ROOM.pos.door; sprAt(ctx, 'door'); tintAt(ctx, 'door_tint', 'door', trimCol);
       if (o.doorOpen > 0.02) {
         const dx = dp[0] + SPR.door.w * 0.2, dw = SPR.door.w * 0.6, dy = dp[1] + SPR.door.h * 0.14, dh = SPR.door.h * 0.8;
         ctx.save(); ctx.globalAlpha = Math.min(1, o.doorOpen * 1.3);
@@ -1223,6 +1235,11 @@
         sprAt(ctx, 'lantern'); ctx.restore();
         const lg2 = ctx.createRadialGradient(lp[0] + SPR.lantern.w / 2, lp[1] + 70, 4, lp[0] + SPR.lantern.w / 2, lp[1] + 70, 70);
         lg2.addColorStop(0, 'rgba(255,200,140,0.35)'); lg2.addColorStop(1, 'rgba(255,200,140,0)'); ctx.fillStyle = lg2; ctx.fillRect(lp[0] - 50, lp[1], 170, 160); }
+      if (decor.includes('painting')) { // hung on a nail by a string
+        const pp = ROOM.pos.painting, cx = pp[0] + SPR.painting.w / 2;
+        ctx.strokeStyle = '#8a5a3a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(pp[0] + 10, pp[1] + 3); ctx.lineTo(cx, pp[1] - 15); ctx.lineTo(pp[0] + SPR.painting.w - 10, pp[1] + 3); ctx.stroke();
+        ctx.fillStyle = '#c9a26a'; ctx.beginPath(); ctx.arc(cx, pp[1] - 15, 2.6, 0, TAU); ctx.fill(); ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 1; ctx.stroke();
+      }
       ['painting', 'poster', 'clock', 'shelf'].forEach((n) => { if (decor.includes(n)) sprAt(ctx, n); });
     }
     if (!useSpr && decor.includes('poster')) place(ctx, 'poster', () => {

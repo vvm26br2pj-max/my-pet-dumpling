@@ -1280,3 +1280,12 @@ body { background:
   radial-gradient(ellipse 22% 6% at 78% 3%, rgba(255,255,255,0.6), transparent 70%),
   radial-gradient(ellipse 18% 5% at 20% 2%, rgba(255,255,255,0.55), transparent 70%),
   linear-gradient(180deg, #fbdcd2 0%, #fbe3d6 40%, #fae6d6 100%) fixed; }
+
+/* bottom bar icons, cut from the cozy design picture */
+.room-wrap .dock.glass.labelled .act span { background-position: center bottom !important; background-size: contain !important; background-repeat: no-repeat !important; }
+.dock.glass.labelled .act[data-a="train"] span { background-image: url('../img/ic_train.webp?v=1') !important; }
+.dock.glass.labelled .act[data-a="arena"] span { background-image: url('../img/ic_arena.webp?v=1') !important; }
+.dock.glass.labelled .act[data-a="shop"] span { background-image: url('../img/ic_shop.webp?v=1') !important; }
+.dock.glass.labelled .act[data-a="closet"] span { background-image: url('../img/ic_wardrobe.webp?v=1') !important; }
+.dock.glass.labelled .act[data-a="decorate"] span { background-image: url('../img/ic_house.webp?v=1') !important; }
+.dock.glass.labelled .act span svg { display: none; }
