@@ -1915,3 +1915,30 @@ img.bt-face { object-fit: cover; object-position: 50% 62%; }
 .cl .dc-shop .dc-ico { height: 1.5em; max-width: 2em; }
 @media (max-width: 600px) { .cl-tabs .dc-tab { font-size: 0.66em; } .cl-tabs .dc-tab span { font-size: 1.7em; } .cl-name { font-size: 0.85em; } }
 .cl-view { min-height: 150px; }
+/* closet v2: icon beside the title, room picture at its own shape, bigger icons and item cards */
+.cl-wardrobe { position: static; transform: none; width: 34px; flex: none; }
+.cl .dc-sign { margin-top: 4px; gap: 8px; }
+.cl-view { flex: 0 0 auto; aspect-ratio: 826 / 392; min-height: 0; }
+.cl .dc-panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.cl .dc-pick { flex: 1 1 auto; min-height: 0; }
+.cl-grid { height: 100%; grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.cl-it { min-height: 0; justify-content: center; }
+.cl-it canvas { flex: 1 1 auto; min-height: 0; width: 100%; height: 100%; object-fit: contain; }
+.cl-tabs .dc-tab { padding: 8px 1px 8px; }
+.cl-tabs .dc-tab span { height: 1.6em; font-size: 2.3em; }
+.cl-tabs .dc-tab .dc-ico { height: 1.4em; max-width: 2em; }
+.cl .dc-hicon { width: 1.9em; height: 1.6em; font-size: 2.3em; }
+@media (max-width: 600px) { .cl-tabs .dc-tab { font-size: 0.68em; } .cl-tabs .dc-tab span { font-size: 2.6em; } .cl-wardrobe { width: 30px; } }
+/* closet v3: the room fills the spare height (cropped at the sides, never stretched); compact item cards */
+.cl-view { flex: 1 1 auto; aspect-ratio: auto; min-height: 150px; }
+.cl .dc-panel { flex: 0 0 auto; display: block; }
+.cl .dc-pick { flex: none; }
+.cl-grid { height: auto; grid-template-rows: auto auto; }
+.cl-it canvas { flex: none; height: auto; object-fit: initial; }
+.cl-view { flex: 0 0 auto; aspect-ratio: 826 / 470; }
+.cl .dc-panel { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
+.cl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto; gap: 8px; }
+.cl-it { padding: 4px 4px 5px; }
+.cl-it small { font-size: 0.75em; }
+.cl-lock { font-size: 1.7em; }
+.cl .dc-pick { padding: 0 4px; }

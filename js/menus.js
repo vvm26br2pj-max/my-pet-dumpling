@@ -266,7 +266,7 @@
     if (!p.look) p.look = { color: 'classic', eyes: 'round', cheeks: 'blush' };
     if (!inv.outfits) inv.outfits = [];
     let raf = 0, tab = startTab || 'outfits', page = 0, pokeT = -9;
-    const PER = 8;
+    const PER = 9;
     const img = (n) => `<img class="dc-ico" src="${(window.DG_ASSETS && window.DG_ASSETS[`img/cl_${n}.webp`]) || `img/cl_${n}.webp?v=1`}" alt="">`;
     const TABS = {
       outfits:     { label: 'Outfits',     title: 'Outfits',     sub: 'Choose an outfit for your dumpling!' },
@@ -306,7 +306,7 @@
       pn.querySelectorAll('.cl-it').forEach((b) => {
         const it = all[+b.dataset.k], cv = b.querySelector('canvas'), c = cv.getContext('2d');
         const look = it.look.lookPatch ? Object.assign({}, p.look, it.look.lookPatch) : p.look;
-        const o = { type: p.type, look, x: 75, y: 116, size: p.type === 'gyoza' ? 122 : 104, stage: Math.min(2, DG.stageIndex()), mood: 'happy', shadow: false, t: 0,
+        const o = { type: p.type, look, x: 75, y: 117, size: p.type === 'gyoza' ? 136 : 116, stage: Math.min(2, DG.stageIndex()), mood: 'happy', shadow: false, t: 0,
           accessory: 'accessory' in it.look ? it.look.accessory : p.accessory, outfit: 'outfit' in it.look ? it.look.outfit : (p.outfit || null) };
         c.clearRect(0, 0, cv.width, cv.height); DG.draw.dumpling(c, o);
       });
@@ -333,7 +333,7 @@
           c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, cw, ch);
           // the dressing-room picture, covering the box (cropped at the sides when the box is narrow)
           // fit the width with the room standing on the bottom; a taller box just shows more striped wall above
-          const BW = 826, BH = 392, k = Math.max(cw / BW, ch / BH * 0.62), ox = (cw - BW * k) / 2, oy = ch - BH * k;
+          const BW = 826, BH = 392, k = Math.max(cw / BW, ch / BH), ox = (cw - BW * k) / 2, oy = ch - BH * k; // cover the box: no extra wall on top
           if (bg.complete && bg.naturalWidth) {
             if (!cap) { // one clean row of wall (wallpaper stripes repeat, so the wardrobe side borrows stripes from further right)
               cap = document.createElement('canvas'); cap.width = BW; cap.height = 1; const cc = cap.getContext('2d');
