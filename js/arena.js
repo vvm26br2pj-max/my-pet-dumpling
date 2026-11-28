@@ -2498,7 +2498,8 @@
     if (loser && loser.state !== 'ko') { setState(loser, 'ko'); loser.mv = null; loser.hopY = 0; }
     F.forEach((f) => { f.blocking = false; f.bubble = 0; f.spin = false; f.hopY = 0; f.mv = null; if (f !== loser) setState(f, 'idle'); });
     const txt = how === 'forfeit' ? 'Match over' : how === 'time' ? "Time's up!" : 'Flop!';
-    banner(result === 'win' ? `${txt} — <b>${DG.ui.esc(F[0].name)} wins!</b> 🏆` : result === 'lose' ? `${txt} — ${DG.ui.esc(F[1].name)} wins!` : `${txt} — It's a draw!`, 2.4);
+    if (result === 'win' && !match.net) banner(`<span class="a-win"><span class="a-win-top">🏆 VICTORY! 🏆</span><span class="a-win-sub">${DG.ui.esc(F[0].name)} wins!</span></span>`, 3);
+    else banner(result === 'win' ? `${txt} — <b>${DG.ui.esc(F[0].name)} wins!</b> 🏆` : result === 'lose' ? `${txt} — ${DG.ui.esc(F[1].name)} wins!` : `${txt} — It's a draw!`, 2.4);
     endSounds(result);
     if (how === 'forfeit') showResults();
   }
@@ -2537,9 +2538,12 @@
     if (DG.OPPONENTS.every((o) => st.beaten[o.id])) DG.unlock('champion');
     const [a, b] = F;
     const titles = { win: '🏆 Victory!', lose: '💫 Nice try!', draw: '🤝 It\'s a draw!' };
+    const CHEERS = ['What a champion!', 'Unstoppable!', 'Dumpling power!', 'Flawless steaming!', 'The crowd goes wild!', 'Legendary!'];
+    const won = result === 'win';
     DG.ui.modal({
-      title: (match.practice ? 'Practice: ' : '') + titles[result], dismissable: false,
-      html: `<p>${DG.ui.esc(a.name)} ${Math.round((a.hp / a.maxHp) * 100)}% health · ${DG.ui.esc(b.name)} ${Math.round((b.hp / b.maxHp) * 100)}% health${match.how === 'time' ? ' (time ran out — higher health % wins)' : ''}</p>
+      cls: won ? 'ar-win-modal' : '', title: won ? '' : (match.practice ? 'Practice: ' : '') + titles[result], dismissable: false,
+      html: `${won ? `<div class="ar-win-head"><div class="ar-win-stars" aria-hidden="true">⭐ ⭐ ⭐</div><h2>${match.practice ? 'Practice ' : ''}VICTORY!</h2>
+          <p class="ar-win-cheer">${pick(CHEERS)} <b>${DG.ui.esc(a.name)}</b> beat <b>${DG.ui.esc(b.name)}</b>!</p></div>` : ''}<p>${DG.ui.esc(a.name)} ${Math.round((a.hp / a.maxHp) * 100)}% health · ${DG.ui.esc(b.name)} ${Math.round((b.hp / b.maxHp) * 100)}% health${match.how === 'time' ? ' (time ran out — higher health % wins)' : ''}</p>
         ${coins ? `<p class="gain">+${coins} 🪙 Dumpling Coins</p>` : ''}
         ${lines.map((l) => `<p>${l}</p>`).join('')}
         ${match.mode === 'tap'

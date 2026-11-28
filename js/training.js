@@ -174,7 +174,7 @@
       keys: { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', Space: 'up', ArrowDown: 'down', KeyS: 'down' },
       gestures: { left: 'left', right: 'right', up: 'up', down: 'down' },
       create(d) {
-        const JUMP = 0.62, SLIDE = 0.7;
+        const JUMP = 0.62, SLIDE = 0.7, DUR = 40;
         const KIND = { chop: 'jump', puddle: 'jump', bowl: 'jump', spoon: 'slide', lantern: 'slide', noodles: 'slide', teapot: 'dodge', steamer: 'dodge', bottle: 'dodge', roller: 'dodge' };
         const POOL = {
           jump: d === 0 ? ['chop', 'chop', 'puddle'] : ['chop', 'puddle', 'bowl'],
@@ -192,8 +192,16 @@
           if (r < 0.16) { // butterfly trail (sometimes floating over a hurdle: jump to catch them)
             const lane = randLane();
             if (d > 0 && Math.random() < 0.45) { add('chop', lane, { z: 1.1 }); fly(lane, 1.03, true); fly(lane, 1.1, true); fly(lane, 1.17, true); }
-            else for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) fly(lane, 1 + i * 0.08, false);
-            gap = 0.2;
+            else { // a long, gently weaving path to follow
+              const n = 5 + Math.floor(Math.random() * 3), STEP = 0.17;
+              let l = lane;
+              for (let i = 0; i < n; i++) {
+                if (i > 0 && i % 2 === 0 && Math.random() < 0.7) l = l === 1 ? pick([0, 2]) : 1; // drift one lane over every couple of butterflies
+                fly(l, 1 + i * STEP, false);
+              }
+              gap = (n * STEP) / g.speed * 0.8; // let the path finish before the next obstacles arrive
+            }
+            if (!gap) gap = 0.2;
           } else if (r < 0.3) { // the same move needed in every lane
             const act = pick(['jump', 'slide']);
             for (let l = 0; l < 3; l++) add(pick(POOL[act]), l);
@@ -234,7 +242,16 @@
           const sp = g.speed * (1 + g.t * 0.01) * (g.stumble > 0 ? 0.6 : 1);
           g.run += sp * dt;
           g.spawnT -= dt;
-          if (g.spawnT <= 0) pattern();
+          const left = DUR - g.t; // seconds of running left
+          if (!g.finishZ && sp * left <= 1) { g.finishZ = 1; sfx('special'); pop('Almost there!', '#d68a00', W / 2, H * 0.3); }
+          if (g.finishZ) {
+            g.finishZ -= sp * dt;
+            if (g.finishZ <= 0 && !g.crossed) {
+              g.crossed = true; g.score += 25; sfx('fanfare');
+              pop('FINISH! 🏁', '#d68a00', W / 2, H * 0.4);
+              DG.draw.confetti(parts, W / 2, playerY() - 60, 50);
+            }
+          } else if (g.spawnT <= 0 && sp * left > 1.35) pattern(); // keep the final stretch clear
           const air = g.jumpT >= 0.06 && g.jumpT < JUMP - 0.05, low = g.slideT >= 0.02 && g.slideT < SLIDE - 0.04;
           const me = Math.round(g.lx), py = H * 0.25;
           for (const o of g.obs) {
@@ -278,6 +295,23 @@
           ctx.fillStyle = col; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
           ctx.beginPath(); ctx.arc(0, top - 22, 17, 0, TAU); ctx.fill(); ctx.stroke();
           ctx.fillStyle = '#fff'; ctx.font = '700 20px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, 0, top - 21); ctx.textBaseline = 'alphabetic';
+        }
+        /** A checkered finish strip across the whole track, with a banner arch overhead. */
+        function drawFinish(z, tl, tw) {
+          const y = playerY() - z * span(), sq = 14;
+          ctx.save();
+          for (let r = 0; r < 2; r++) for (let x = tl, i = 0; x < tl + tw; x += sq, i++) {
+            ctx.fillStyle = (i + r) % 2 ? '#2b2b33' : '#ffffff'; ctx.fillRect(x, y - sq * (r + 1) + sq, Math.min(sq, tl + tw - x), sq);
+          }
+          // posts and banner
+          const L = tl - 16, R = tl + tw + 16, top = y - 150;
+          [L, R].forEach((x) => { ctx.fillStyle = '#c4373a'; DG.roundRect(ctx, x - 6, top, 12, y - top + 4, 5); ctx.fill(); ctx.fillStyle = '#f0c75a'; ctx.beginPath(); ctx.arc(x, top, 9, 0, TAU); ctx.fill(); });
+          const wave = Math.sin(T * 4) * 3;
+          ctx.fillStyle = '#fff6e0'; ctx.strokeStyle = '#c4373a'; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(L, top + 6); ctx.quadraticCurveTo(W / 2, top + 20 + wave, R, top + 6); ctx.lineTo(R, top + 46); ctx.quadraticCurveTo(W / 2, top + 60 + wave, L, top + 46); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#c4373a'; ctx.font = '800 30px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText('🏁 FINISH 🏁', W / 2, top + 33 + wave); ctx.textBaseline = 'alphabetic';
+          ctx.restore();
         }
         const shadow = (w) => { ctx.fillStyle = 'rgba(90,50,20,0.18)'; ctx.beginPath(); ctx.ellipse(0, 2, w, 9, 0, 0, TAU); ctx.fill(); };
         const pole = (x, h, c) => { ctx.fillStyle = c || '#8a5a3a'; DG.roundRect(ctx, x - 4, -h, 8, h, 3); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x - 3, -h, 2, h); };
@@ -466,6 +500,7 @@
           ctx.lineCap = 'butt';
           // obstacles behind the dumpling, the dumpling, then anything that has passed it
           const far = g.obs.filter((o) => o.z > 0.0).sort((p, q) => q.z - p.z), near = g.obs.filter((o) => o.z <= 0.0).sort((p, q) => q.z - p.z);
+          if (g.finishZ != null && g.finishZ > -0.4) drawFinish(g.finishZ, tl, tw);
           far.forEach(drawObs);
           const jh = g.jumpT >= 0 ? Math.sin(Math.PI * g.jumpT / JUMP) * 135 : 0, sl = g.slideT >= 0;
           if (!(g.inv > 0 && Math.sin(T * 30) > 0.3)) {
@@ -488,39 +523,44 @@
 
     /* ---------- 3. Rice sack push: strength ---------- */
     ricesack: {
-      name: 'Rice Sack Push', stat: 'strength', icon: '🍙', duration: 40,
-      desc: 'Push a heavy rice sack up the hill with perfectly timed shoves.',
-      how: '<b>Tap</b> or <b>swipe up</b> (or press <b>Space</b>) when the moving marker is inside the <b style="color:#2a9d6f">green zone</b>. The dark center gives a <b>perfect</b> push. Mashing doesn\'t help: after each push, wait for the next good moment.',
+      name: 'Rice Sack Push', stat: 'strength', icon: '🍙', duration: 40, mash: true,
+      desc: 'Tap as fast as you can to shove a heavy rice sack up the hill before it slides back down!',
+      how: '<b>Tap rapidly</b> anywhere (or press <b>Space</b> over and over) to push the sack up the hill. Stop and it slides back down! Each sack you deliver is a little heavier. When the bar glows <b style="color:#d68a00">HEAVE!</b>, every tap counts double.',
       keys: { Space: 'push', KeyJ: 'push', Enter: 'push', ArrowUp: 'push', KeyW: 'push' },
       gestures: { tap: 'push', up: 'push', right: 'push' },
       create(d) {
-        const g = { m: 0.1, dir: 1, speed: [0.85, 1.15, 1.5][d], zw: [0.3, 0.22, 0.16][d], zc: 0.5, lock: 0, prog: 0, sacks: 0,
-          presses: 0, perfects: 0, goods: 0, misses: 0, score: 0, push: 0, t: 0 };
+        const P = [4.2, 3.7, 3.3][d], SLIDE = [9, 12, 15][d];
+        const g = { prog: 0, shown: 0, sacks: 0, taps: 0, heaveTaps: 0, score: 0, push: 0, t: 0, rate: 0, recent: [],
+          heave: null, heaveT: 4, slips: 0, best: 0 };
+        const weight = () => 1 + g.sacks * 0.12; // later sacks are heavier
         g.press = (id) => {
           if (id !== 'push') return;
-          if (g.lock > 0) return;
-          g.presses++;
-          const dist = Math.abs(g.m - g.zc);
-          let gain;
-          if (dist < 0.035) { g.perfects++; gain = 13; pop('PERFECT PUSH!', '#2a9d6f'); sfx('perfect'); }
-          else if (dist < g.zw / 2) { g.goods++; gain = 7 + 5 * (1 - dist / (g.zw / 2)); pop('Good push!'); sfx('good'); }
-          else { g.misses++; gain = -4; pop('Slipped!', '#e8607a'); sfx('bad'); }
-          g.prog = Math.max(0, g.prog + gain); g.score += Math.max(0, Math.round(gain));
-          g.push = gain > 0 ? 1 : -1; g.lock = 0.45; g.zc = 0.2 + Math.random() * 0.6;
-          if (g.prog >= 100) { g.sacks++; g.score += 50; g.prog = 0; pop('Sack delivered! +50', '#d68a00', W / 2, H * 0.32); sfx('fanfare'); }
+          g.taps++; g.recent.push(g.t);
+          const hv = g.heave && g.heave.t < g.heave.len;
+          g.prog += (P * (hv ? 2 : 1)) / weight(); g.push = 1;
+          g.score += hv ? 2 : 1; if (hv) g.heaveTaps++;
+          sfx(hv ? 'pop' : 'click');
+          if (g.prog >= 100) {
+            g.sacks++; g.score += 50; g.prog = 0; g.shown = 0;
+            pop('Sack delivered! +50', '#d68a00', W / 2, H * 0.32); sfx('fanfare');
+            DG.draw.confetti(parts, W - 120, H * 0.35, 24);
+          }
         };
         g.update = (dt) => {
           g.t += dt;
-          if (g.lock > 0) g.lock -= dt;
-          else {
-            g.m += g.dir * g.speed * dt * (1 + g.t * 0.006);
-            if (g.m > 1) { g.m = 1; g.dir = -1; } if (g.m < 0) { g.m = 0; g.dir = 1; }
-          }
-          g.push *= Math.max(0, 1 - dt * 5);
+          g.recent = g.recent.filter((x) => g.t - x < 1); g.rate = g.recent.length; g.best = Math.max(g.best, g.rate);
+          // the sack slides back whenever you ease off
+          const before = g.prog;
+          g.prog = Math.max(0, g.prog - SLIDE * weight() * dt * (g.rate < 2 ? 1.6 : 1));
+          if (before > 8 && g.prog === 0) { g.slips++; pop('Slid back down!', '#e8607a'); }
+          g.shown += (g.prog - g.shown) * Math.min(1, dt * 12);
+          g.push *= Math.max(0, 1 - dt * 6);
+          if (g.heave) { g.heave.t += dt; if (g.heave.t > g.heave.len) { g.heave = null; g.heaveT = 4 + Math.random() * 3; } }
+          else if ((g.heaveT -= dt) <= 0) { g.heave = { t: 0, len: [1.8, 1.5, 1.2][d] }; pop('HEAVE! ×2', '#d68a00', W / 2, H * 0.45); sfx('special'); }
         };
-        g.perf = () => ((g.perfects + g.goods * 0.75) / Math.max(1, g.presses)) * Math.min(1, g.presses / (14 + d * 3));
-        g.hud = () => `Sacks <b>${g.sacks}</b> · ⭐<b>${g.perfects}</b>`;
-        g.summary = () => `${g.sacks} sacks delivered · ${g.perfects} perfect / ${g.goods} good / ${g.misses} slips`;
+        g.perf = () => clamp((g.sacks + g.prog / 100) / [5, 4, 3.2][d], 0, 1);
+        g.hud = () => `Sacks <b>${g.sacks}</b> · <b>${g.rate}</b>/s`;
+        g.summary = () => `${g.sacks} sacks delivered · ${g.taps} pushes · best ${g.best} taps/second`;
         g.draw = () => {
           sky('#ffe9c9', '#fff7ea');
           const x0 = PT ? 130 : 60, y0 = PT ? H - Math.max(70, H * 0.12) : H - 35, x1 = W - (PT ? 100 : 60), y1 = PT ? y0 - (x1 - x0) * 1.05 : 205, ang = Math.atan2(y1 - y0, x1 - x0);
@@ -538,7 +578,7 @@
           ctx.fillStyle = '#c4553e'; ctx.fillRect(x1 + 20, y1 - 90, 5, 80);
           ctx.fillStyle = '#ff7a7a'; ctx.beginPath(); ctx.moveTo(x1 + 25, y1 - 90); ctx.lineTo(x1 + 70, y1 - 75); ctx.lineTo(x1 + 25, y1 - 60); ctx.fill();
           for (let i = 0; i < Math.min(g.sacks, 4); i++) { ctx.fillStyle = '#f0e2c4'; DG.roundRect(ctx, x1 - 10 + i * 12, y1 - 40 - i * 8, 40, 32, 10); ctx.fill(); }
-          const k = 0.12 + (g.prog / 100) * 0.78;
+          const k = 0.12 + (g.shown / 100) * 0.78;
           const sx = x0 + (x1 - x0) * k, sy = y0 + (y1 - y0) * k;
           ctx.save(); ctx.translate(sx, sy); ctx.rotate(ang);
           ctx.fillStyle = '#f3e6c9'; DG.roundRect(ctx, -45, -80, 90, 80, 22); ctx.fill();
@@ -551,21 +591,21 @@
           DG.draw.dumpling(ctx, petOpts({ x: px, y: py, size: 88, rot: ang + 0.25, squash: g.push > 0.3 ? -0.1 : 0.04,
             mood: g.push < -0.3 ? 'surprised' : g.push > 0.3 ? 'joy' : 'grumpy', shadow: false }));
           if (Math.sin(T * 6) > 0.7) parts.push({ kind: 'dot', color: '#8fd0ff', x: px - 30, y: py - 80, vx: -40, vy: -60, g: 300, size: 4, life: 0.5, max: 0.5 });
-          // timing bar
-          const bw = Math.min(500, W - 60), bx = W / 2 - bw / 2;
-          ctx.globalAlpha = g.lock > 0 ? 0.45 : 1;
-          ctx.fillStyle = 'rgba(255,255,255,0.9)'; DG.roundRect(ctx, bx - 8, by - 8, bw + 16, 42, 14); ctx.fill();
-          ctx.fillStyle = '#bdf0d4'; ctx.fillRect(bx + (g.zc - g.zw / 2) * bw, by, g.zw * bw, 26);
-          ctx.fillStyle = '#2fb57a'; ctx.fillRect(bx + (g.zc - 0.035) * bw, by, 0.07 * bw, 26);
-          ctx.strokeStyle = '#d6b89a'; ctx.lineWidth = 2; ctx.strokeRect(bx, by, bw, 26);
-          const mx = bx + g.m * bw;
-          ctx.fillStyle = '#5a4636'; ctx.fillRect(mx - 3, by - 4, 6, 34);
-          ctx.globalAlpha = 1;
-          ctx.font = '600 14px Fredoka, sans-serif'; ctx.fillStyle = '#7a6250'; ctx.textAlign = 'center';
-          ctx.fillText(g.lock > 0 ? 'catching breath…' : 'tap when the marker is in the green!', W / 2, by + 52);
+          // effort meter: how fast you're tapping (gold during HEAVE!)
+          const bw = Math.min(500, W - 60), bx = W / 2 - bw / 2, hv = g.heave && g.heave.t < g.heave.len;
+          ctx.fillStyle = hv ? 'rgba(255,236,160,0.95)' : 'rgba(255,255,255,0.9)'; DG.roundRect(ctx, bx - 8, by - 8, bw + 16, 42, 14); ctx.fill();
+          if (hv) { ctx.strokeStyle = `rgba(230,160,20,${0.5 + 0.5 * Math.abs(Math.sin(T * 14))})`; ctx.lineWidth = 4; DG.roundRect(ctx, bx - 8, by - 8, bw + 16, 42, 14); ctx.stroke(); }
+          const eff = Math.min(1, g.rate / 9);
+          const eg = ctx.createLinearGradient(bx, 0, bx + bw, 0); eg.addColorStop(0, '#9fe08a'); eg.addColorStop(0.6, '#ffd24a'); eg.addColorStop(1, '#ff7a4a');
+          ctx.fillStyle = 'rgba(214,184,154,0.35)'; DG.roundRect(ctx, bx, by, bw, 26, 10); ctx.fill();
+          ctx.fillStyle = eg; DG.roundRect(ctx, bx, by, Math.max(20, bw * eff), 26, 10); ctx.fill();
+          ctx.font = '800 16px Fredoka, sans-serif'; ctx.fillStyle = '#5a3a22'; ctx.textAlign = 'center';
+          ctx.fillText(hv ? '💪 HEAVE! Taps count double!' : g.rate >= 7 ? '🔥 Super strong!' : g.rate >= 4 ? 'Keep it up!' : 'TAP TAP TAP!', W / 2, by + 19);
+          ctx.font = '600 14px Fredoka, sans-serif'; ctx.fillStyle = '#7a6250';
+          ctx.fillText(`Sack ${g.sacks + 1}${g.sacks ? ` · ${Math.round((weight() - 1) * 100)}% heavier` : ''}`, W / 2, by + 52);
           // progress up the hill
           ctx.fillStyle = 'rgba(255,255,255,0.85)'; DG.roundRect(ctx, bx, by + 64, bw, 14, 7); ctx.fill();
-          ctx.fillStyle = '#ffb04a'; DG.roundRect(ctx, bx, by + 64, Math.max(14, bw * g.prog / 100), 14, 7); ctx.fill();
+          ctx.fillStyle = '#ffb04a'; DG.roundRect(ctx, bx, by + 64, Math.max(14, bw * g.shown / 100), 14, 7); ctx.fill();
         };
         return g;
       },
@@ -573,9 +613,10 @@
 
     /* ---------- 4. Pea dodge: defense ---------- */
     peadodge: {
-      name: 'Pea Dodge', stat: 'defense', icon: '🟢', duration: 40, repeatKeys: true,
+      name: 'Pea Dodge', stat: 'defense', icon: '🟢', duration: 40, repeatKeys: true, lives: true,
+      crash: { title: '💫 Bonked three times!', text: (n) => `${n} got bonked by 3 peas, so this round doesn't count and earns no rewards. Try again — no extra energy needed.` },
       desc: 'Peas roll across the tray and drop from above. Every wave aims at you, so keep hopping to a safe square!',
-      how: '<b>Swipe</b> up, down, left or right to hop one square (or use the <b>arrow keys / WASD</b>). <b style="color:#e8607a">Red arrows</b> show rows and columns where peas will roll, and <b>growing shadows</b> show where big peas will land. Every wave aims at your square, so you have to move! Grab ✨ <b>golden peas</b> for bonus points.',
+      how: '<b>Swipe</b> up, down, left or right to hop one square (or use the <b>arrow keys / WASD</b>). <b style="color:#e8607a">Red arrows</b> show rows and columns where peas will roll, and <b>growing shadows</b> show where big peas will land. Every wave aims at your square, so you have to move! Grab ✨ <b>golden peas</b> for bonus points. You have <b>3 stars</b>: get bonked 3 times and the round earns no rewards.',
       keys: { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down' },
       gestures: { left: 'left', right: 'right', up: 'up', down: 'down' },
       create(d) {
@@ -635,7 +676,9 @@
         };
         const hurt = (px, py) => {
           const { ox, oy } = geo();
-          g.hits++; g.wave.hit = true; g.inv = 1.0; pop('Bonk!', '#e8607a', ox + px, oy + py - 50); sfx('bad');
+          g.hits++; g.wave.hit = true; g.inv = 1.0; sfx('bad');
+          pop(g.hits >= 3 ? 'Out of stars!' : 'Bonk! −⭐', '#e8607a', ox + px, oy + py - 50);
+          if (g.hits >= 3) g.dead = true;
         };
         g.update = (dt) => {
           g.t += dt;
@@ -743,6 +786,9 @@
               mood: g.inv > 0 ? 'dizzy' : w && w.t < warn ? 'surprised' : 'happy' }));
           }
           if (PT) { ctx.font = '600 15px Fredoka, sans-serif'; ctx.fillStyle = '#4f8a6a'; ctx.textAlign = 'center'; ctx.fillText('swipe to hop one square', W / 2, oy + B + 78); }
+          // stars left (3 bonks and the round is over)
+          ctx.fillStyle = 'rgba(255,255,255,0.85)'; DG.roundRect(ctx, 10, 10, 128, 40, 20); ctx.fill();
+          for (let i = 0; i < 3; i++) DG.draw.sparkle(ctx, 34 + i * 38, 30, 14, i < 3 - g.hits ? '#ffc93c' : 'rgba(150,130,110,0.35)');
         };
         return g;
       },
@@ -752,39 +798,48 @@
     balance: {
       name: 'Steamer Balance', stat: 'focus', icon: '⭐', duration: 40, drag: true, tilt: true,
       desc: 'Balance on a wobbly steamer lid, stay near the middle and collect floating stars.',
-      how: '<b>Hold your finger down and slide it</b> left or right to shuffle (or hold <b>←/→</b> / A/D). Keep your balance, grab ⭐ stars, and stay inside the green middle zone for bonus points. Focus makes your special move recharge faster in battle!',
+      how: '<b>Hold your finger down and slide it</b> left or right to shuffle (or hold <b>←/→</b> / A/D). Grab the ⭐ stars that float beside you on the lid (gold stars near the edge are worth more), stay in the green middle zone for bonus points, and brace for 💨 <b>steam gusts</b> — the arrow shows which way they\'ll push you. Falling off costs points. Focus makes your special move recharge faster in battle!',
       keys: { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' },
       gestures: {},
       create(d) {
-        const g = { t: 0, x: 0, vx: 0, ang: 0, amp: [0.12, 0.17, 0.22][d], falls: 0, fallT: 0, stars: [], starT: 0.8, spawned: 0,
-          got: 0, center: 0, score: 0, ph: Math.random() * 6, steer: 0, tilt: 0 };
+        const g = { t: 0, x: 0, vx: 0, ang: 0, amp: [0.16, 0.22, 0.28][d], falls: 0, fallT: 0, stars: [], starT: 0.8, spawned: 0,
+          got: 0, center: 0, score: 0, ph: Math.random() * 6, steer: 0, tilt: 0, zone: [0.26, 0.2, 0.15][d],
+          gust: null, gustT: [6, 4.5, 3.5][d], gusts: 0 };
         const geo = () => ({ px: W / 2, py: PT ? H * 0.56 : 300, L: PT ? W * 0.39 : 260 });
         g.press = () => {};
         g.update = (dt, hd) => {
           g.t += dt;
-          const w = 1 + g.t / 90;
-          g.ang = g.amp * w * (Math.sin(g.t * 1.25 + g.ph) * 0.65 + Math.sin(g.t * 2.6 + 1.3) * 0.35);
+          const w = 1 + g.t / 60, f = 1 + g.t / 120; // the wobble grows and quickens as the round goes on
+          g.ang = g.amp * w * (Math.sin(g.t * 1.25 * f + g.ph) * 0.55 + Math.sin(g.t * 2.6 * f + 1.3) * 0.3 + Math.sin(g.t * 4.1 + 0.4) * 0.15);
           g.starT -= dt;
           if (g.starT <= 0) {
-            g.starT = [1.4, 1.2, 1.0][d];
-            g.stars.push({ x: (Math.random() * 2 - 1) * (Math.random() < 0.5 ? 0.45 : 0.8), life: 3.6, bob: Math.random() * 6 });
+            g.starT = [1.5, 1.3, 1.1][d];
+            const edge = Math.random() < 0.35, x = (Math.random() < 0.5 ? -1 : 1) * (edge ? 0.62 + Math.random() * 0.25 : 0.15 + Math.random() * 0.4);
+            g.stars.push({ x, gold: edge, life: [3.2, 2.7, 2.2][d], max: [3.2, 2.7, 2.2][d], bob: Math.random() * 6 });
             g.spawned++;
           }
+          // steam gusts: a warning arrow, then a shove
+          if (g.gust) {
+            g.gust.t += dt;
+            if (g.gust.t > 0.9 && !g.gust.hit) { g.gust.hit = true; g.vx += g.gust.dir * [2.2, 2.8, 3.4][d]; sfx('whoosh'); g.gusts++; }
+            if (g.gust.t > 1.4) { g.gust = null; g.gustT = [5.5, 4.2, 3.2][d] * (0.75 + Math.random() * 0.5); }
+          } else if (g.t > 3 && (g.gustT -= dt) <= 0) g.gust = { dir: Math.random() < 0.5 ? -1 : 1, t: 0 };
           g.stars.forEach((s) => (s.life -= dt));
           g.stars = g.stars.filter((s) => s.life > 0);
           if (g.fallT > 0) { g.fallT -= dt; if (g.fallT <= 0) { g.x = 0; g.vx = 0; } return; }
           const inp = clamp((hd.right ? 1 : 0) - (hd.left ? 1 : 0) + g.steer + g.tilt, -1, 1);
-          g.vx += (Math.sin(g.ang) * 7 + inp * 4.5) * dt;
+          g.vx += (Math.sin(g.ang) * 9 + inp * 4.8) * dt;
           g.vx *= Math.max(0, 1 - 1.8 * dt);
           g.x += g.vx * dt;
-          if (Math.abs(g.x) < 0.3) { g.center += dt; g.score += dt * 2; }
+          if (Math.abs(g.x) < g.zone) { g.center += dt; g.score += dt * 2; }
           const { px, py, L } = geo();
           for (let i = g.stars.length - 1; i >= 0; i--) {
-            if (Math.abs(g.stars[i].x - g.x) < 0.14) { g.stars.splice(i, 1); g.got++; g.score += 10; pop('+10 ⭐', '#e8a33a', px + g.x * L, py - 150); sfx('coin'); }
+            const st = g.stars[i];
+            if (Math.abs(st.x - g.x) < 0.1) { g.stars.splice(i, 1); g.got++; const v = st.gold ? 20 : 10; g.score += v; pop(`+${v} ⭐`, st.gold ? '#d68a00' : '#e8a33a', px + g.x * L, py - 120); sfx('coin'); }
           }
-          if (Math.abs(g.x) > 1.06) { g.falls++; g.fallT = 1.2; g.fallDir = Math.sign(g.x); pop('Whoops! Fell off!', '#e8607a'); sfx('bad'); }
+          if (Math.abs(g.x) > 1.06) { g.falls++; g.fallT = 1.2; g.fallDir = Math.sign(g.x); g.score = Math.max(0, g.score - 15); pop('Whoops! Fell off! −15', '#e8607a'); sfx('bad'); }
         };
-        g.perf = () => clamp((0.6 * g.got) / Math.max(1, g.spawned) + (0.4 * g.center) / Math.max(1, g.t) + 0.1 - g.falls * 0.08, 0, 1);
+        g.perf = () => clamp((0.6 * g.got) / Math.max(1, g.spawned) + (0.4 * g.center) / Math.max(1, g.t) + 0.1 - g.falls * 0.1, 0, 1);
         g.hud = () => `⭐<b>${g.got}</b> · Falls <b>${g.falls}</b>`;
         g.summary = () => `${g.got} stars · ${Math.round(g.center)}s centered · ${g.falls} falls`;
         g.draw = () => {
@@ -816,7 +871,14 @@
           ctx.save(); ctx.translate(px, py); ctx.rotate(g.ang);
           ctx.fillStyle = '#e8c48c'; ctx.beginPath(); ctx.ellipse(0, 6, R, 12, 0, Math.PI, TAU); ctx.fill();
           ctx.fillStyle = '#d4a86a'; ctx.fillRect(-R, 4, R * 2, 12);
-          ctx.fillStyle = 'rgba(80,200,140,0.45)'; ctx.fillRect(-0.3 * L, -6, 0.6 * L, 10);
+          ctx.fillStyle = 'rgba(80,200,140,0.45)'; ctx.fillRect(-g.zone * L, -6, g.zone * 2 * L, 10);
+          g.stars.forEach((s) => { // stars float just above the lid, right where the dumpling walks
+            const sy = 6 - 12 * Math.sqrt(Math.max(0, 1 - ((s.x * L) / R) ** 2)) - 42 + Math.sin(T * 3 + s.bob) * 5;
+            ctx.globalAlpha = Math.min(1, s.life * 1.5) * (s.life < 0.8 ? 0.5 + 0.5 * Math.abs(Math.sin(T * 12)) : 1);
+            if (s.gold) { ctx.fillStyle = 'rgba(255,200,60,0.3)'; ctx.beginPath(); ctx.arc(s.x * L, sy, 22, 0, TAU); ctx.fill(); }
+            DG.draw.sparkle(ctx, s.x * L, sy, s.gold ? 22 : 18, s.gold ? '#ffb31a' : '#ffd84d');
+            ctx.globalAlpha = 1;
+          });
           ctx.fillStyle = '#c4553e'; ctx.beginPath(); ctx.arc(0, -8, 6, 0, TAU); ctx.fill();
           const lidY = 6 - 12 * Math.sqrt(Math.max(0, 1 - ((g.x * L) / R) ** 2));
           if (g.fallT <= 0) DG.draw.dumpling(ctx, petOpts({ x: g.x * L, y: lidY, size: 84, mood: Math.abs(g.x) > 0.75 ? 'surprised' : 'happy', rot: -g.ang * 0.5 + g.vx * 0.15, shadow: false }));
@@ -825,12 +887,17 @@
             const k = 1.2 - g.fallT;
             DG.draw.dumpling(ctx, petOpts({ x: px + g.fallDir * (R + k * 120), y: py - 16 + k * k * 400, size: 84, mood: 'dizzy', rot: k * 6 * g.fallDir, shadow: false }));
           }
-          g.stars.forEach((s) => {
-            const sx = px + s.x * L * Math.cos(g.ang), sy = py - 130 + s.x * L * Math.sin(g.ang) + Math.sin(T * 3 + s.bob) * 8;
-            ctx.globalAlpha = Math.min(1, s.life);
-            DG.draw.sparkle(ctx, sx, sy, 17, '#ffcc33');
-            ctx.globalAlpha = 1;
-          });
+          if (g.gust) { // steam gust warning: puffs and a big arrow showing the push direction
+            const k = Math.min(1, g.gust.t / 0.9), dir = g.gust.dir, ax = px - dir * (L + 40), ay = py - 70;
+            ctx.save(); ctx.globalAlpha = g.gust.hit ? Math.max(0, 1 - (g.gust.t - 0.9) * 2) : 0.5 + 0.5 * Math.abs(Math.sin(T * 10));
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(ax - dir * i * 16 + dir * k * 30, ay + Math.sin(T * 6 + i) * 6, 16 - i * 2, 0, TAU); ctx.fill(); }
+            ctx.translate(px, py - 150); ctx.scale(dir, 1);
+            ctx.fillStyle = '#5aa8ff'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(-50, -12); ctx.lineTo(20, -12); ctx.lineTo(20, -28); ctx.lineTo(55, 0); ctx.lineTo(20, 28); ctx.lineTo(20, 12); ctx.lineTo(-50, 12); ctx.closePath(); ctx.stroke(); ctx.fill();
+            ctx.restore();
+            if (!g.gust.hit) { ctx.font = '800 20px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#3a78d0'; ctx.fillText('💨 Steam gust!', px, py - 190); }
+          }
           // steering hint: shows how far the finger has slid
           if (PT || g.steer || tiltOn()) {
             const hy = PT ? H - 46 : H - 26, hw = Math.min(150, W * 0.3), v = clamp(g.steer + g.tilt, -1, 1);
@@ -970,6 +1037,7 @@
       if (e.target.closest('.t-overlay:not([hidden])')) return;
       DG.audio.unlock();
       if (phase === 'intro') { begin(); return; }
+      if (def && def.mash) { e.preventDefault(); gesture('tap'); return; } // rapid tapping: every finger-down counts right away
       down = { x: e.clientX, y: e.clientY, t: performance.now(), fired: false, id: e.pointerId };
       try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
       e.preventDefault();
@@ -1030,10 +1098,11 @@
   function crashed() {
     phase = 'crashed';
     const ov = root.querySelector('#t-ov'); ov.hidden = false;
-    ov.innerHTML = `<div class="ov-card"><h2>💫 Out of stars!</h2>
-      <p>${DG.ui.esc(DG.pet().name)} bumped into 3 obstacles. Try the run again — no extra energy needed.</p>
+    const cr = def.crash || { title: '💫 Out of stars!', text: (n) => `${n} bumped into 3 obstacles, so this run earns no rewards. Try again — no extra energy needed.` };
+    ov.innerHTML = `<div class="ov-card"><h2>${cr.title}</h2>
+      <p>${cr.text(DG.ui.esc(DG.pet().name))}</p>
       <p class="fine">${g.summary()}</p>
-      <div class="btn-row"><button class="btn primary big" id="t-retry">↻ Restart</button><button class="btn ghost" id="t-giveup">Quit</button></div></div>`;
+      <div class="btn-row"><button class="btn primary big" id="t-retry">↻ Retry</button><button class="btn ghost" id="t-giveup">Leave</button></div></div>`;
     ov.querySelector('#t-retry').onclick = () => {
       DG.audio.play('click');
       g = def.create(diff); parts = []; held = {};
@@ -1113,7 +1182,10 @@
         if (g.dead) crashed();
         else {
           timeLeft -= dt;
-          if (timeLeft <= 0) { timeLeft = 0; finish(); }
+          if (g.crossed && !g.crossedT) g.crossedT = 0.9; // a moment to enjoy crossing the line, then the results
+          if (g.crossedT) { g.crossedT -= dt; if (g.crossedT <= 0) { timeLeft = 0; finish(); } }
+          else if (timeLeft <= 0 && !g.finishZ) { timeLeft = 0; finish(); }
+          if (timeLeft < 0) timeLeft = 0;
         }
       }
       const k = layout();

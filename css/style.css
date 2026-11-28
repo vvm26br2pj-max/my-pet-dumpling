@@ -2015,3 +2015,19 @@ img.bt-face { object-fit: cover; object-position: 50% 62%; }
 .sh-note { min-height: 3.4em; box-sizing: border-box; }
 .sh-tab, .sh-tab.on { transform: none; }
 .sh-tab.on { box-shadow: 0 0 0 2px #ffb21a, 0 3px 0 rgba(120, 80, 40, 0.3); }
+
+/* ---------- Arena victory: big and celebratory ---------- */
+.a-banner .a-win { display: flex; flex-direction: column; align-items: center; gap: 4px; font-style: normal; animation: winPop 0.7s cubic-bezier(.2,.9,.3,1.5); }
+.a-win-top { font-size: clamp(46px, 14vw, 86px); font-weight: 900; line-height: 1; color: #ffe066; -webkit-text-stroke: 4px #7a3e0c; paint-order: stroke fill;
+  text-shadow: 0 6px 0 #7a3e0c, 0 0 30px rgba(255, 210, 80, 0.95), 0 0 60px rgba(255, 160, 40, 0.7); animation: winGlow 0.9s ease-in-out infinite alternate; }
+.a-win-sub { font-size: clamp(24px, 7vw, 40px); font-weight: 800; color: #fff; -webkit-text-stroke: 3px #5a2e14; paint-order: stroke fill; text-shadow: 0 4px 0 #5a2e14; }
+@keyframes winPop { 0% { transform: scale(0.2) rotate(-8deg); opacity: 0; } 60% { transform: scale(1.15) rotate(3deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+@keyframes winGlow { from { transform: scale(1); } to { transform: scale(1.06); } }
+.modal.ar-win-modal { text-align: center; font-size: 1.12em; background: radial-gradient(ellipse at 50% 0%, #fff6cf, #fffaf4 60%); border: 4px solid #ffd25a; box-shadow: 0 0 0 4px #fff3c4, 0 20px 60px rgba(150, 90, 0, 0.35); }
+.ar-win-head { margin: -4px 0 8px; }
+.ar-win-stars { font-size: 2em; letter-spacing: 0.15em; animation: winPop 0.8s cubic-bezier(.2,.9,.3,1.5); }
+.ar-win-head h2 { margin: 2px 0 4px; font-size: clamp(2.4em, 12vw, 3.4em); font-weight: 900; line-height: 1; color: #ffcc2e; -webkit-text-stroke: 3px #8a4a10; paint-order: stroke fill;
+  text-shadow: 0 5px 0 #8a4a10, 0 0 24px rgba(255, 200, 60, 0.8); animation: winPop 0.7s cubic-bezier(.2,.9,.3,1.5); }
+.ar-win-cheer { font-size: 1.25em; font-weight: 800; color: #6b3a10; margin: 4px 0 8px; }
+.ar-win-modal .gain { font-size: 1.5em; font-weight: 900; color: #c47a00; }
+@media (prefers-reduced-motion: reduce) { .a-banner .a-win, .a-win-top, .ar-win-stars, .ar-win-head h2 { animation: none; } }
