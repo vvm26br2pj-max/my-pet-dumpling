@@ -35,6 +35,7 @@
       adoptStops.push(DG.ui.previewLoop(cv, (t) => Object.assign({ type, stage: 0, size: 150, shadow: false }, PREVIEW_STYLE[type](t)), 240, 170));
     });
     root.querySelectorAll('.ts-card').forEach((b) => (b.onclick = () => { DG.audio.unlock(); DG.audio.play('babysqueak'); adoptStep2(b.dataset.type); }));
+    const ts = root.querySelector('.title-scr'); DG.ui.autoFit(ts, { top: ts.getBoundingClientRect().top + window.scrollY, pad: 4 });
   }
   /* Shared color / eyes / cheeks picker (adoption + closet) */
   function lookPickerHtml(type, look) {
@@ -272,6 +273,8 @@
           : `<button class="sh-buy" data-k="${k}" ${st.coins < it.price ? 'data-poor="1"' : ''}><i class="fd-coin"></i>${it.price}</button>`}
       </div>`;
     const render = (el) => {
+      const PER = tab === 'outfits' ? 6 : 12; // outfits get bigger cards, two across
+      el.querySelector('#sh-grid').classList.toggle('two', tab === 'outfits');
       const all = items(), np = Math.max(1, Math.ceil(all.length / PER)); page = Math.min(page, np - 1);
       el.querySelector('#sh-coins').textContent = st.coins;
       el.querySelector('#sh-note').textContent = TABS[tab].note;
@@ -280,8 +283,11 @@
       el.querySelector('[data-pg="-1"]').disabled = !page; el.querySelector('[data-pg="1"]').disabled = page >= np - 1;
       el.querySelectorAll('.sh-cv').forEach((cv) => {
         const c = cv.getContext('2d'); c.clearRect(0, 0, cv.width, cv.height);
-        if (cv.dataset.toy && DG.draw.toy) DG.draw.toy(c, cv.dataset.toy, 60, 92, 1.35, { t: 0 });
-        if (cv.dataset.outfit && p) DG.draw.dumpling(c, { type: p.type, look: p.look, x: 80, y: 114, size: p.type === 'gyoza' ? 128 : 108, stage: 2, mood: 'happy', shadow: false, t: 0, accessory: null, outfit: cv.dataset.outfit });
+        if (cv.dataset.toy && DG.draw.toy) { // some toys are tall or wide: draw those a bit smaller so nothing is cut off
+          const FIT = { drum: [60, 98, 0.95], blocks: [60, 104, 0.95], kite: [60, 112, 0.8] }[cv.dataset.toy] || [60, 92, 1.35];
+          DG.draw.toy(c, cv.dataset.toy, FIT[0], FIT[1], FIT[2], { t: 0 });
+        }
+        if (cv.dataset.outfit && p) DG.draw.dumpling(c, { type: p.type, look: p.look, x: 80, y: 116, size: p.type === 'gyoza' ? 140 : 118, stage: 2, mood: 'happy', shadow: false, t: 0, accessory: null, outfit: cv.dataset.outfit });
       });
       if (tab === 'outfits' && !DG.outfitArtReady()) setTimeout(() => { if (el.isConnected) render(el); }, 200);
       el.querySelectorAll('.sh-buy').forEach((b) => (b.onclick = () => {
@@ -303,7 +309,7 @@
       cls: 'sh-modal', wide: true,
       html: `<div class="sh">
           <div class="sh-top"><div class="sh-awning"></div><div class="sh-sign"><span class="sh-store">${`<img src="${A('img/cl_shop.webp')}" alt="">`}</span><h2>Dumpling Shop</h2></div>
-            <div class="sh-peek"><canvas id="sh-pet" width="240" height="90"></canvas></div></div>
+            <div class="sh-peek"><canvas id="sh-pet" width="240" height="110"></canvas></div><div class="sh-counter" aria-hidden="true"></div></div>
           <div class="sh-body">
             <div class="sh-tabs">${Object.entries(TABS).map(([k, x]) => `<button class="sh-tab sh-t-${k} ${k === tab ? 'on' : ''}" data-tab="${k}">${ico(k)}<span>${x.label}</span></button>`).join('')}</div>
             <div class="sh-coinline">${ico('coin')}<b id="sh-coins"></b> Dumpling Coins</div>
@@ -315,7 +321,7 @@
       onClose() { if (stopPeek) stopPeek(); },
       onOpen(el) {
         if (p) stopPeek = DG.ui.previewLoop(el.querySelector('#sh-pet'), (t) => ({ type: p.type, look: p.look, stage: 0, size: 110, accessory: p.accessory, mood: 'joy', shadow: false,
-          blink: (t % 3.1) < 0.12, y: 104 - Math.max(0, Math.sin(t * 3)) * 4 }), 240, 90);
+          blink: (t % 3.1) < 0.12, y: 122 - Math.max(0, Math.sin(t * 3)) * 5 }), 240, 110);
         render(el);
         el.querySelectorAll('[data-pg]').forEach((b) => (b.onclick = () => { page += +b.dataset.pg; DG.audio.play('click'); render(el); }));
         el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => {
@@ -379,7 +385,7 @@
       });
     };
     DG.ui.modal({
-      cls: 'dc-modal cl-modal', wide: true,
+      cls: 'dc-modal cl-modal no-fit', wide: true,
       html: `<div class="dc cl">
           <div class="dc-sign"><span class="cl-wardrobe" aria-hidden="true"><img src="${(window.DG_ASSETS && window.DG_ASSETS['img/ic_wardrobe.webp']) || 'img/ic_wardrobe.webp?v=1'}" alt=""></span><h2>Closet</h2></div>
           <div class="dc-view cl-view"><canvas id="cl-prev"></canvas>
@@ -474,7 +480,7 @@
     if (!st.home) st.home = { wall: 'peach', pattern: 'stripes', floor: 'wood' };
     const h = st.home, R = DG.ROOM;
     let raf = 0, tab = 'walls', page = 0;
-    const PER = 10;
+    const PER = 8; // 4 × 2 per page, with room to breathe (the arrows page through the rest)
     const TABS = {
       walls:    { icon: 'walls', label: 'Walls',    title: 'Wall Color',    sub: 'Choose a color for your walls' },
       patterns: { icon: 'patterns', label: 'Patterns', title: 'Wallpaper',     sub: 'Pick a pattern for your walls' },
@@ -529,7 +535,7 @@
         <div class="dc-dots">${pages > 1 ? Array.from({ length: pages }, (_, i) => `<i class="${i === page ? 'on' : ''}"></i>`).join('') : ''}</div>`;
     };
     DG.ui.modal({
-      cls: 'dc-modal', wide: true,
+      cls: 'dc-modal no-fit', wide: true,
       html: `<div class="dc">
           <div class="dc-sign"><span class="dc-house" aria-hidden="true">🏠</span><h2>Decorate Your Home</h2></div>
           <div class="dc-view"><canvas id="dc-prev"></canvas></div>
@@ -590,32 +596,57 @@
   /* ================= Stats ================= */
   function stats() {
     const p = DG.pet(), si = DG.stageIndex(), cap = DG.statCap(), c = DG.state.counters;
-    const bs = DG.battleStats(p.stats, null, false);
-    const mv = DG.STARTERS[p.type].moves;
-    const moveLine = (k, need, label) => `<li class="${si >= need ? '' : 'locked'}">${si >= need ? '✅' : '🔒'} <b>${label}: ${DG.MOVES[mv[k]].name}</b> — ${DG.MOVES[mv[k]].desc}${si >= need ? '' : ` <small>(${DG.STAGES[need].name} stage)</small>`}</li>`;
+    const bs = DG.battleStats(p.stats, null, DG.cozy());
+    const ic = (n) => `<img class="st-ico" src="${(window.DG_ASSETS && window.DG_ASSETS[`img/st_${n}.webp`]) || `img/st_${n}.webp?v=1`}" alt="">`;
+    const pers = DG.personality(), base = pers.split(' & ')[0];
+    const PICON = { Cheerful: '😊', Mischievous: '😈', Sleepy: '😴' }[base] || '🎭';
+    const perHit = Math.round(20 * Math.max(0.8, 0.85 + (bs.charge - 4) / 10)); // matches the arena: each landed hit charges this much
+    const fav = p.favoriteKnown ? `${DG.FOODS[p.favoriteFood].icon} ${DG.FOODS[p.favoriteFood].name}` : '??? — try different foods!';
+    let stop = null;
     DG.ui.modal({
-      title: `📊 ${pname()}'s Stats`, wide: true,
-      html: `<p><b>${DG.STARTERS[p.type].name}</b> · ${DG.STAGES[si].name} · ${DG.fmtAge(DG.ageMs())} · Personality: <b>${DG.personality()}</b></p>
-        <p class="fine">Stats can grow up to <b>${cap}</b> at the ${DG.STAGES[si].name} stage. Growing bigger raises the cap.</p>
-        <div class="stat-list">${DG.STAT_KEYS.map((k) => {
-          const i = DG.STAT_INFO[k];
-          return `<div class="stat-row"><span class="stat-name">${i.icon} ${i.name}</span>${DG.ui.bar(p.stats[k], cap, i.color, i.name)}<b>${Math.floor(p.stats[k])}<small>/${cap}</small></b></div>`;
-        }).join('')}</div>
-        <div class="two-col">
-          <div><div class="lbl">Battle profile</div><ul class="nice-list small">
-            <li>❤️ Health ${bs.maxHp}</li><li>🔋 Stamina ${bs.maxSta}</li><li>👊 Attack ${bs.dmg.toFixed(1)}</li>
-            <li>💨 Speed ${bs.speed.toFixed(1)}</li><li>🛡️ Block ${Math.round(bs.blockRed * 100)}%</li><li>🎯 Special charge ${bs.charge.toFixed(1)}/s</li></ul></div>
-          <div><div class="lbl">Moves</div><ul class="nice-list small">
-            <li>✅ <b>Basic attack</b>, block and dodge</li>${moveLine('special', 2, 'Special')}${moveLine('move2', 3, 'Move 2')}${moveLine('ult', 4, 'Ultimate')}</ul></div>
-        </div>
-        <p>⭐ Favorite food: <b>${p.favoriteKnown ? DG.FOODS[p.favoriteFood].icon + ' ' + DG.FOODS[p.favoriteFood].name : '??? — try different foods!'}</b>
-        ${p.foodBonus ? `<br>🍱 Next battle: <b>${p.foodBonus.label}</b>` : ''}
-        ${DG.cozy() ? '<br>🏠 Cozy bonus: well cared for → +10% special charge in battle.' : '<br>🏠 Keep all needs high (avg 70+) for a cozy +10% special charge.'}
-        <br>🏟️ Record: ${c.wins} wins · ${c.losses} losses · ${c.draws} draws · 🏋️ ${c.trainings} training sessions</p>`,
-      buttons: [{ label: 'Close', cls: 'primary' }],
+      cls: 'st-modal', wide: true,
+      html: `<div class="st">
+          <div class="st-ribbon ${p.name.length > 7 ? 'long' : ''} ${p.name.length > 10 ? 'xlong' : ''}">${ic('bars')}<h2>${pname()}'s Stats</h2></div>
+          <div class="st-hero">
+            <div class="st-pet"><span class="st-glow" aria-hidden="true"></span><span class="st-cushion" aria-hidden="true"></span><canvas id="st-pet" width="240" height="200"></canvas>
+              <i class="st-sp s1" aria-hidden="true">✦</i><i class="st-sp s2" aria-hidden="true">✦</i><i class="st-sp s3" aria-hidden="true">✦</i></div>
+            <div class="st-id">
+              <h3 class="${p.name.length > 7 ? 'long' : ''} ${p.name.length > 10 ? 'xlong' : ''}">${ic('crown')}<span>${pname()}</span></h3>
+              <p class="st-age">${DG.STAGES[si].name} · ${DG.fmtAge(DG.ageMs())}</p>
+              <div class="st-tags"><div class="st-pers"><span>${PICON}</span><div><small>Personality:</small><b>${DG.ui.esc(pers)}</b></div></div>
+                <div class="st-medal"><span>👑</span><b>${DG.STAGES[si].name}</b></div></div>
+            </div>
+          </div>
+          <div class="st-note"><i class="sh-i">i</i><span>Stats can grow up to <b>${cap}</b> at the ${DG.STAGES[si].name} stage. Growing bigger raises the cap.</span></div>
+          <div class="st-cards">
+            <section class="st-card st-core"><h4 class="st-head"><span>💪</span>Core Stats</h4>
+              ${DG.STAT_KEYS.map((k) => { const i = DG.STAT_INFO[k], v = Math.floor(p.stats[k]);
+                return `<div class="st-row">${ic(k)}<span class="st-nm">${i.name}</span><span class="st-bar"><i style="width:${Math.min(100, (v / cap) * 100)}%;background:${i.color}"></i></span><b>${v}<small>/${cap}</small></b></div>`; }).join('')}
+            </section>
+            <section class="st-card st-battle"><h4 class="st-head"><span>⚔️</span>Battle Profile</h4>
+              ${[['health', 'Health', bs.maxHp], ['sta', 'Stamina', bs.maxSta], ['attack', 'Attack', bs.dmg.toFixed(1)], ['speed', 'Speed', bs.speed.toFixed(1)], ['block', 'Block', Math.round(bs.blockRed * 100) + '%'], ['charge', 'Special Charge', `+${perHit}/hit`]]
+                .map(([n, l, v]) => `<div class="st-prow">${ic(n)}<span>${l}</span><b>${v}</b></div>`).join('')}
+            </section>
+          </div>
+          <div class="st-trio">
+            <div>${ic('star')}<h5>Favorite Food</h5><p>${fav}</p></div>
+            <div>${ic('house')}<h5>Cozy Bonus</h5><p>${DG.cozy() ? 'Well cared for → +10% special charge in battle.' : 'Keep all needs high (avg 70+) for +10% special charge.'}</p></div>
+            <div>${ic('trophy')}<h5>Record</h5><p>${c.wins} wins<br>${c.losses} losses<br>${c.draws} draws<br>${c.trainings} training sessions</p></div>
+          </div>
+          ${p.foodBonus ? `<p class="st-bonus">🍱 Next battle: <b>${p.foodBonus.label}</b></p>` : ''}
+          <button class="st-close" id="st-close">Close</button>
+        </div>`,
+      onClose() { if (stop) stop(); },
+      onOpen(el, close) {
+        stop = DG.ui.previewLoop(el.querySelector('#st-pet'), (t) => ({ type: p.type, look: p.look, stage: si, size: 150, accessory: p.accessory, trait: p.trait, shadow: false,
+          mood: (t % 5) < 1.4 ? 'joy' : 'happy', blink: (t % 3.3) < 0.12, hop: Math.max(0, Math.sin(t * 2.5)) * 5, y: 176 }), 240, 200);
+        el.querySelector('#st-close').onclick = () => { DG.audio.play('click'); close(); };
+        // long names: shrink the text until the whole name fits (never cut it off)
+        const shrink = (t, min) => { let fs = parseFloat(getComputedStyle(t).fontSize); while (t.scrollWidth > t.clientWidth + 1 && fs > min) { fs -= 1; t.style.fontSize = fs + 'px'; } };
+        requestAnimationFrame(() => { shrink(el.querySelector('.st-ribbon h2'), 13); shrink(el.querySelector('.st-id h3 span'), 14); });
+      },
     });
   }
-
   function trophies() {
     const a = DG.state.achievements;
     const ids = Object.keys(DG.ACHIEVEMENTS);

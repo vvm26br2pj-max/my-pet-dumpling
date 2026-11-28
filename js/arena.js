@@ -11,7 +11,8 @@
   const MATCH_TIME = 90;
   /* Tap combat (single-player default). All times are in fight-seconds (they pause and slow with the match). */
   const TAP = {
-    hitCharge: 12.5,   // each of your normal hits that lands fills this much of the special meter (4 hits = one special)
+    bubbleTime: 6, bubbleTimeRival: 5, bubbleReflect: 0.2, bubbleTake: 0.45, // Broth Bubble: how long it lasts, and how much damage bounces back
+    hitCharge: 20,     // each of your normal hits that lands fills this much of the special meter (about 3 hits = one special)
     eHitCharge: 22, eDefCharge: 9, // the rival charges when its attacks land / when you defend them
     spWarn: 0.9,       // warning before a rival special
     spBlock: 0.35,     // damage you still take from a rival special while blocking
@@ -23,7 +24,8 @@
     blockHold: 0.45, dodgeHold: 0.42, defCd: 0.5,     // your block / dodge
     hitStun: 0.32,     // how long you're stunned when an attack lands
     atkGap: 0.3,       // minimum time between your basic attacks
-    dodgeCost: 25,     // energy (the yellow bar) a dodge uses
+    dodgeCost: 25,     // classic mode: stamina a dodge uses
+    dodgeSta: 0.34, dodgeRegen: 0.14, // tap battles: dodging has its own energy (starts full, ~3 dodges in a row, refills in ~7 s)
     dodgeBack: 2.6,    // how far a dodge retreats (× size)
     spamWindow: 3.0,   // attacks inside this many seconds count as mashing…
     stumble: 2.0,      // …and a blocked attack leaves you stumbling (can't move or act) this long
@@ -108,6 +110,7 @@
       if (tapOn && !st.settings.battleTutDone) battleTutorial(go); else go(); // first tap battle: learn the basics first
     }));
     root.querySelector('#a-host').onclick = () => { DG.audio.unlock(); hostGame(); };
+    const ar = root.querySelector('.ar'); DG.ui.autoFit(ar, { top: ar.getBoundingClientRect().top + window.scrollY, pad: 10 }); // fit the phone screen without scrolling
     root.querySelector('#a-join').onclick = () => { DG.audio.unlock(); joinGame(); };
   }
 
@@ -117,11 +120,11 @@
     const img = (n) => `<img src="${colSrc(n)}" alt="">`;
     const SL = [
       { art: `<div class="tu-art tu-hit">${img('e-attack-slash')}<div class="tu-meter"><i></i></div></div>`, t: 'Tap to attack',
-        p: `${DG.ui.isTouch() ? 'Tap' : 'Click'} your rival to attack. <b>Every hit that lands fills your ✨ special meter.</b> It starts empty, and four hits charge one special.` },
+        p: `${DG.ui.isTouch() ? 'Tap' : 'Click'} your rival to attack. <b>Every hit that lands fills your ✨ special meter.</b> It starts empty, and about three hits charge one special.` },
       { art: `<div class="tu-art tu-blue">${img('e-block-shield')}</div>`, t: 'Blue glow = Block',
         p: 'When your rival glows <b style="color:#2e6fe0">blue</b>, it\'s about to attack. Tap 🛡️ <b>Block</b> before it strikes and you take no damage.' },
       { art: `<div class="tu-art tu-red">${img('e-attack-warning')}${img('e-dodge-chevron')}</div>`, t: 'Red glow = Dodge',
-        p: 'A <b style="color:#e0342a">red</b> glow means a heavy attack that smashes through blocks. Tap 💨 <b>Dodge</b> to hop away. Dodging is tiring: it uses a quarter of your special meter.' },
+        p: 'A <b style="color:#e0342a">red</b> glow means a heavy attack that smashes through blocks. Tap 💨 <b>Dodge</b> to hop away. Dodging is tiring: you can do about three in a row, then it takes a few seconds to catch your breath.' },
       { art: `<div class="tu-art tu-sp"><span class="tu-orb" style="--oc:${orb[0]}">${img(orb[1])}</span><span class="tu-rune">〰</span></div>`, t: 'Special attacks',
         p: 'When the meter says <b>SPECIAL READY</b>, tap a special button. Time stops: <b>trace the glowing rune</b> with your finger. A neater trace hits harder!' },
       { art: `<div class="tu-art tu-rival">${img('e-purple-tornado')}${img('e-block-shield')}</div>`, t: 'Rival specials',
@@ -730,6 +733,8 @@
     });
   }
   function setState(f, s) {
+    if (f.state === 'move' && s !== 'move' && match && match.wave) match.wave = null; // an interrupted Ladle Splash washes away
+    if (f.state === 'move' && s !== 'move') { f.ladle = null; if (match && match.hotpot && !match.hotpot.hit) match.hotpot = null; }
     if (f.state === 'move' && s !== 'move' && (f.mvPose || f.meteor || f.onFire || f.mvRot || f.mvSq)) { f.mvPose = f.mvRot = f.mvSq = null; f.mvFace = 0; f.meteor = f.onFire = false; f.hopY = 0; f.lockFacing = false; }
     f.state = s; f.stT = 0;
   }
@@ -742,6 +747,7 @@
     const S = match.S;
     if (match.mode === 'tap' && !att.isPlayer && att.state === 'move' && att.mvMul) { // a rival special: no dodging it, but a shield helps
       dmg *= att.mvMul;
+      if (def.bubble > 0) { bubbleReflect(att, def, dmg); return 'bubble'; }
       const guarded = def.blocking || def.shieldT > 0 || def.spGuard;
       let d2 = Math.max(1, Math.round(dmg * (guarded ? TAP.spBlock : 1)));
       if (def.state === 'dodge') { setState(def, 'idle'); def.dodgeTo = null; def.hopY = 0; }
@@ -768,6 +774,7 @@
     if (match.mode === 'tap' && crit && def.invuln <= 0) btBadge(def, 'crit');
     let d = dmg, kb = (o.kb || 3) * S, result = 'hit';
     const faceDot = facingVec(def).dot(dirTo(def, att));
+    if (def.bubble > 0 && match.mode === 'tap') { bubbleReflect(att, def, dmg); return 'bubble'; }
     if (def.bubble > 0) { d *= 0.2; kb *= 0.2; floatText(def, 'Bubble!', '#7fd0ff'); sfx('pop'); result = 'bubble'; }
     else if (def.blocking && faceDot > 0.2) {
       if (def.parryT > 0 && !o.noParry && (def.isPlayer || Math.random() < def.skill * 0.6)) return parry(def, att);
@@ -1270,15 +1277,8 @@
         sprite('e-purple-tornado', { at: at(o, H(o) + 0.6), delay: 0.6, size: 7.5 * S, life: 0.9, z: 8, anim: (k) => ({ s: ease.pop(Math.min(1, k * 1.4)), r: Math.sin(k * 26) * 0.08, y: k * 0.6 * S, o: fade(k, 0.6) }) });
         sprite('e-lightning-strike', { at: at(o, H(o)), delay: 0.75, size: 4 * S, life: 0.3, z: 9, anim: (k) => ({ o: k < 0.5 ? 1 : 0 }) });
         break;
-      case 'hotpot':
-        sprite('e-ice-burst', { at: at(o, H(o)), delay: 0.7, size: 6 * S, life: 0.85, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.65) }) });
-        sprite('e-lightning-strike', { at: at(o, H(o) + 1), delay: 0.78, size: 4.6 * S, life: 0.35, z: 9, anim: (k) => ({ o: k < 0.55 ? 1 : 0 }) });
-        break;
       case 'brothbubble':
         sprite('e-broth-splash', { at: at(f, H(f)), delay: 0.55, size: 6 * S, life: 0.7, z: 8, anim: (k) => ({ s: 0.5 + ease.out(k) * 0.9, o: fade(k, 0.5) }) });
-        break;
-      case 'ladlesplash':
-        sprite('e-broth-splash', { at: atO, delay: 0.6, size: 5.2 * S, life: 0.6, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
         break;
     }
     switch (id) {
@@ -1289,15 +1289,6 @@
           anim: (k) => ({ x: Math.sin(a) * 3.2 * ease.out(k) * S, y: (Math.cos(a) * 1.6 * ease.out(k) - k * k * 1.2) * S, o: fade(k, 0.5) }) }); }
         sprite('cloud2', { at: at0, delay: 0.55, size: 3.4 * S, life: 0.7, z: 5, anim: (k) => ({ s: 0.5 + k, y: k * S, o: fade(k, 0.2) * 0.8 }) });
         break;
-      case 'ladlesplash': {
-        const from = at(f, 0.7), to = at(o, 0.7);
-        sprite('slash3', { at: from, delay: 0.2, size: 4.2 * S, life: 0.55, z: 6, flip: to.x < from.x,
-          anim: (k) => ({ x: (to.x - from.x) * k, z: (to.z - from.z) * k, s: 0.8 + k * 0.4, o: fade(k, 0.7) }) });
-        for (let i = 0; i < 6; i++) sprite('ic_drop', { at: to, delay: 0.62 + i * 0.02, size: 0.8 * S, life: 0.5, z: 7,
-          anim: (k) => ({ x: rand(-2, 2) * k * S, y: (2 * k - 2.5 * k * k) * S, o: fade(k, 0.5) }) });
-        sprite('ring_b2', { at: to, delay: 0.62, size: 3.4 * S, life: 0.45, z: 5, anim: (k) => ({ s: 0.5 + ease.out(k) * 1.2, o: fade(k, 0.3) }) });
-        break;
-      }
       case 'grandsteamer':
         [0, 1, 2].forEach((i) => { const a = (i / 3) * TAU; sprite(i === 1 ? 'tornado2' : 'tornado1', { at: at0, size: 3.6 * S, life: 1.3, z: 4,
           anim: (k) => ({ x: Math.sin(a + k * 9) * 2 * S * (1 - k * 0.4), z: Math.cos(a + k * 9) * S, y: k * 0.8 * S, s: 0.6 + k * 0.8, o: k < 0.15 ? k / 0.15 : fade(k, 0.7) }) }); });
@@ -1306,13 +1297,6 @@
         sprite('tornado2', { at: atO, delay: 0.7, size: 6 * S, life: 0.7, z: 7, anim: (k) => ({ s: ease.pop(k), r: Math.sin(k * 20) * 0.1, o: fade(k, 0.6) }) });
         sprite('impact3', { at: atO, delay: 0.72, size: 5 * S, life: 0.5, z: 8, anim: (k) => ({ s: ease.pop(k), r: k, o: fade(k, 0.5) }) });
         sprite('halo', { at: at(o, 2.6), delay: 0.8, size: 3 * S, life: 0.8, z: 8, anim: (k) => ({ r: k * 4, o: fade(k, 0.5) }) });
-        break;
-      case 'hotpot':
-        sprite('ring_b2', { at: at0, size: 4 * S, life: 0.7, z: 3, anim: (k) => ({ s: 0.4 + k, r: k * 3, o: fade(k, 0.6) }) });
-        sprite('ice2', { at: at(o, 0.9), delay: 0.7, size: 5.6 * S, life: 0.8, z: 7, anim: (k) => ({ s: ease.pop(k), y: -0.3 * S * (1 - k), o: fade(k, 0.65) }) });
-        sprite('ice1', { at: at(o, 0.7), delay: 0.76, size: 4 * S, life: 0.7, z: 8, anim: (k) => ({ x: 1.4 * S, s: ease.pop(k), o: fade(k, 0.6) }) });
-        sprite('ice1', { at: at(o, 0.7), delay: 0.8, size: 3.6 * S, life: 0.7, z: 8, flip: true, anim: (k) => ({ x: -1.4 * S, s: ease.pop(k), o: fade(k, 0.6) }) });
-        ['bolt1', 'bolt2', 'bolt1'].forEach((n, i) => sprite(n, { at: atO, delay: 0.72 + i * 0.1, size: 4 * S, life: 0.25, z: 9, flip: i === 1, anim: (k) => ({ y: (1 - i * 0.5) * S, o: k < 0.5 ? 1 : 0 }) }));
         break;
     }
   }
@@ -1342,12 +1326,12 @@
     hud.querySelector('.me .en i').style.width = p.special + '%';
     hud.querySelector('.them .en i').style.width = (e.state === 'windup' ? Math.min(100, (e.stT / e.windup) * 100) : 0) + '%';
     const ready = [0, 1].some((i) => tapSpecialState(p, i).ready);
-    const r = hud.querySelector('#bt-ready1'); r.textContent = ready ? 'SPECIAL READY ✦' : p.special < TAP.dodgeCost ? 'Low energy' : 'Charging…'; r.classList.toggle('on', ready); r.classList.toggle('low', !ready && p.special < TAP.dodgeCost);
+    const r = hud.querySelector('#bt-ready1'); r.textContent = ready ? 'SPECIAL READY ✦' : 'Charging…'; r.classList.toggle('on', ready); r.classList.toggle('low', false);
     hud.querySelector('#bt-time').textContent = Math.ceil(match.time);
   }
   /** A special's button: a glossy orb in the move's colour with its picture, and three charge pips. */
   const ORB = { steampuff: ['#b78cff', 'e-steam-burst'], bunslam: ['#ffb34a', 'e-ground-shockwave'], crispydash: ['#ff7a3a', 'e-gold-sparks'], pleatflurry: ['#5fb0ff', 'e-attack-slash'],
-    brothbubble: ['#4cc2ff', 'e-shield-bubble'], ladlesplash: ['#3fa0ff', 'e-broth-splash'], grandsteamer: ['#a54cf0', 'e-purple-tornado'], goldenfry: ['#ff5a2a', 'e-fire-dragon'], hotpot: ['#58c8ff', 'e-ice-burst'] };
+    brothbubble: ['#4cc2ff', 'e-shield-bubble'], ladlesplash: ['#ffb347', 'e-ladle-icon'], grandsteamer: ['#a54cf0', 'e-purple-tornado'], goldenfry: ['#ff5a2a', 'e-fire-dragon'], hotpot: ['#ffb347', 'e-hotpot-icon'] };
   function btOrb(id) { const o = ORB[id] || ['#ffb34a', 'sparkle']; return `<span class="bt-orb" style="--oc:${o[0]}"><img src="${o[1].startsWith('e-') ? colSrc(o[1]) : btSrc(o[1])}" alt=""></span>`; }
 
   /* ===================== Coliseum 2D stage (solo tap battles) =====================
@@ -1494,6 +1478,8 @@
       try { colCrowd(ctx, plate, V); } catch (err) { /* decoration only: never let it break the arena */ }
     }
     const e = F[1], sw = e && e.spWarn, a = sw ? { color: 'special' } : e && e.tap && e.tap.atk, warn = sw || (a && !a.resolved && e.state === 'windup');
+    if (match.wave) { try { drawWave(ctx, match.wave, 'wave'); } catch (err) { match.wave = null; } } // the broth wave rolls behind the fighters
+    if (match.hotpot) { try { drawHotPot(ctx, match.hotpot, 'floor'); } catch (err) { match.hotpot = null; } }
     // fighters, back to front
     const order = F.slice().sort((p, q) => p.pos.z - q.pos.z);
     order.forEach((f) => {
@@ -1538,7 +1524,7 @@
       }
       const glow = f.meteor ? 'rgba(255,120,30,0.95)' : f.onFire ? `rgba(255,${90 + 40 * Math.sin(T * 30) | 0},20,0.95)` : f === e && warn ? (a.color === 'blue' ? `rgba(70,150,255,${0.75 + 0.25 * Math.sin(T * 20)})` : a.color === 'special' ? `rgba(170,90,255,${0.8 + 0.2 * Math.sin(T * 24)})` : `rgba(255,60,50,${0.75 + 0.25 * Math.sin(T * 20)})`) : null;
       const warnTint = f === e && warn ? (a.color === 'blue' ? '#5f9dff' : a.color === 'special' ? '#b98aff' : '#ff6a5a') : null; // the rival turns blue, red or purple
-      drawDumpling2D(ctx, p.x + dx, p.y - lift, { species: f.shape, pose, size: D, mirror: f.mirror2d, tint: warnTint || bodyTint(f), acc: f.accessory, glow, flash: f.flash, sx: sxk, sy: syk, rot,
+      drawDumpling2D(ctx, p.x + dx, p.y - lift, { species: f.shape, pose, size: D, mirror: f.mirror2d, tint: warnTint || bodyTint(f), acc: f.isPlayer ? null : f.accessory, glow, flash: f.flash, sx: sxk, sy: syk, rot,
         alpha: f.state === 'ko' && f.stT > 2.4 ? Math.max(0.4, 1 - (f.stT - 2.4)) : 1 });
       if (f.stumbling && f.state === 'stun') { // dazed: little birds flap in circles around the head
         const hy = p.y - lift - D * ((875 - ANCH[f.shape].idle[3]) / 1024) - D * 0.02;
@@ -1563,11 +1549,15 @@
         if (colOk(sh)) { const ss = D * 0.42, sx0 = p.x + (f.mirror2d ? -1 : 1) * D * 0.34; ctx.drawImage(sh, sx0 - ss / 2, cy0 - ss / 2, ss, ss); }
         ctx.restore();
       }
-      if (f.bubble > 0 && colOk(colImg('e-shield-bubble'))) { // Broth Bubble
-        const s = D * (1.0 + 0.04 * Math.sin(T * 9));
-        ctx.save(); ctx.globalAlpha = 0.75; ctx.drawImage(colImg('e-shield-bubble'), p.x - s / 2, p.y - lift - D * 0.36 - s / 2, s, s); ctx.restore();
+      if (f.ladle && f.state === 'move') drawLadle(ctx, p.x, p.y - lift, D, f.mirror2d, f.ladle);
+      if (f.bubble > 0 && colOk(colImg('e-shield-bubble'))) { // Broth Bubble (flickers in its last seconds)
+        const s = D * 1.12 * (1.0 + 0.04 * Math.sin(T * 9)) * (1 + (f.bubbleHit || 0) * 0.3);
+        const al = f.bubble < 2 ? 0.35 + 0.4 * Math.abs(Math.sin(T * 14)) : 0.78;
+        ctx.save(); ctx.globalAlpha = al; ctx.drawImage(colImg('e-shield-bubble'), p.x - s / 2, p.y - lift - D * 0.36 - s / 2, s, s); ctx.restore();
       }
     });
+    if (match.wave) { try { drawWave(ctx, match.wave, 'splash'); } catch (err) { match.wave = null; } }
+    if (match.hotpot) { try { drawHotPot(ctx, match.hotpot, 'top'); } catch (err) { match.hotpot = null; } }
   }
   /** A little cartoon bird (for the dazed effect). dir: true = flying right. */
   function drawBird(ctx, x, y, r, dir, flap) {
@@ -1835,6 +1825,172 @@
       return false;
     }, t: () => t };
   }
+  /** Ladle Splash (art: your sprite sheet): scoop broth with a ladle, fling it, and a golden broth wave grows and
+      rolls across the ring, crashes on the rival in a big splash, and leaves a steaming puddle. */
+  function tapLadleSplash(f, o) {
+    const S = match.S, dir = o.pos.x >= f.pos.x ? 1 : -1, edge = match.R + 2 * S;
+    let t = 0, w = null;
+    f.lockFacing = true; f.mvFace = dir; f.ladle = { a: -0.5, broth: 1 };
+    for (let i = 0; i < 7; i++) colImg('e-ladle-wave' + i); for (let i = 0; i < 5; i++) colImg('e-ladle-splash' + i);
+    return { update(dt) {
+      t += dt; f.vel.set(0, 0, 0);
+      if (t < 0.5) { // dip and scoop
+        f.mvPose = 'wind-up'; f.mvSq = 0.92;
+        f.ladle.a = -0.5 + Math.sin(Math.min(1, t / 0.5) * Math.PI) * 0.45;
+
+        if (Math.random() < 0.25) sprite('sparkle', { at: at(f, 0.6), size: 0.7 * S, life: 0.35, z: 6, anim: (q) => ({ x: dir * 0.9 * S, y: -q * 0.4 * S, s: 1 - q, o: 1 - q }) });
+        return false;
+      }
+      if (t < 0.72) { // fling!
+        f.mvPose = 'attack'; f.mvSq = 1;
+        f.ladle.a = -0.5 + ((t - 0.5) / 0.22) * 2.2; f.ladle.broth = Math.max(0, 1 - (t - 0.5) / 0.15);
+        return false;
+      }
+      if (!w) {
+        sfx('splash'); sfx('whoosh'); match.shake = Math.max(match.shake, 0.15 * S); f.ladle.broth = 0;
+        f.hopY = 0;
+        w = match.wave = { kind: 'broth', x: f.pos.x - dir * 2.2 * S, z: (f.pos.z + o.pos.z) / 2, dir, t: 0, hit: false, splash: null, fade: 1 };
+      }
+      w.t += dt;
+      if (t > 1.0) { f.ladle = null; f.mvPose = 'idle'; }
+      if (!w.hit) {
+        w.x += dir * 6.2 * S * dt * Math.min(1, 0.35 + w.t * 1.2);
+        match.shake = Math.max(match.shake, 0.08 * S * Math.min(1, w.t * 2));
+        if (w.t > 0.25 && Math.random() < 0.3) sprite('e-ladle-splash' + (Math.random() < 0.5 ? 0 : 1), { at: new THREE.Vector3(w.x + dir * rand(0.5, 2.5) * S, rand(4, 6) * S, w.z), size: rand(1.4, 2.4) * S, life: 0.6, z: 9,
+          anim: (q) => ({ x: dir * q * 2 * S, y: -q * q * 3 * S, s: 0.7 + q * 0.4, r: dir * q, o: fade(q, 0.3) }) });
+        if ((w.x - o.pos.x) * dir >= -o.radius * 0.4) { // crash!
+          w.hit = true; w.hitT = w.t; w.splash = { x: o.pos.x, z: o.pos.z + 0.05 * S, t: 0 };
+          applyHit(f, o, f.dmg * 1.35, { kb: 9, stun: 0.8, aoe: true, noParry: true, heavy: true });
+          sfx('splash'); sfx('thud'); match.shake = Math.max(match.shake, 0.7 * S); flashScreen(); cheer(1.6);
+        }
+      } else {
+        w.x += dir * 3 * S * dt; w.fade = Math.max(0, 1 - (w.t - w.hitT) / 0.5); w.splash.t += dt;
+        if (w.splash.t > 1.5) { match.wave = null; f.ladle = null; f.mvFace = 0; f.lockFacing = false; f.mvPose = 'idle'; return true; }
+      }
+      if (!w.hit && ((w.x - dir * edge) * dir > 0 || w.t > 2.5)) { match.wave = null; f.ladle = null; f.mvFace = 0; f.lockFacing = false; return true; }
+      return false;
+    }, t: () => t };
+  }
+  /** Draws the broth wave (growing, rolling, then collapsing) and the splash → steaming puddle where it crashed. */
+  function drawWave(ctx, w, part) {
+    const S = match.S;
+    const put = (name, wx, wz, worldW, alpha, flip, tall) => {
+      const im = colImg(name); if (!colOk(im)) return;
+      const g = pj(new THREE.Vector3(wx, 0, wz)), wp = worldW * S * g.ppu, hp = wp * im.naturalHeight / im.naturalWidth * (tall || 1);
+      ctx.save(); ctx.globalAlpha = alpha; ctx.translate(g.x, g.y + hp * 0.06); if (flip) ctx.scale(-1, 1);
+      ctx.drawImage(im, -wp / 2, -hp, wp, hp); ctx.restore();
+    };
+    if (part !== 'splash' && !w.hit) { // the wave: frames 0-5 as it builds (and grows), then rocking between 4 and 5 as it rolls
+      const i = w.t < 0.6 ? Math.min(5, Math.floor(w.t / 0.1)) : 4 + (Math.floor(w.t / 0.13) % 2), grow = 0.55 + 0.45 * Math.min(1, w.t / 0.5);
+      put('e-ladle-wave' + i, w.x - w.dir * 1.2 * S, w.z || 0, 10.5 * grow, 1, w.dir < 0, 1.3 + 0.08 * Math.sin(w.t * 9));
+    }
+    if (part !== 'wave' && w.hit && w.fade > 0) // crashing down right on top of the rival
+      put('e-ladle-wave6', w.x - w.dir * 0.4 * S, (w.splash && w.splash.z) || 0, 10.5, w.fade, w.dir < 0, 1.35);
+    if (part !== 'wave' && w.splash) { // splash 0-1 bursting, then the puddle rings (2-4) slowly fading with steam
+      const st = w.splash.t, i = st < 0.12 ? 0 : st < 0.3 ? 1 : st < 0.6 ? 2 : st < 0.95 ? 3 : 4;
+      const sz = i < 2 ? 8.5 + st * 5 : 9, al = st > 1.1 ? Math.max(0, 1 - (st - 1.1) / 0.4) : 1;
+      put('e-ladle-splash' + i, w.splash.x, w.splash.z || 0, sz, al, w.dir < 0);
+    }
+  }
+  /** A silver ladle in your dumpling's paws (Ladle Splash). a = swing angle, broth = how full it is. */
+  function drawLadle(ctx, x, y, D, mirror, L) {
+    const s = mirror ? -1 : 1;
+    ctx.save(); ctx.translate(x + s * D * 0.14, y - D * 0.1); ctx.scale(s, 1); ctx.rotate(-L.a);
+    const len = D * 0.2, r = D * 0.075;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#7c8794'; ctx.lineWidth = D * 0.035; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(len, 0); ctx.stroke();
+    ctx.strokeStyle = '#e8edf2'; ctx.lineWidth = D * 0.018; ctx.beginPath(); ctx.moveTo(0, -D * 0.005); ctx.lineTo(len, -D * 0.005); ctx.stroke();
+    const bg = ctx.createRadialGradient(len + r * 0.6, -r * 0.2, r * 0.2, len + r * 0.8, 0, r * 1.2); bg.addColorStop(0, '#ffffff'); bg.addColorStop(0.5, '#cfd6de'); bg.addColorStop(1, '#7c8794');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(len + r * 0.8, r * 0.2, r, 0, Math.PI); ctx.lineTo(len - r * 0.2, r * 0.2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#5a6470'; ctx.lineWidth = Math.max(1, D * 0.012); ctx.stroke();
+    if (L.broth > 0.05) { // golden broth in the bowl
+      ctx.globalAlpha = L.broth; const bg2 = ctx.createLinearGradient(0, -r * 0.1, 0, r * 0.6); bg2.addColorStop(0, '#fff2a0'); bg2.addColorStop(1, '#f0a020');
+      ctx.fillStyle = bg2; ctx.beginPath(); ctx.ellipse(len + r * 0.8, r * 0.25, r * 0.88, r * 0.32, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#7cc84a'; ctx.beginPath(); ctx.arc(len + r * 0.6, r * 0.22, r * 0.1, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+  /** Hot Pot Tsunami (art: your sprite sheet): a giant pot of broth drops in, tips and pours; a broth wave rolls
+      into the rival, then the broth floods the whole ring and keeps scalding the rival, before steaming away. */
+  function tapHotPot(f, o) {
+    const S = match.S, dir = o.pos.x >= f.pos.x ? 1 : -1, z = (f.pos.z + o.pos.z) / 2;
+    const NAMES = ['pour', 'pool', 'tofu', 'onion', 'steam0', 'steam1'].concat([0, 1, 2, 3, 4].map((i) => 'wave' + i), [0, 1, 2, 3, 4].map((i) => 'flood' + i), [0, 1, 2].map((i) => 'splash' + i));
+    NAMES.forEach((n) => colImg('e-hotpot-' + n));
+    const h = match.hotpot = { dir, z, px: f.pos.x + dir * 2.1 * S, t: 0, wave: null, flood: 0, fade: 1, hit: false, ticks: 0 };
+    f.lockFacing = true; f.mvFace = dir;
+    let bobT = 0;
+    return { update(dt) {
+      h.t += dt; const t = h.t; f.vel.set(0, 0, 0);
+      f.mvPose = t < 0.55 ? 'wind-up' : t < 2.2 ? 'attack' : 'idle'; f.mvSq = t < 0.55 ? 0.9 : 1;
+      if (t > 0.5 && !h.poured) { h.poured = true; sfx('splash'); sfx('whoosh'); match.shake = Math.max(match.shake, 0.25 * S); }
+      if (h.poured && t < 2.3) match.shake = Math.max(match.shake, 0.06 * S);
+      if (t > 0.75 && !h.wave) h.wave = { x: h.px, t: 0 };
+      if (h.wave) {
+        h.wave.t += dt;
+        if (!h.hit) {
+          h.wave.x += dir * 5.5 * S * dt * Math.min(1, 0.4 + h.wave.t * 1.2);
+          if ((h.wave.x - o.pos.x) * dir >= -o.radius * 0.3) {
+            h.hit = true; h.hitT = t;
+            applyHit(f, o, f.dmg * 1.3, { kb: 8, stun: 0.9, aoe: true, noParry: true, heavy: true });
+            sfx('splash'); sfx('thud'); match.shake = Math.max(match.shake, 0.6 * S); flashScreen(); cheer(1.6);
+            sprite('e-hotpot-splash0', { at: new THREE.Vector3(o.pos.x, 0, o.pos.z + 0.05 * S), size: 7 * S, life: 0.7, z: 9, anim: (q) => ({ s: 0.6 + ease.out(q) * 0.6, o: fade(q, 0.5) }) });
+          }
+        }
+      }
+      if (t > 1.1) h.flood = Math.min(1, (t - 1.1) / 0.9); // broth fills the arena
+      if (h.flood > 0.4 && h.ticks < 4 && t > 1.5 + h.ticks * 0.4 && o.state !== 'ko') { // scalding broth
+        h.ticks++; applyHit(f, o, f.dmg * 0.3, { kb: 0.3, stun: 0.2, aoe: true, noParry: true });
+        sprite('e-hotpot-splash2', { at: new THREE.Vector3(o.pos.x, 0, o.pos.z + 0.05 * S), size: 3 * S, life: 0.45, z: 9, anim: (q) => ({ s: 0.6 + q * 0.5, o: fade(q, 0.4) }) });
+      }
+      bobT -= dt;
+      if (h.flood > 0.5 && t < 3 && bobT <= 0) { // tofu and green onions bobbing, steam rising
+        bobT = 0.18;
+        const bx = rand(-0.85, 0.85) * match.R, bz = z + rand(-0.4, 0.6) * S;
+        sprite(Math.random() < 0.5 ? 'e-hotpot-tofu' : 'e-hotpot-onion', { at: new THREE.Vector3(bx, 0.2 * S, bz), size: 0.8 * S, life: 0.9, z: 4,
+          anim: (q) => ({ y: Math.sin(q * Math.PI) * 0.35 * S, r: q * 2, o: fade(q, 0.3) }) });
+        if (Math.random() < 0.5) sprite(Math.random() < 0.5 ? 'e-hotpot-steam0' : 'e-hotpot-steam1', { at: new THREE.Vector3(rand(-0.8, 0.8) * match.R, 0.8 * S, bz), size: 3 * S, life: 1.4, z: 8,
+          anim: (q) => ({ y: q * 2.4 * S, s: 0.6 + q * 0.6, o: Math.sin(q * Math.PI) * 0.75 }) });
+      }
+      if (t > 2.6) h.fade = Math.max(0, 1 - (t - 2.6) / 0.8);
+      if (t >= 3.4) { match.hotpot = null; f.mvFace = 0; f.lockFacing = false; f.mvPose = 'idle'; return true; }
+      return false;
+    }, t: () => h.t };
+  }
+  /** Draws Hot Pot Tsunami: 'floor' = the flood and the rolling wave (behind the fighters); 'top' = the pot, its pour and the splash. */
+  function drawHotPot(ctx, h, part) {
+    const S = match.S, R = match.R, flip = h.dir < 0;
+    const put = (name, wx, wy, wz, worldW, alpha, opts) => {
+      const im = colImg('e-hotpot-' + name); if (!colOk(im) || alpha <= 0.01) return;
+      opts = opts || {};
+      const g = pj(new THREE.Vector3(wx, wy, wz)), wp = worldW * S * g.ppu, hp = wp * im.naturalHeight / im.naturalWidth * (opts.tall || 1);
+      const ax = opts.ax == null ? 0.5 : opts.ax, ay = opts.ay == null ? 1 : opts.ay, rev = opts.rev == null ? 1 : opts.rev;
+      ctx.save(); ctx.globalAlpha = alpha; ctx.translate(g.x, g.y); if (flip) ctx.scale(-1, 1); if (opts.rot) ctx.rotate(opts.rot);
+      ctx.drawImage(im, 0, 0, im.naturalWidth, im.naturalHeight * rev, -wp * ax, -hp * ay, wp, hp * rev);
+      ctx.restore();
+    };
+    const t = h.t;
+    if (part === 'floor') {
+      if (h.flood > 0) { // the flood frames spreading over the ring, then the calm steaming pool
+        const fi = Math.min(4, Math.floor(h.flood * 5)), grow = 0.45 + 0.55 * h.flood;
+        put(t > 2.3 ? 'pool' : 'flood' + fi, h.px * (1 - h.flood), 0, h.z + 0.6 * S, 2 * R / S * 1.08 * grow, h.fade * Math.min(1, h.flood * 2), { ay: 0.72, tall: 0.62 });
+      }
+      if (h.wave && h.fade > 0) { // the broth wave building and rolling to the rival
+        const wi = h.hit ? 4 : Math.min(4, Math.floor(h.wave.t / 0.1)), sz = 7.5 * (0.6 + 0.4 * Math.min(1, h.wave.t / 0.4));
+        const al = h.hit ? Math.max(0, 1 - (t - h.hitT) / 0.5) : 1;
+        put('wave' + wi, h.wave.x - h.dir * 1.6 * S, 0, h.z, sz, al * h.fade, { tall: 1.25 });
+      }
+      return;
+    }
+    // the pot: drops in from the sky, tips, pours (its stream revealed as it starts), then lifts away
+    const drop = t < 0.45 ? 1 - Math.pow(Math.min(1, t / 0.45), 2) : 0, lift = t > 2.2 ? Math.pow((t - 2.2) / 0.9, 2) : 0;
+    const rev = t < 0.45 ? 0.52 : Math.min(1, 0.52 + (t - 0.45) / 0.35 * 0.48);
+    const potAlpha = Math.max(0, 1 - lift * 1.2);
+    put('pour', h.px, (drop * 9 + lift * 8) * S, h.z, 7, potAlpha, { ax: 0.67, ay: 0.98, rev, rot: 0.06 * Math.sin(t * 3) });
+    if (t > 0.5 && t < 2.3) { // splashing where the broth lands
+      const si = Math.floor(t / 0.09) % 3;
+      put('splash' + si, h.px, 0, h.z + 0.05 * S, 4.2, Math.min(1, (t - 0.5) * 4) * (t > 2.1 ? (2.3 - t) / 0.2 : 1));
+    }
+  }
   /* ===================== Trace-to-cast (tap battles) =====================
      Pressing a ready special freezes time and shows that move's rune. A glowing guide traces it to
      show the way; you draw over it. Good tracing casts the move (neater = stronger); a miss or the
@@ -2040,7 +2196,7 @@
       if (s.id === 'grandsteamer' || s.id === 'goldenfry' || s.id === 'hotpot') { speedLines(0.9); return ultimate(f, o, s.id); }
       return MOVES[s.id](f, o);
     };
-    const SIG = { steampuff: tapSteamPuff, bunslam: tapBunSlam, crispydash: tapCrispyDash, pleatflurry: tapPleatFlurry, goldenfry: tapFieryBreath };
+    const SIG = { steampuff: tapSteamPuff, bunslam: tapBunSlam, crispydash: tapCrispyDash, pleatflurry: tapPleatFlurry, goldenfry: tapFieryBreath, ladlesplash: tapLadleSplash, brothbubble: tapBubble, hotpot: tapHotPot };
     f.mv = SIG[s.id] ? SIG[s.id](f, o) : tapCloseIn(f, o, make);
     f.mvSlot = 'tap' + i;
     btSpecialFx(s.id, f, o);
@@ -2063,16 +2219,26 @@
   }
   /** Broth Bubble in tap mode: a short protective bubble that pops outward for bonus damage. */
   function tapBubble(f, o) {
-    let t = 0, popped = false;
-    f.bubble = 1.1; ring(f.pos, 0x9fe0ff, 2.5 * match.S, 0.5); sfx('pop');
-    return { update(dt) {
-      t += dt; f.vel.set(0, 0, 0);
-      if (!popped && t >= 0.55) {
-        popped = true; sfx('splash'); ring(f.pos, 0x9fe0ff, 4 * match.S, 0.5); puffs(f.pos, 14, 0xbfe9ff, 2.6 * match.S, 0.3);
-        applyHit(f, o, f.dmg, { kb: 4, stun: 0.45, aoe: true, noParry: true });
-      }
-      return t >= 0.75;
-    }, t: () => t };
+    let t = 0;
+    f.bubble = f.isPlayer ? TAP.bubbleTime : TAP.bubbleTimeRival; sfx('pop'); sfx('splash');
+    sprite('e-shield-bubble', { at: at(f, f.mesh.topY * 0.45), size: 5 * match.S, life: 0.5, z: 8, anim: (k) => ({ s: 0.3 + ease.pop(k) * 0.9, o: fade(k, 0.4) }) });
+    floatText(f, 'Bubble shield!', '#9fe0ff', true);
+    return { update(dt) { t += dt; f.vel.set(0, 0, 0); f.mvPose = t < 0.25 ? 'wind-up' : 'block'; return t >= 0.5; }, t: () => t };
+  }
+  /** A Broth Bubble soaks up most of a hit and bounces damage back at the attacker. */
+  function bubbleReflect(att, def, dmg) {
+    const back = Math.max(1, Math.round(dmg * TAP.bubbleReflect)), took = Math.max(1, Math.round(dmg * TAP.bubbleTake));
+    def.hp = Math.max(0, def.hp - took); def.bubbleHit = 0.3;
+    floatText(def, 'Bubble! -' + took, '#9fe0ff');
+    if (att && att !== def && att.state !== 'ko') {
+      att.hp = Math.max(0, att.hp - back); att.flash = 0.18;
+      floatText(att, 'Deflected! -' + back, '#7fd0ff', true);
+      sprite('e-broth-splash', { at: at(att, att.mesh.topY * 0.5), size: 2.6 * match.S, life: 0.45, z: 9, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
+      att.kb.copy(dirTo(def, att)).multiplyScalar(4 * match.S);
+      if (att.hp <= 0) endMatch(att === F[0] ? 'lose' : 'win', 'ko');
+    }
+    sfx('pop');
+    if (def.hp <= 0) endMatch(def === F[0] ? 'lose' : 'win', 'ko');
   }
 
   function tapDefend(p, kind) {
@@ -2080,14 +2246,14 @@
     if (p.defCd > 0) return; // still busy with the last block/dodge
     // answering a warning cancels your own basic attack straight away (before its hit lands)
     if (p.state === 'windup' || (p.state === 'attack' && !p.hitDone) || p.state === 'recover') setState(p, 'idle');
-    if (kind === 'dodge' && p.special < TAP.dodgeCost) { if (p.msgT <= 0) { floatText(p, 'Too tired to dodge!', '#ffc75a'); p.msgT = 0.6; } sfx('bad'); return; }
+    if (kind === 'dodge' && p.sta < p.maxSta * TAP.dodgeSta) { if (p.msgT <= 0) { floatText(p, 'Too tired to dodge!', '#ffc75a'); p.msgT = 0.6; } sfx('bad'); return; }
     p.defCd = TAP.defCd;
     if (kind === 'block') {
       p.blocking = true; p.blockT = TAP.blockHold; p.shieldT = TAP.blockHold + 0.15; sfx('block');
       const r = F[1]; if (r.spWarn || (r.state === 'move' && r.mvMul)) { p.spGuard = true; floatText(p, 'Bracing!', '#9fc4ff'); } // holds until the rival's special is over
     }
     else {
-      p.special -= TAP.dodgeCost; // dodging is tiring
+      p.sta -= p.maxSta * TAP.dodgeSta; // dodging is tiring (its own energy, not your special meter)
       setState(p, 'dodge'); p.dodgeTo = null; sfx('whoosh');
       sprite('e-dust-burst', { at: at(p, 0.3), size: 2.6 * match.S, life: 0.45, z: 2, anim: (k) => ({ s: 0.6 + k * 0.6, o: fade(k, 0.3) }) });
     }
@@ -2206,6 +2372,7 @@
       f.defCd = Math.max(0, (f.defCd || 0) - dt); f.tapShieldT = Math.max(0, (f.tapShieldT || 0) - dt);
       if (f.chainT > 0) { f.chainT -= dt; if (f.chainT <= 0) f.chain = 0; }
       if (f.bubble > 0) f.bubble = Math.max(0, f.bubble - dt);
+      if (f.bubbleHit > 0) f.bubbleHit = Math.max(0, f.bubbleHit - dt);
       Object.keys(f.tapCd || {}).forEach((k) => (f.tapCd[k] = Math.max(0, f.tapCd[k] - dt)));
     });
     if (e.style === 'mixed') { e.ai.mixT -= dt; if (e.ai.mixT <= 0) { e.ai.mixT = 7; e.ai.cur = pick(['charger', 'blocker', 'dodger']); } }
@@ -2214,7 +2381,8 @@
       else if ((e.spWarn.t += dt) >= TAP.spWarn) { const i = e.spWarn.i; e.spWarn = null; tapCueEl(null); setState(e, 'idle'); tapStartSpecial(e, p, i, 1); match.stats.rivalSpecials = (match.stats.rivalSpecials || 0) + 1; }
     }
     if (p.spGuard) { if (!e.spWarn && !(e.state === 'move' && e.mvMul)) p.spGuard = false; else p.shieldT = Math.max(p.shieldT || 0, 0.3); }
-    // (tap battles: no passive charging — your hits fill the meter)
+    // (tap battles: no passive special charging — your hits fill the meter; dodge energy refills by itself)
+    if (!match.over && p.state !== 'ko') p.sta = Math.min(p.maxSta, p.sta + p.maxSta * TAP.dodgeRegen * dt);
 
     // --- your input (one per press) ---
     const k = E('KeyJ') ? 'attack' : E('KeyK') ? 'block' : E('Space') ? 'dodge' : E('KeyL') ? 'sp0' : E('KeyI') ? 'sp1' : null;
@@ -2451,7 +2619,7 @@
           <button class="tp blk" data-tap="block" aria-label="Block (K) — answers blue attacks"><img src="${btSrc('btn_block')}" alt=""><kbd>K</kbd></button>
           <button class="tp dge" data-tap="dodge" aria-label="Dodge (Space) — answers red attacks"><img src="${btSrc('btn_dodge')}" alt=""><kbd>Space</kbd></button>
           ${tapMv.map((x, i) => `<button class="tp sp" data-tap="sp${i}" data-id="${x.id}" aria-label="Special ${i + 1}: ${DG.ui.esc(x.name)}">${btOrb(x.id)}<span class="bt-pips"><i></i><i></i><i></i></span><b>${DG.ui.esc(x.name)}</b><kbd>${i ? 'I' : 'L'}</kbd></button>`).join('')}
-          ${tapMv.length < 2 ? '<div class="tp sp sp-empty" aria-label="Empty special slot: buy more abilities in Special Attacks"><span class="sp-plus" aria-hidden="true">＋</span><b>Buy more</b></div>' : ''}
+          ${tapMv.length < 2 ? '<div class="tp sp sp-empty" aria-label="Empty special slot"><span class="sp-plus" aria-hidden="true">–</span><b>None</b></div>' : ''}
         </nav>` : ''}
         <div class="a-touch" id="a-touch" ${DG.ui.isTouch() && mode !== 'tap' ? '' : 'hidden'}>
           <div class="joy-zone" id="a-joyzone">
@@ -2491,6 +2659,7 @@
         f.mesh.topY = ((875 - an[3]) * unit) / S;
       });
       F[0].special = 0; // the special meter starts empty and fills from your hits
+      F[0].sta = F[0].maxSta; // dodge energy starts full
       F[0].chargeMul = Math.max(0.8, 0.85 + (F[0].charge - 4) / 10); // Focus training (and snack / cozy bonuses) make each hit charge more
       F[1].special = 0; F[1].tapMoves = (DG.TAP_STARTERS[F[1].shape] || []).slice(); F[1].tapCd = {}; F[1].spWarn = null; // rivals have their species' specials too
       if (!F[1].isPlayer) F[1].tint2d = DG.draw.mix('#' + new THREE.Color(F[1].hex).getHexString(), '#ffffff', 0.3);
@@ -2610,7 +2779,7 @@
         b.setAttribute('aria-label', `Special ${i + 1}: ${DG.MOVES[s.id].name}, ${why}`);
         b.dataset.cd = s.cd > 0 ? Math.ceil(s.cd) : '';
       });
-      stageEl.querySelectorAll('.tp.blk, .tp.dge').forEach((b) => b.classList.toggle('off', p.defCd > 0 || p.state === 'stun' || p.state === 'move'));
+      stageEl.querySelectorAll('.tp.blk, .tp.dge').forEach((b) => b.classList.toggle('off', p.defCd > 0 || p.state === 'stun' || p.state === 'move' || (b.classList.contains('dge') && p.sta < p.maxSta * TAP.dodgeSta)));
       return;
     }
     const chip = (key, label, ok, extra) => `<span class="mchip ${ok ? 'ok' : ''}"><kbd>${key}</kbd>${label}${extra || ''}</span>`;

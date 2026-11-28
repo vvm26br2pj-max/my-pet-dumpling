@@ -991,6 +991,7 @@
       if (DG.pet().needs.energy < df.cost) { DG.ui.toast(`😴 ${DG.ui.esc(DG.pet().name)} is too tired (needs ⚡${df.cost}). Try a nap or Warm Broth!`); DG.audio.play('bad'); return; }
       DG.audio.play('click'); start(b.dataset.g, d);
     }));
+    const tg = root.querySelector('.tg'); DG.ui.autoFit(tg, { top: tg.getBoundingClientRect().top + window.scrollY, pad: 4 }); // fit the phone screen without scrolling
   }
 
   /* ======================= Playing ======================= */

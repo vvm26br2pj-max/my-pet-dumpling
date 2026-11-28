@@ -1042,12 +1042,13 @@
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, y, rx, 0, TAU); ctx.fill(); ctx.restore();
   }
   /** Twinkling 4-point sparkles scattered around the room. */
-  function twinkles(ctx, W, H, t, n) {
+  function twinkles(ctx, W, H, t, n, yMin) {
+    yMin = yMin || 0;
     for (let i = 0; i < n; i++) {
       const cyc = 2.6 + (i % 5) * 0.45, ph = ((t + i * 0.77) % cyc) / cyc, life = Math.sin(ph * Math.PI);
       if (life <= 0.05) continue;
       const seed = Math.floor((t + i * 0.77) / cyc) * 13 + i * 7;
-      const x = (Math.sin(seed * 12.9898) * 43758.5453 % 1 + 1) % 1 * W, y = (Math.sin(seed * 78.233) * 12543.231 % 1 + 1) % 1 * H;
+      const x = (Math.sin(seed * 12.9898) * 43758.5453 % 1 + 1) % 1 * W, y = yMin + (Math.sin(seed * 78.233) * 12543.231 % 1 + 1) % 1 * (H - yMin);
       ctx.globalAlpha = life * 0.9; sparkle(ctx, x, y, 3 + life * 5, '#fffbe6'); ctx.globalAlpha = 1;
     }
   }
@@ -1269,6 +1270,7 @@
     // wall (tiled upwards when the view is taller than the room)
     const wallPaint = () => {
     ctx.fillStyle = wall.a; ctx.fillRect(0, 0, W, floorY);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, floorY); ctx.clip(); // patterns stay on the wall
     ctx.fillStyle = wall.b;
     if (pat === 'stripes') for (let x = 0; x < W; x += 60) ctx.fillRect(x, 0, 28, floorY);
     else if (pat === 'dots') { for (let y = 20; y < floorY - 40; y += 44) for (let x = ((y / 44) % 2) * 30 + 15; x < W; x += 60) { ctx.beginPath(); ctx.arc(x, y, 8, 0, TAU); ctx.fill(); } }
@@ -1311,6 +1313,7 @@
         sparkle(ctx, x + 40, y + 22, 5, ctx.fillStyle);
       }
     }
+    ctx.restore();
     };
     const WT = floorY - 36;
     for (let k = 1; (k - 1) * WT < E; k++) { ctx.save(); ctx.translate(0, -k * WT); ctx.beginPath(); ctx.rect(0, 0, W, WT); ctx.clip(); wallPaint(); ctx.restore(); }
@@ -1636,7 +1639,7 @@
         ctx.fillStyle = `rgba(255,250,225,${0.3 + 0.35 * Math.sin(t * 2 + i)})`; ctx.beginPath(); ctx.arc(dx, dy, 1.2 + (i % 3) * 0.8, 0, TAU); ctx.fill();
       }
       ctx.restore();
-      twinkles(ctx, W, Hf, t, 9);
+      twinkles(ctx, W, Hf, t, 3, ROOM.floorY + 30); // just a few, low in the room (the window's light beams and dust stay)
     }
     ctx.save(); ctx.globalCompositeOperation = 'screen';
     if (useSpr) ctx.globalAlpha = 0;

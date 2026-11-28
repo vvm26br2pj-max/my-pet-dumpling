@@ -54,7 +54,30 @@
       if (opts.dismissable !== false) wrap.addEventListener('pointerdown', (e) => { if (e.target === wrap) close(); });
       root.appendChild(wrap);
       if (opts.onOpen) opts.onOpen(wrap.querySelector('.modal'), close);
+      DG.ui.autoFit(wrap.querySelector('.modal'), { pad: 12 });
       return close;
+    },
+    /** Shrinks an element (with CSS zoom) just enough that it fits the visible screen height, so it never needs scrolling.
+        Re-checks when its pictures load and when the screen size changes. Full-height layouts opt out with .no-fit. */
+    autoFit(el, o) {
+      if (!el || el.classList.contains('no-fit')) return;
+      o = o || {};
+      const fit = () => {
+        if (!el.isConnected) { window.removeEventListener('resize', fit); return; }
+        el.style.zoom = '';
+        if (el.classList.contains('modal')) el.style.maxHeight = '';
+        const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+        const top = o.top != null ? o.top : 0, room = vh - (o.pad || 0) * 2 - top;
+        if (el.classList.contains('modal')) el.style.maxHeight = 'none'; // measure the full height, not a scrolled box
+        const need = el.scrollHeight;
+        if (need > room + 1) el.style.zoom = Math.max(o.min || 0.6, room / need).toFixed(3);
+        else if (el.classList.contains('modal')) el.style.maxHeight = '';
+      };
+      fit();
+      requestAnimationFrame(fit);
+      el.querySelectorAll('img').forEach((im) => { if (!im.complete) im.addEventListener('load', fit, { once: true }); });
+      window.addEventListener('resize', fit);
+      el._refit = fit;
     },
     anyModal: () => !!$('#modal-root').children.length,
 

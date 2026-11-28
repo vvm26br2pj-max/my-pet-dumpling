@@ -47,7 +47,7 @@ def data_uri(name):
     return 'data:%s;base64,%s' % (mime, base64.b64encode(path.read_bytes()).decode())
 html = re.sub(r"(['\"])img/([\w.-]+?\.(?:webp|png|jpg|svg))(?:\?v=\d+)?\1", lambda m: m.group(1) + data_uri(m.group(2)) + m.group(1), html)
 # images whose names are built at run time (room art: img/rm_<piece>.webp) go into a lookup table the code checks first
-assets = {f'img/{p.name}': data_uri(p.name) for pat in ('rm_*.webp', 'bt_*.webp', 'ar_opp_*.webp', 'fd_*.webp', 'dc_*.webp', 'of_*.webp', 'cl_*.webp', 'sh_*.webp', 'ab_*.webp') for p in sorted((root / 'img').glob(pat))}
+assets = {f'img/{p.name}': data_uri(p.name) for pat in ('rm_*.webp', 'bt_*.webp', 'ar_opp_*.webp', 'fd_*.webp', 'dc_*.webp', 'of_*.webp', 'cl_*.webp', 'sh_*.webp', 'ab_*.webp', 'st_*.webp') for p in sorted((root / 'img').glob(pat))}
 # the Coliseum battle art lives in img/col/ and is loaded by name at run time
 assets.update({f'img/col/{p.name}': data_uri(f'col/{p.name}') for p in sorted((root / 'img' / 'col').glob('*.webp'))})
 import json
