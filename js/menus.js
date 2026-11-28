@@ -237,25 +237,94 @@
     return true;
   }
   function shop(tab) {
-    tab = tab || 'food';
-    const st = DG.state, inv = st.inventory;
-    const tabs = [['food', '🍱 Food'], ['outfits', '👕 Outfits'], ['accessories', '🎀 Hats & Accessories'], ['toys', '🧸 Toys'], ['decor', '🪴 Decor'], ['arenas', '🏟️ Arenas']];
-    const table = { food: DG.FOODS, outfits: DG.OUTFITS, accessories: DG.ACCESSORIES, toys: DG.TOYS, decor: DG.DECOR, arenas: DG.ARENAS }[tab];
-    const items = Object.entries(table).filter(([, it]) => !(tab === 'food' && it.free) && !(tab !== 'food' && it.price === 0));
+    tab = { food: 'outfits', arenas: 'decor' }[tab] || tab || 'outfits';
+    const st = DG.state, inv = st.inventory, p = DG.pet();
+    if (!inv.outfits) inv.outfits = [];
+    let page = 0, stopPeek = null;
+    const PER = 12;
+    const A = (path) => (window.DG_ASSETS && window.DG_ASSETS[path]) || `${path}?v=1`;
+    const ico = (n) => `<img class="sh-ico" src="${A(`img/sh_${n}.webp`)}" alt="">`;
+    const ORB = { steampuff: ['#b78cff', 'e-steam-burst'], bunslam: ['#ffb34a', 'e-ground-shockwave'], crispydash: ['#ff7a3a', 'e-gold-sparks'], pleatflurry: ['#5fb0ff', 'e-attack-slash'],
+      brothbubble: ['#4cc2ff', 'e-shield-bubble'], ladlesplash: ['#3fa0ff', 'e-broth-splash'], grandsteamer: ['#a54cf0', 'e-purple-tornado'], goldenfry: ['#ff5a2a', 'e-fire-dragon'], hotpot: ['#58c8ff', 'e-ice-burst'] };
+    const RM = ['lantern', 'painting', 'poster', 'clock', 'shelf', 'fish', 'plant'];
+    const TABS = {
+      outfits:     { label: 'Outfits',     note: 'Dress up! Outfits are cosmetic and can be worn in the Closet.' },
+      accessories: { label: 'Accessories', note: 'Build your style! Accessories are cosmetic and can be equipped in the Closet.' },
+      toys:        { label: 'Toys',        note: 'Toys go in the toy basket. Playing makes your dumpling happy!' },
+      decor:       { label: 'Decor',       note: 'Show or hide decorations with the House button. Arena looks change your battle arena.' },
+      abilities:   { label: 'Abilities',   note: 'Special moves for tap battles. Equip two in the Arena under ✨ Specials.' },
+    };
+    const items = () => {
+      if (tab === 'outfits') return Object.entries(DG.OUTFITS).map(([id, x]) => ({ cat: 'outfits', id, name: x.name, price: x.price, own: inv.outfits.includes(id), art: `<canvas class="sh-cv" data-outfit="${id}" width="160" height="120"></canvas>` }));
+      if (tab === 'accessories') return Object.entries(DG.ACCESSORIES).map(([id, x]) => ({ cat: 'accessories', id, name: x.name, price: x.price, own: inv.accessories.includes(id), art: `<img src="${A(`img/col/a-${id}.webp`)}" alt="">` }));
+      if (tab === 'toys') return Object.entries(DG.TOYS).filter(([, x]) => x.price > 0).map(([id, x]) => ({ cat: 'toys', id, name: x.name, price: x.price, own: inv.toys.includes(id), art: `<canvas class="sh-cv" data-toy="${id}" width="120" height="120"></canvas>` }));
+      if (tab === 'decor') return Object.entries(DG.DECOR).map(([id, x]) => ({ cat: 'decor', id, name: x.name, price: x.price, own: inv.decor.includes(id),
+        art: RM.includes(id) ? `<img src="${A(`img/rm_${id}.webp`)}" alt="">` : `<span class="sh-emoji">${x.icon}</span>` }))
+        .concat(Object.entries(DG.ARENAS).filter(([, x]) => x.price > 0).map(([id, x]) => ({ cat: 'arenas', id, name: x.name, price: x.price, own: inv.arenas.includes(id), tag: 'Arena', art: `<span class="sh-emoji">${x.icon}</span>` })));
+      return Object.entries(DG.TAP_MOVES).map(([id, x]) => {
+        const can = DG.canUseMove(id), o = ORB[id] || ['#ffb34a', ''];
+        return { cat: 'abilities', id, name: DG.MOVES[id].name, price: x.price, own: st.moves && st.moves.owned.includes(id), why: can.ok ? '' : can.why,
+          art: `<span class="sh-orb" style="--oc:${o[0]}">${o[1] ? `<img src="${A(`img/col/${o[1]}.webp`)}" alt="">` : x.icon}</span>` };
+      });
+    };
+    const card = (it, k) => `<div class="sh-card sh-c-${tab}">
+        ${it.tag ? `<i class="sh-tag">${it.tag}</i>` : ''}<div class="sh-art">${it.art}</div>
+        <b class="sh-name">${esc(it.name)}</b>
+        ${it.own ? '<span class="sh-owned">Owned ✓</span>' : it.why ? `<span class="sh-lock">🔒 ${esc(it.why)}</span>`
+          : `<button class="sh-buy" data-k="${k}" ${st.coins < it.price ? 'data-poor="1"' : ''}><i class="fd-coin"></i>${it.price}</button>`}
+      </div>`;
+    const render = (el) => {
+      const all = items(), np = Math.max(1, Math.ceil(all.length / PER)); page = Math.min(page, np - 1);
+      el.querySelector('#sh-coins').textContent = st.coins;
+      el.querySelector('#sh-note').textContent = TABS[tab].note;
+      el.querySelector('#sh-grid').innerHTML = all.slice(page * PER, page * PER + PER).map((it, i) => card(it, page * PER + i)).join('');
+      el.querySelector('#sh-dots').innerHTML = np > 1 ? Array.from({ length: np }, (_, i) => `<i class="${i === page ? 'on' : ''}"></i>`).join('') : '';
+      el.querySelector('[data-pg="-1"]').disabled = !page; el.querySelector('[data-pg="1"]').disabled = page >= np - 1;
+      el.querySelectorAll('.sh-cv').forEach((cv) => {
+        const c = cv.getContext('2d'); c.clearRect(0, 0, cv.width, cv.height);
+        if (cv.dataset.toy && DG.draw.toy) DG.draw.toy(c, cv.dataset.toy, 60, 92, 1.35, { t: 0 });
+        if (cv.dataset.outfit && p) DG.draw.dumpling(c, { type: p.type, look: p.look, x: 80, y: 114, size: p.type === 'gyoza' ? 128 : 108, stage: 2, mood: 'happy', shadow: false, t: 0, accessory: null, outfit: cv.dataset.outfit });
+      });
+      if (tab === 'outfits' && !DG.outfitArtReady()) setTimeout(() => { if (el.isConnected) render(el); }, 200);
+      el.querySelectorAll('.sh-buy').forEach((b) => (b.onclick = () => {
+        const it = all[+b.dataset.k];
+        if (it.cat === 'abilities') {
+          const r = DG.buyMove(it.id);
+          if (!r.ok) { DG.ui.toast(r.why.startsWith('Needs') ? 'Not enough Dumpling Coins yet — train or battle to earn more!' : r.why); DG.audio.play('bad'); return; }
+          DG.audio.play('coin'); DG.ui.toast(`Learned ${DG.TAP_MOVES[it.id].icon} ${DG.MOVES[it.id].name}!`); if (DG.Home) DG.Home.renderHud();
+        } else if (!buy(it.cat, it.id)) return;
+        render(el);
+      }));
+    };
+    const fit = (el) => { // shrink to fit the screen so the shop never needs scrolling
+      const box = el.querySelector('.sh'); box.style.zoom = 1;
+      const need = box.offsetHeight + 16, room = window.innerHeight - 12;
+      if (need > room) box.style.zoom = Math.max(0.6, room / need).toFixed(3);
+    };
     DG.ui.modal({
-      title: '🛍️ Dumpling Shop', wide: true,
-      html: `<div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${k === tab ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>
-        <p class="coins-line">🪙 <b>${st.coins}</b> Dumpling Coins</p>
-        <div class="shop-grid">${items.map(([id, it]) => {
-          const owned = tab !== 'food' && inv[tab].includes(id);
-          return `<div class="shop-item ${owned ? 'owned' : ''}" title="${esc(it.desc || it.name)}"><div class="shop-ico">${it.icon}</div><b>${it.name}</b>
-            ${tab === 'food' ? `<small class="desc">${it.desc}</small><small class="have">Have: ${inv.food[id] || 0}</small>` : ''}
-            ${owned ? '<span class="owned-tag">Owned ✓</span>' : `<button class="btn small primary" data-buy="${id}" ${st.coins < it.price ? 'disabled' : ''}>🪙 ${it.price}</button>`}</div>`;
-        }).join('')}</div>
-        <p class="fine">Everything is earned through play. Accessories, decor and arenas are cosmetic. Equip them in the Closet.</p>`,
-      onOpen(el, cl) {
-        el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { cl(); shop(b.dataset.tab); }));
-        el.querySelectorAll('[data-buy]').forEach((b) => (b.onclick = () => { if (buy(tab, b.dataset.buy)) { cl(); shop(tab); } }));
+      cls: 'sh-modal', wide: true,
+      html: `<div class="sh">
+          <div class="sh-top"><div class="sh-awning"></div><div class="sh-sign"><span class="sh-store">${`<img src="${A('img/cl_shop.webp')}" alt="">`}</span><h2>Dumpling Shop</h2></div>
+            <div class="sh-peek"><canvas id="sh-pet" width="240" height="90"></canvas></div></div>
+          <div class="sh-body">
+            <div class="sh-tabs">${Object.entries(TABS).map(([k, x]) => `<button class="sh-tab sh-t-${k} ${k === tab ? 'on' : ''}" data-tab="${k}">${ico(k)}<span>${x.label}</span></button>`).join('')}</div>
+            <div class="sh-coinline">${ico('coin')}<b id="sh-coins"></b> Dumpling Coins</div>
+            <div class="sh-pick"><button class="dc-arrow" data-pg="-1" aria-label="Previous">‹</button><div class="sh-grid" id="sh-grid"></div><button class="dc-arrow" data-pg="1" aria-label="Next">›</button></div>
+            <div class="dc-dots" id="sh-dots"></div>
+            <div class="sh-note"><span>✨</span><p><i class="sh-i">i</i><span id="sh-note"></span></p><span>✨</span></div>
+          </div>
+        </div>`,
+      onClose() { if (stopPeek) stopPeek(); },
+      onOpen(el) {
+        if (p) stopPeek = DG.ui.previewLoop(el.querySelector('#sh-pet'), (t) => ({ type: p.type, look: p.look, stage: 0, size: 110, accessory: p.accessory, mood: 'joy', shadow: false,
+          blink: (t % 3.1) < 0.12, y: 104 - Math.max(0, Math.sin(t * 3)) * 4 }), 240, 90);
+        render(el);
+        el.querySelectorAll('[data-pg]').forEach((b) => (b.onclick = () => { page += +b.dataset.pg; DG.audio.play('click'); render(el); }));
+        el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => {
+          tab = b.dataset.tab; page = 0; DG.audio.play('click');
+          el.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('on', x === b)); render(el); // same size on every tab: no re-fit
+        }));
+        fit(el); el.querySelectorAll('img').forEach((im) => { if (!im.complete) im.addEventListener('load', () => fit(el), { once: true }); });
       },
     });
   }

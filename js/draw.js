@@ -193,7 +193,7 @@
   const OFIMG = {};
   const ofImg = (n) => {
     if (typeof Image === 'undefined') return null;
-    if (!OFIMG[n]) { const im = new Image(); im.decoding = 'async'; im.src = (window.DG_ASSETS && window.DG_ASSETS[`img/of_${n}.webp`]) || `img/of_${n}.webp?v=1`; OFIMG[n] = im; }
+    if (!OFIMG[n]) { const im = new Image(); im.decoding = 'async'; im.src = (window.DG_ASSETS && window.DG_ASSETS[`img/of_${n}.webp`]) || `img/of_${n}.webp?v=2`; OFIMG[n] = im; }
     return OFIMG[n].complete && OFIMG[n].naturalWidth ? OFIMG[n] : null;
   };
   // where clothes sit on each body: top (in u, from the feet), bottom, width
