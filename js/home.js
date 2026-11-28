@@ -217,7 +217,7 @@
           <button class="act big train" data-a="train" title="Training" aria-label="Training"><span>🏋️</span><em class="act-lbl">Train</em></button>
           <button class="act big arena" data-a="arena" id="h-arena" title="Arena" aria-label="Arena"><span>🏟️</span><em class="act-lbl">Arena</em></button>
           <button class="act a-shop" data-a="shop" title="Shop" aria-label="Shop"><span>🛍️</span><em class="act-lbl">Shop</em></button>
-          <button class="act a-closet" data-a="closet" title="Closet" aria-label="Closet"><span><svg class="ico-svg" viewBox="0 0 64 64" aria-hidden="true"><path d="M10 14 Q32 3 54 14 L54 18 L10 18 Z" fill="#c98a4f" stroke="#6b3f1e" stroke-width="3" stroke-linejoin="round"/><rect x="12" y="17" width="40" height="38" rx="4" fill="#e6b073" stroke="#6b3f1e" stroke-width="3"/><rect x="16" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><rect x="33" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><circle cx="28" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><circle cx="36" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><path d="M15 55 v5 M49 55 v5" stroke="#6b3f1e" stroke-width="4" stroke-linecap="round"/><path d="M18 24 v10" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"/></svg></span><em class="act-lbl">Wardrobe</em></button>
+          <button class="act a-closet" data-a="closet" title="Closet" aria-label="Closet"><span><svg class="ico-svg" viewBox="0 0 64 64" aria-hidden="true"><path d="M10 14 Q32 3 54 14 L54 18 L10 18 Z" fill="#c98a4f" stroke="#6b3f1e" stroke-width="3" stroke-linejoin="round"/><rect x="12" y="17" width="40" height="38" rx="4" fill="#e6b073" stroke="#6b3f1e" stroke-width="3"/><rect x="16" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><rect x="33" y="21" width="15" height="30" rx="2.5" fill="#f2c890" stroke="#6b3f1e" stroke-width="2.2"/><circle cx="28" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><circle cx="36" cy="36" r="2.2" fill="#ffd36a" stroke="#6b3f1e" stroke-width="1.5"/><path d="M15 55 v5 M49 55 v5" stroke="#6b3f1e" stroke-width="4" stroke-linecap="round"/><path d="M18 24 v10" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"/></svg></span><em class="act-lbl">Closet</em></button>
           <button class="act a-decorate" data-a="decorate" title="Decorate" aria-label="Decorate"><span>🏠</span><em class="act-lbl">House</em></button>
           ${TROPHY_IN_HEADER ? '' : '<button class="act a-trophies" data-a="trophies" title="Trophies" aria-label="Trophies"><span>🏆</span></button>'}
         </nav>
@@ -374,6 +374,7 @@
   }
   function inRect(pt, r) { return pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h; }
   function hitPet(pt) {
+    if (!DG.pet()) return false;
     if (DG.pet().asleep) return Math.hypot(pt.x - DG.bedPoint(860, 0).x, pt.y - (DG.bedPoint(0, 440).y - 30)) < 70;
     const b = petBox(); return Math.hypot(pt.x - b.x, pt.y - b.y) < b.r;
   }

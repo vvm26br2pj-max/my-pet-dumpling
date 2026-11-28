@@ -36,6 +36,7 @@
       inventory: {
         food: { veg: 2, tofu: 1, noodle: 1, peach: 1 },
         accessories: [],
+        outfits: [],
         toys: ['ball', 'mushroom'],
         decor: [],
         arenas: ['classic'],

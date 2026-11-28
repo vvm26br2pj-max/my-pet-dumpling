@@ -14,6 +14,8 @@
       if (current && screens[current] && screens[current].exit) screens[current].exit();
       document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== 'screen-' + id));
       current = id;
+      const scr = document.getElementById('screen-' + id); // a soft fade-in instead of a hard cut
+      if (scr) { scr.classList.remove('scr-in'); void scr.offsetWidth; scr.classList.add('scr-in'); }
       if (screens[id] && screens[id].enter) screens[id].enter(arg);
       window.scrollTo(0, 0);
     },
@@ -37,7 +39,7 @@
         ${opts.dismissable !== false ? '<button class="modal-x" aria-label="Close">✕</button>' : ''}
         <div class="modal-body">${opts.html || ''}</div>
         <div class="modal-btns"></div></div>`;
-      const close = () => { wrap.classList.add('out'); setTimeout(() => wrap.remove(), 180); if (opts.onClose) opts.onClose(); };
+      const close = () => { wrap.classList.add('out'); setTimeout(() => wrap.remove(), 220); if (opts.onClose) opts.onClose(); };
       const btns = wrap.querySelector('.modal-btns');
       (opts.buttons || []).forEach((b) => {
         const be = document.createElement('button');

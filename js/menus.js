@@ -16,25 +16,20 @@
     const THEME = { bao: 'pink', gyoza: 'orange', soup: 'blue' };
     root.innerHTML = `
       <div class="title-scr">
-        <img class="title-art" src="img/title.webp?v=2" alt="My Pet Dumpling. Three baby dumplings are looking for a home. Who will you adopt?">
+        <img class="title-art" src="img/title.webp?v=3" alt="My Pet Dumpling. Three baby dumplings are looking for a home. Who will you adopt?">
         <div class="ts-grid">
           ${Object.values(DG.STARTERS).map((s) => `
             <button class="ts-card ts-${THEME[s.id]}" data-type="${s.id}">
-              <div class="ts-top"><span class="ts-pop" aria-hidden="true"></span><canvas class="starter-canvas" data-type="${s.id}"></canvas></div>
+              <div class="ts-top"><canvas class="starter-canvas" data-type="${s.id}"></canvas></div>
               <div class="ts-name"><i aria-hidden="true">✿</i>${s.name}<i aria-hidden="true">✿</i></div>
               <div class="ts-kind">${s.kind}</div>
               <p class="ts-desc">${s.desc}</p>
               <div class="ts-box"><span class="ts-ico" aria-hidden="true">💪</span><span>${s.strength}</span></div>
+              <div class="ts-ab-title">Special Ability</div>
               <div class="ts-box"><span class="ts-ico" aria-hidden="true">✨</span><span><b>${DG.MOVES[s.moves.special].name}:</b> ${DG.MOVES[s.moves.special].desc}</span></div>
             </button>`).join('')}
         </div>
-        <div class="ts-note"><canvas class="ts-note-pet" width="160" height="130" aria-hidden="true"></canvas><p>All three are equally strong overall — training can improve any weaker area.</p></div>
       </div>`;
-    { // the little happy bao in the bottom note
-      const nc = root.querySelector('.ts-note-pet').getContext('2d');
-      DG.draw.dumpling(nc, { type: 'bao', x: 80, y: 118, size: 92, mood: 'joy', stage: 1, shadow: false, t: 0 });
-      nc.fillStyle = '#ff7f9e'; [[22, 30, 9], [138, 22, 7], [30, 62, 6]].forEach(([x, y, s]) => { nc.beginPath(); nc.moveTo(x, y + s * 0.6); nc.bezierCurveTo(x - s * 1.2, y - s * 0.2, x - s * 0.5, y - s * 1.1, x, y - s * 0.35); nc.bezierCurveTo(x + s * 0.5, y - s * 1.1, x + s * 1.2, y - s * 0.2, x, y + s * 0.6); nc.fill(); });
-    }
     root.querySelectorAll('.starter-canvas').forEach((cv) => {
       const type = cv.dataset.type;
       adoptStops.push(DG.ui.previewLoop(cv, (t) => Object.assign({ type, stage: 0, size: 150, shadow: false }, PREVIEW_STYLE[type](t)), 240, 170));
@@ -88,15 +83,7 @@
       DG.ui.show('home');
       setTimeout(() => {
         DG.Home.celebrate(`Hi! I'm ${DG.pet().name}!`);
-        DG.ui.modal({
-          title: `Welcome home, ${pname()}! 🎉`,
-          html: `<p>Your baby dumpling grows in <b>real time</b> — even when the game is closed:</p>
-            <ul class="nice-list"><li>🌱 <b>Small</b> after 1 hour — unlocks arena battles</li><li>🌿 <b>Medium</b> after 1 day — a special move</li><li>🌳 <b>Large</b> after 7 days — advanced training & a second move</li><li>🏔️ <b>Giant</b> after 1 month — an ultimate move!</li></ul>
-            <p>Keep ${pname()} fed, happy, rested and clean. If any need drops below <b>20</b>, growing <b>pauses</b> until you raise it again. Dumplings never lose progress.</p>
-            <p>🌙 From <b>9 PM to 7 AM</b>, ${pname()} goes to bed on its own.</p>
-            <p>Want to battle right away? In the <b>Arena</b> you can battle a friend on the same Wi‑Fi.</p>`,
-          buttons: [{ label: "Let's go!", cls: 'primary' }],
-        });
+        welcomeHome();
       }, 400);
     };
     DG.ui.modal({
@@ -138,6 +125,45 @@
         el.querySelector('#ad-go').onclick = () => { DG.audio.play('click'); doAdopt(close); };
         const inp = el.querySelector('#ad-name');
         if (!DG.ui.isTouch()) { inp.focus(); inp.select(); }
+      },
+    });
+  }
+  /* "Welcome Home" card shown right after adopting: the dumpling, its growth stages and the four kinds of care */
+  function welcomeHome() {
+    const p = DG.pet(), sp = DG.STARTERS[p.type];
+    const rm = (n) => (window.DG_ASSETS && window.DG_ASSETS[`img/rm_${n}.webp`]) || `img/rm_${n}.webp?v=6`;
+    const when = (ms) => { const h = ms / DG.HOUR; return h < 24 ? `After ${h} hour${h > 1 ? 's' : ''}` : h < 24 * 28 ? `After ${h / 24} day${h > 24 ? 's' : ''}` : 'After 1 month'; };
+    const stages = [1, 2, 3, 4].map((i) => ({ i, st: DG.STAGES[i] }));
+    const care = [['feed', 'Feed', 'Raise Fullness!', `<img src="${rm('bowl')}" alt="">`], ['play', 'Play', 'Raise Happiness!', '<canvas class="wh-ball" width="120" height="120"></canvas>'],
+      ['sleep', 'Sleep', 'Increase Energy!', `<img src="${rm('bed')}" alt=""><b class="wh-z">z<sup>z</sup><sup>z</sup></b>`], ['wash', 'Wash', 'Increase Cleanliness!', `<img src="${rm('bath')}" alt="">`]];
+    let stop = null;
+    DG.ui.modal({
+      cls: 'wh-modal', wide: true,
+      html: `<div class="wh">
+          <div class="wh-sky"><i class="wh-cloud c1"></i><i class="wh-cloud c2"></i><i class="wh-bush b1"></i><i class="wh-bush b2"></i></div>
+          <div class="wh-sign"><span class="wh-house" aria-hidden="true">🏠</span><h2>Welcome Home, ${esc(p.name)}!</h2></div>
+          <div class="wh-peek"><canvas id="wh-pet" width="300" height="150"></canvas></div>
+          <div class="wh-body">
+            <div class="wh-pill"><span>⭐</span>Your ${esc(sp.name)} grows over time!<span>⭐</span></div>
+            <div class="wh-stages">${stages.map(({ i, st }, n) => `${n ? '<i class="wh-arrow" aria-hidden="true">➜</i>' : ''}
+              <div class="wh-st wh-st${i}"><div class="wh-st-art"><canvas data-stage="${i}" width="200" height="160"></canvas>${i === 4 ? '<span class="wh-crown" aria-hidden="true">👑</span>' : ''}</div>
+                <b class="wh-tag">${st.name}</b><small>${when(st.at)}</small></div>`).join('')}</div>
+            <div class="wh-care">${care.map(([k, name, tip, art]) => `<div class="wh-cc wh-${k}"><div class="wh-cc-art">${art}</div><b class="wh-tag">${name}</b><small>${tip}</small></div>`).join('')}</div>
+            <button class="wh-go" id="wh-go">Let's Go! <span aria-hidden="true">➜</span></button>
+          </div>
+        </div>`,
+      onClose() { if (stop) stop(); },
+      onOpen(el, close) {
+        const draw = (cv, o) => { const c = cv.getContext('2d'); c.clearRect(0, 0, cv.width, cv.height); DG.draw.dumpling(c, Object.assign({ type: p.type, look: p.look, shadow: false, t: 0 }, o)); };
+        // your dumpling peeking over the banner, with its accessory
+        stop = DG.ui.previewLoop(el.querySelector('#wh-pet'), (t) => ({ type: p.type, look: p.look, stage: 0, size: 150, accessory: p.accessory, mood: 'joy', shadow: false,
+          hop: Math.max(0, Math.sin(t * 3)) * 6, blink: (t % 3.2) < 0.12, y: 132 }), 300, 150);
+        el.querySelectorAll('[data-stage]').forEach((cv) => {
+          const i = +cv.dataset.stage, k = DG.STAGES[i].scale / DG.STAGES[4].scale;
+          draw(cv, { x: 100, y: 154, size: 165 * (0.4 + 0.6 * k), stage: i, mood: ['happy', 'happy', 'joy', 'happy', 'joy'][i] });
+        });
+        const ball = el.querySelector('.wh-ball'); if (ball && DG.draw.toy) DG.draw.toy(ball.getContext('2d'), 'ball', 60, 64, 1.9);
+        el.querySelector('#wh-go').onclick = () => { DG.audio.play('click'); close(); };
       },
     });
   }
@@ -197,7 +223,7 @@
   /* ================= Shop ================= */
   function buy(cat, id) {
     const st = DG.state, inv = st.inventory;
-    const table = { food: DG.FOODS, accessories: DG.ACCESSORIES, toys: DG.TOYS, decor: DG.DECOR, arenas: DG.ARENAS }[cat];
+    const table = { food: DG.FOODS, outfits: DG.OUTFITS, accessories: DG.ACCESSORIES, toys: DG.TOYS, decor: DG.DECOR, arenas: DG.ARENAS }[cat];
     const item = table[id];
     if (cat !== 'food' && inv[cat].includes(id)) return false;
     if (!DG.spend(item.price)) { DG.ui.toast('Not enough Dumpling Coins yet — train or battle to earn more!'); DG.audio.play('bad'); return false; }
@@ -213,8 +239,8 @@
   function shop(tab) {
     tab = tab || 'food';
     const st = DG.state, inv = st.inventory;
-    const tabs = [['food', '🍱 Food'], ['accessories', '🎀 Hats & Accessories'], ['toys', '🧸 Toys'], ['decor', '🪴 Decor'], ['arenas', '🏟️ Arenas']];
-    const table = { food: DG.FOODS, accessories: DG.ACCESSORIES, toys: DG.TOYS, decor: DG.DECOR, arenas: DG.ARENAS }[tab];
+    const tabs = [['food', '🍱 Food'], ['outfits', '👕 Outfits'], ['accessories', '🎀 Hats & Accessories'], ['toys', '🧸 Toys'], ['decor', '🪴 Decor'], ['arenas', '🏟️ Arenas']];
+    const table = { food: DG.FOODS, outfits: DG.OUTFITS, accessories: DG.ACCESSORIES, toys: DG.TOYS, decor: DG.DECOR, arenas: DG.ARENAS }[tab];
     const items = Object.entries(table).filter(([, it]) => !(tab === 'food' && it.free) && !(tab !== 'food' && it.price === 0));
     DG.ui.modal({
       title: '🛍️ Dumpling Shop', wide: true,
@@ -235,68 +261,141 @@
   }
 
   /* ================= Closet ================= */
-  function closet() {
-    const st = DG.state, p = DG.pet();
-    let stop = null;
-    const accs = st.inventory.accessories;
+  function closet(startTab) {
+    const st = DG.state, p = DG.pet(), inv = st.inventory;
     if (!p.look) p.look = { color: 'classic', eyes: 'round', cheeks: 'blush' };
+    if (!inv.outfits) inv.outfits = [];
+    let raf = 0, tab = startTab || 'outfits', page = 0, pokeT = -9;
+    const PER = 8;
+    const img = (n) => `<img class="dc-ico" src="${(window.DG_ASSETS && window.DG_ASSETS[`img/cl_${n}.webp`]) || `img/cl_${n}.webp?v=1`}" alt="">`;
+    const TABS = {
+      outfits:     { label: 'Outfits',     title: 'Outfits',     sub: 'Choose an outfit for your dumpling!' },
+      accessories: { label: 'Accessories', title: 'Accessories', sub: 'Hats, glasses and more' },
+      face:        { label: 'Face',        title: 'Face',        sub: 'Pick your eyes' },
+      cheeks:      { label: 'Cheeks',      title: 'Cheeks',      sub: 'Pick your cheeks' },
+      color:       { label: 'Color',       title: 'Color',       sub: 'Choose a color for your dumpling' },
+    };
+    /* every option, drawn on your own dumpling */
+    const items = () => {
+      if (tab === 'outfits') return [{ id: '', name: 'No outfit', on: !p.outfit, look: { outfit: null } }].concat(Object.entries(DG.OUTFITS).map(([id, x]) => {
+        const own = inv.outfits.includes(id);
+        return { id, name: own ? x.name : `🪙${x.price}`, full: x.name, on: p.outfit === id, locked: !own, look: { outfit: id } };
+      }));
+      if (tab === 'accessories') return [{ id: '', name: 'None', on: !p.accessory, look: { accessory: null, outfit: null } }].concat(Object.entries(DG.ACCESSORIES).map(([id, x]) => {
+        const own = inv.accessories.includes(id);
+        return { id, name: own ? x.name : `🪙${x.price}`, full: x.name, on: p.accessory === id, locked: !own, look: { accessory: id, outfit: null } };
+      }));
+      const key = { face: 'eyes', cheeks: 'cheeks', color: 'color' }[tab], table = { eyes: DG.EYES, cheeks: DG.CHEEKS, color: DG.LOOK_COLORS }[key];
+      return Object.entries(table).map(([id, x]) => ({ id, name: x.name, on: p.look[key] === id, look: { lookPatch: { [key]: id } } }));
+    };
+    const pages = () => Math.max(1, Math.ceil(items().length / PER));
+    const panel = () => {
+      const all = items(), np = pages(); page = Math.min(page, np - 1);
+      const T = TABS[tab], show = all.slice(page * PER, page * PER + PER);
+      return `<div class="dc-head"><span class="dc-hicon">${img(tab)}</span><div><h3>${T.title}</h3><p>${T.sub}</p></div></div>
+        <div class="dc-pick">
+          <button class="dc-arrow" data-pg="-1" ${page ? '' : 'disabled'} aria-label="Previous">‹</button>
+          <div class="cl-grid">${show.map((it, k) => `<button class="cl-it ${it.on ? 'on' : ''} ${it.locked ? 'locked' : ''}" data-id="${it.id}" data-k="${page * PER + k}" title="${esc(it.full || it.name)}">
+            <canvas width="150" height="120"></canvas>${it.on ? '<span class="cl-check">✓</span>' : ''}${it.locked ? '<span class="cl-lock">🔒</span>' : ''}<small>${esc(it.name)}</small></button>`).join('')}</div>
+          <button class="dc-arrow" data-pg="1" ${page < np - 1 ? '' : 'disabled'} aria-label="Next">›</button>
+        </div>
+        <div class="dc-dots">${np > 1 ? Array.from({ length: np }, (_, i) => `<i class="${i === page ? 'on' : ''}"></i>`).join('') : ''}</div>`;
+    };
+    const drawItems = (pn) => {
+      const all = items();
+      pn.querySelectorAll('.cl-it').forEach((b) => {
+        const it = all[+b.dataset.k], cv = b.querySelector('canvas'), c = cv.getContext('2d');
+        const look = it.look.lookPatch ? Object.assign({}, p.look, it.look.lookPatch) : p.look;
+        const o = { type: p.type, look, x: 75, y: 116, size: p.type === 'gyoza' ? 122 : 104, stage: Math.min(2, DG.stageIndex()), mood: 'happy', shadow: false, t: 0,
+          accessory: 'accessory' in it.look ? it.look.accessory : p.accessory, outfit: 'outfit' in it.look ? it.look.outfit : (p.outfit || null) };
+        c.clearRect(0, 0, cv.width, cv.height); DG.draw.dumpling(c, o);
+      });
+    };
     DG.ui.modal({
-      title: '🎀 Closet', wide: true,
-      html: `<div class="closet">
-        <canvas class="closet-prev" id="cl-prev"></canvas>
-        <div>
-          <label class="lbl" for="cl-name">Name</label>
-          <div class="name-row"><input id="cl-name" class="text-in" maxlength="14" value="${esc(p.name)}" autocomplete="off" enterkeyhint="done"><button class="btn small" id="cl-rename">Rename</button></div>
-          ${lookPickerHtml(p.type, p.look)}
-          <div class="lbl">Accessory</div>
-          <div class="chip-row tight" id="cl-acc">
-            <button class="chip-btn ${!p.accessory ? 'on' : ''}" data-acc="">🚫 None</button>
-            ${accs.map((a) => `<button class="chip-btn ${p.accessory === a ? 'on' : ''}" data-acc="${a}">${DG.ACCESSORIES[a].icon} ${DG.ACCESSORIES[a].name}</button>`).join('')}
-          </div>
-          ${p.trait ? `<p class="note">${DG.TRAITS[p.trait].icon} Training look: <b>${DG.TRAITS[p.trait].name}</b> (earned at Large stage)</p>` : ''}
-          <div class="lbl">Arena look</div>
-          <div class="chip-row tight">${st.inventory.arenas.map((a) => `<button class="chip-btn ${st.equipped.arena === a ? 'on' : ''}" data-arena="${a}">${DG.ARENAS[a].icon} ${DG.ARENAS[a].name}</button>`).join('')}</div>
-          <p class="fine">Decorate your house with the 🏠 <b>Decorate</b> button on the home screen.</p>
-        </div></div>`,
-      buttons: [{ label: 'Done', cls: 'primary' }],
-      onClose() { if (stop) stop(); DG.save(); if (DG.Home) DG.Home.renderHud(); },
-      onOpen(el) {
-        let pokeT = -9;
-        stop = DG.ui.previewLoop(el.querySelector('#cl-prev'), (t) => {
-          el._t = t;
-          const poked = t - pokeT < 0.7;
-          return { type: p.type, look: p.look, stage: DG.stageIndex(), size: 130, accessory: p.accessory, trait: p.trait,
-            mood: poked ? 'joy' : 'happy', blink: (t % 3.2) < 0.12, hop: poked ? Math.sin((t - pokeT) / 0.7 * Math.PI) * 16 : Math.max(0, Math.sin(t * 3)) * 5 };
-        }, 240, 200);
-        const poke = () => { pokeT = el._t || 0; DG.save(); };
-        wireLookPicker(el, p.look, poke);
-        const nameIn = el.querySelector('#cl-name');
-        // the name updates as you type (so closing the closet never loses it); Rename / Enter confirms it
-        let announced = p.name;
-        const live = () => {
-          const v = nameIn.value.trim().slice(0, 14);
-          if (!v || v === p.name) return;
-          p.name = v; DG.save();
-          if (DG.Home) DG.Home.renderHud();
+      cls: 'dc-modal cl-modal', wide: true,
+      html: `<div class="dc cl">
+          <div class="dc-sign"><span class="cl-wardrobe" aria-hidden="true"><img src="${(window.DG_ASSETS && window.DG_ASSETS['img/ic_wardrobe.webp']) || 'img/ic_wardrobe.webp?v=1'}" alt=""></span><h2>Closet</h2></div>
+          <div class="dc-view cl-view"><canvas id="cl-prev"></canvas>
+            <label class="cl-name"><span aria-hidden="true">✏️</span><input id="cl-name" maxlength="14" value="${esc(p.name)}" autocomplete="off" enterkeyhint="done" aria-label="Your dumpling's name"></label></div>
+          <div class="dc-tabs cl-tabs">${Object.entries(TABS).map(([k, x]) => `<button class="dc-tab ${k === tab ? 'on' : ''}" data-tab="${k}"><span>${img(k)}</span>${x.label}</button>`).join('')}</div>
+          <div class="dc-panel" id="cl-panel"></div>
+          <div class="dc-foot"><button class="dc-shop" id="cl-shop">${img('shop')} Shop Outfits</button><button class="dc-done" id="cl-done">Done</button></div>
+        </div>`,
+      onClose() { cancelAnimationFrame(raf); DG.save(); if (DG.Home) DG.Home.renderHud(); },
+      onOpen(el, close) {
+        const cv = el.querySelector('#cl-prev'), c = cv.getContext('2d'), pn = el.querySelector('#cl-panel');
+        const bg = new Image(); bg.src = (window.DG_ASSETS && window.DG_ASSETS['img/cl_scene.webp']) || 'img/cl_scene.webp?v=1'; let cap = null;
+        const t0 = performance.now();
+        const frame = (now) => {
+          if (!cv.isConnected) return;
+          const dpr = Math.min(2, window.devicePixelRatio || 1), cw = cv.clientWidth, ch = cv.clientHeight;
+          if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+          c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, cw, ch);
+          // the dressing-room picture, covering the box (cropped at the sides when the box is narrow)
+          // fit the width with the room standing on the bottom; a taller box just shows more striped wall above
+          const BW = 826, BH = 392, k = Math.max(cw / BW, ch / BH * 0.62), ox = (cw - BW * k) / 2, oy = ch - BH * k;
+          if (bg.complete && bg.naturalWidth) {
+            if (!cap) { // one clean row of wall (wallpaper stripes repeat, so the wardrobe side borrows stripes from further right)
+              cap = document.createElement('canvas'); cap.width = BW; cap.height = 1; const cc = cap.getContext('2d');
+              for (let x = 0; x < BW; x++) cc.drawImage(bg, x < 262 ? x + 288 : x > 560 && x < 650 ? x - 96 : x, 4, 1, 1, x, 0, 1, 1);
+            }
+            if (oy > 0) c.drawImage(cap, 0, 0, BW, 1, ox, 0, BW * k, oy + 1);
+            c.drawImage(bg, ox, oy, BW * k, BH * k);
+          }
+          const t = (now - t0) / 1000, poked = t - pokeT < 0.7;
+          DG.draw.dumpling(c, { type: p.type, look: p.look, x: ox + 408 * k, y: oy + 346 * k, size: (p.type === 'gyoza' ? 300 : 260) * k * (0.8 + 0.2 * DG.stage().scale), stage: DG.stageIndex(),
+            accessory: p.accessory, outfit: p.outfit || null, trait: p.trait, mood: poked ? 'joy' : 'happy', blink: (t % 3.2) < 0.12,
+            hop: (poked ? Math.sin((t - pokeT) / 0.7 * Math.PI) * 16 : Math.max(0, Math.sin(t * 3)) * 5) * k * 2, t });
+          raf = requestAnimationFrame(frame);
         };
-        const rename = () => {
-          live();
-          if (!nameIn.value.trim()) nameIn.value = p.name;
-          if (p.name === announced) return;
-          announced = p.name; DG.audio.play('good'); poke();
-          DG.ui.toast(`✏️ Your dumpling is now called <b>${esc(p.name)}</b>!`);
+        raf = requestAnimationFrame(frame);
+        const poke = () => { pokeT = (performance.now() - t0) / 1000; };
+        const draw = () => {
+          pn.innerHTML = panel(); drawItems(pn);
+          if (!DG.outfitArtReady()) { let n = 0; const again = () => { if (!pn.isConnected) return; drawItems(pn); if (!DG.outfitArtReady() && ++n < 20) setTimeout(again, 150); }; setTimeout(again, 150); }
+          pn.querySelectorAll('[data-pg]').forEach((b) => (b.onclick = () => { page += +b.dataset.pg; DG.audio.play('click'); draw(); }));
+          pn.querySelectorAll('.cl-it').forEach((b) => (b.onclick = () => {
+            const it = items()[+b.dataset.k];
+            if (it.locked) {
+              const x = tab === 'outfits' ? DG.OUTFITS[it.id] : DG.ACCESSORIES[it.id];
+              DG.ui.toast(`🔒 ${x.icon} ${x.name} is in the Shop for 🪙${x.price}`); DG.audio.play('bad'); return;
+            }
+            if (tab === 'outfits') p.outfit = it.id || null;
+            else if (tab === 'accessories') { p.accessory = it.id || null; if (it.id && p.outfit && (DG.OUTFITS[p.outfit].hat || DG.OUTFITS[p.outfit].acc)) p.outfit = null; }
+            else Object.assign(p.look, it.look.lookPatch);
+            DG.audio.play('pop'); poke(); DG.save(); draw();
+          }));
         };
-        nameIn.addEventListener('input', live);
-        nameIn.addEventListener('blur', live);
-        el.querySelector('#cl-rename').onclick = rename;
-        nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { rename(); nameIn.blur(); } });
-        el.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => {
-          p.accessory = b.dataset.acc || null; DG.audio.play('pop'); poke();
-          el.querySelectorAll('[data-acc]').forEach((x) => x.classList.toggle('on', x === b));
+        draw();
+        el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => {
+          tab = b.dataset.tab; page = 0; DG.audio.play('click');
+          el.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('on', x === b)); draw();
         }));
+        // rename: updates as you type, so closing never loses it
+        const nameIn = el.querySelector('#cl-name'), was = p.name;
+        nameIn.addEventListener('input', () => { const v = nameIn.value.trim().slice(0, 14); if (v) { p.name = v; DG.save(); } });
+        nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') nameIn.blur(); });
+        nameIn.addEventListener('blur', () => {
+          if (!nameIn.value.trim()) nameIn.value = p.name;
+          if (p.name !== was) { DG.audio.play('good'); poke(); }
+        });
+        el.querySelector('#cl-done').onclick = () => { DG.audio.play('click'); close(); };
+        el.querySelector('#cl-shop').onclick = () => { DG.audio.play('click'); close(); setTimeout(() => shop(tab === 'accessories' ? 'accessories' : 'outfits'), 220); };
+      },
+    });
+  }
+  /** Arena look picker (moved here from the closet). */
+  function arenaLook() {
+    const st = DG.state;
+    DG.ui.modal({
+      title: '🏟️ Arena look',
+      html: `<div class="chip-row tight">${st.inventory.arenas.map((a) => `<button class="chip-btn ${st.equipped.arena === a ? 'on' : ''}" data-arena="${a}">${DG.ARENAS[a].icon} ${DG.ARENAS[a].name}</button>`).join('')}</div>
+        <p class="fine">Buy more arena looks in the 🛍️ Shop.</p>`,
+      buttons: [{ label: 'Done', cls: 'primary' }],
+      onOpen(el) {
         el.querySelectorAll('[data-arena]').forEach((b) => (b.onclick = () => {
-          st.equipped.arena = b.dataset.arena; DG.audio.play('pop');
-          el.querySelectorAll('[data-arena]').forEach((x) => x.classList.toggle('on', x === b)); DG.save();
+          st.equipped.arena = b.dataset.arena; DG.audio.play('pop'); DG.save();
+          el.querySelectorAll('[data-arena]').forEach((x) => x.classList.toggle('on', x === b));
         }));
       },
     });
@@ -306,54 +405,117 @@
   function decorate() {
     const st = DG.state;
     if (!st.home) st.home = { wall: 'peach', pattern: 'stripes', floor: 'wood' };
-    const h = st.home;
-    let raf = 0;
-    const chips = (key, table) => Object.entries(table).map(([id, x]) =>
-      `<button class="chip-btn ${h[key] === id ? 'on' : ''}" data-hk="${key}" data-v="${id}">${x.a ? `<i class="dot" style="background:${x.custom ? (h.wallColor || x.a) : x.a};border-color:${x.trim || x.b}"></i>` : ''}${x.name}</button>`).join('');
+    const h = st.home, R = DG.ROOM;
+    let raf = 0, tab = 'walls', page = 0;
+    const PER = 10;
+    const TABS = {
+      walls:    { icon: 'walls', label: 'Walls',    title: 'Wall Color',    sub: 'Choose a color for your walls' },
+      patterns: { icon: 'patterns', label: 'Patterns', title: 'Wallpaper',     sub: 'Pick a pattern for your walls' },
+      floors:   { icon: 'floors', label: 'Floors',   title: 'Floor',         sub: 'Choose your floor' },
+      decor:    { icon: 'decor', label: 'Decor',    title: 'Decorations',   sub: 'Tap to show or hide · buy more in the Shop' },
+    };
+    const ico = (n) => `<img class="dc-ico" src="${(window.DG_ASSETS && window.DG_ASSETS[`img/dc_${n}.webp`]) || `img/dc_${n}.webp?v=1`}" alt="">`;
+    /* little samples of each pattern and floor, cut from a real render of the room */
+    const thumbs = {};
+    const sample = (home, kind) => {
+      const tall = R.W < 700, box = kind === 'wall' ? (tall ? [380, 30, 150, 150] : [560, 30, 150, 150]) : (tall ? [185, 320, 160, 160] : [395, 305, 120, 120]);
+      const full = document.createElement('canvas'); full.width = R.W * 0.5; full.height = (R.H + 140) * 0.5;
+      const c = full.getContext('2d'), keep = [DG.devNight, DG.devSky]; c.scale(0.5, 0.5);
+      DG.devNight = false; DG.devSky = { hour: 12, weather: 'clear' }; // samples always in daylight
+      try { DG.draw.room(c, { t: 0, decor: [], toys: [], home, bottom: 140 }); } finally { [DG.devNight, DG.devSky] = keep; }
+      const out = document.createElement('canvas'); out.width = out.height = 96;
+      out.getContext('2d').drawImage(full, box[0] * 0.5, box[1] * 0.5, box[2] * 0.5, box[3] * 0.5, 0, 0, 96, 96);
+      return out.toDataURL();
+    };
+    const thumb = (kind, id) => {
+      const key = kind + id + (kind === 'wall' ? '' : h.wall + h.wallColor + (kind === 'pattern' ? '' : h.pattern));
+      if (!thumbs[key]) {
+        let over = {};
+        if (kind === 'pattern') { // a high-contrast copy of the wall colour, so each pattern is easy to see
+          const w0 = DG.WALLS[h.wall] && !DG.WALLS[h.wall].custom ? DG.WALLS[h.wall] : DG.WALLS.peach, mx = DG.draw.mix;
+          DG.WALLS.__pv = w0.dark ? { a: w0.a, b: mx(w0.a, '#ffffff', 0.45), trim: w0.trim, dark: true } : { a: mx(w0.a, '#ffffff', 0.3), b: mx(w0.trim, '#000000', 0.12), trim: w0.trim };
+          over = { pattern: id, wall: '__pv' };
+        } else over = { floor: id };
+        try { thumbs[key] = sample(Object.assign({}, h, over), kind === 'pattern' ? 'wall' : 'floor'); } finally { delete DG.WALLS.__pv; }
+      }
+      return thumbs[key];
+    };
+    const items = () => {
+      if (tab === 'walls') return Object.entries(DG.WALLS).filter(([, x]) => !x.custom).map(([id, x]) => ({ id, name: x.name, on: h.wall === id,
+        html: `<i class="dc-sw" style="background:radial-gradient(circle at 35% 30%, #ffffffaa, transparent 45%), ${x.dark ? x.a : DG.draw.mix(x.a, x.trim, 0.55)}"></i>` }));
+      if (tab === 'patterns') return Object.entries(DG.PATTERNS).map(([id, x]) => ({ id, name: x.name, on: h.pattern === id, html: `<i class="dc-sw dc-pat" style="background-image:url(${thumb('pattern', id)})"></i>` }));
+      if (tab === 'floors') return Object.entries(DG.FLOORS).map(([id, x]) => ({ id, name: x.name, on: h.floor === id, html: `<i class="dc-sw" style="background-image:url(${thumb('floor', id)})"></i>` }));
+      return Object.entries(DG.DECOR).map(([id, x]) => {
+        const own = st.inventory.decor.includes(id);
+        return { id, name: own ? x.name : `🪙${x.price}`, on: own && st.equipped.decor.includes(id), locked: !own, html: `<i class="dc-sw dc-emoji">${x.icon}${own ? '' : '<b class="dc-lock">🔒</b>'}</i>` };
+      });
+    };
+    const panel = () => {
+      const all = items(), pages = Math.max(1, Math.ceil(all.length / PER)); page = Math.min(page, pages - 1);
+      const T = TABS[tab], show = all.slice(page * PER, page * PER + PER);
+      return `<div class="dc-head"><span class="dc-hicon">${ico(T.icon)}</span><div><h3>${T.title}</h3><p>${T.sub}</p></div></div>
+        <div class="dc-pick">
+          <button class="dc-arrow" data-pg="-1" ${page ? '' : 'disabled'} aria-label="Previous">‹</button>
+          <div class="dc-sws ${tab === 'walls' ? 'plain' : ''}">${show.map((it) => `<button class="dc-it ${it.on ? 'on' : ''} ${it.locked ? 'locked' : ''}" data-id="${it.id}" title="${esc(it.name)}">${it.html}<span class="dc-check" aria-hidden="true">✓</span>${tab === 'walls' ? '' : `<small>${esc(it.name)}</small>`}</button>`).join('')}</div>
+          <button class="dc-arrow" data-pg="1" ${page < pages - 1 ? '' : 'disabled'} aria-label="Next">›</button>
+        </div>
+        <div class="dc-dots">${pages > 1 ? Array.from({ length: pages }, (_, i) => `<i class="${i === page ? 'on' : ''}"></i>`).join('') : ''}</div>`;
+    };
     DG.ui.modal({
-      title: '🏠 Decorate Your Home', wide: true, cls: 'decor-modal',
-      html: `<canvas class="decor-prev" id="dc-prev"></canvas>
-        <div class="lbl">Wall color</div><div class="chip-row tight">${chips('wall', DG.WALLS)}<label class="chip-btn color-pick" title="Pick any wall color">🎨 Pick any color <input type="color" id="dc-wallcol" value="${h.wallColor || '#ffe9d6'}"></label></div>
-        <div class="lbl">Wallpaper pattern</div><div class="chip-row tight">${chips('pattern', DG.PATTERNS)}</div>
-        <div class="lbl">Floor</div><div class="chip-row tight">${chips('floor', DG.FLOORS)}</div>
-        <div class="lbl">Decorations <small>(tap to show or hide)</small></div>
-        <div class="chip-row tight">${Object.entries(DG.DECOR).map(([d, x]) => st.inventory.decor.includes(d)
-          ? `<button class="chip-btn ${st.equipped.decor.includes(d) ? 'on' : ''}" data-decor="${d}">${x.icon} ${x.name}</button>`
-          : `<span class="chip-btn locked" title="Buy in the Shop">🔒 ${x.icon} ${x.name} · 🪙${x.price}</span>`).join('')}</div>
-        <p class="fine">Walls, patterns and floors are free to change any time. Buy more decorations in the 🛍️ Shop.</p>`,
-      buttons: [{ label: '🛍️ Shop decor', cls: 'ghost', onClick: () => setTimeout(() => shop('decor'), 200) }, { label: 'Done', cls: 'primary' }],
+      cls: 'dc-modal', wide: true,
+      html: `<div class="dc">
+          <div class="dc-sign"><span class="dc-house" aria-hidden="true">🏠</span><h2>Decorate Your Home</h2></div>
+          <div class="dc-view"><canvas id="dc-prev"></canvas></div>
+          <div class="dc-tabs">${Object.entries(TABS).map(([k, x]) => `<button class="dc-tab ${k === tab ? 'on' : ''}" data-tab="${k}"><span>${ico(x.icon)}</span>${x.label}</button>`).join('')}</div>
+          <div class="dc-panel" id="dc-panel"></div>
+          <div class="dc-info"><span class="dc-i">i</span><p>Walls, patterns and floors are free to change anytime. Buy more decorations in the <b>Shop!</b> 🛍️</p></div>
+          <div class="dc-foot"><button class="dc-shop" id="dc-shop">🛍️ Shop Decor</button><button class="dc-done" id="dc-done">Done</button></div>
+        </div>`,
       onClose() { cancelAnimationFrame(raf); DG.save(); },
-      onOpen(el) {
-        const cv = el.querySelector('#dc-prev'), c = cv.getContext('2d'), R = DG.ROOM;
+      onOpen(el, close) {
+        const cv = el.querySelector('#dc-prev'), c = cv.getContext('2d'), pn = el.querySelector('#dc-panel');
         const t0 = performance.now();
         const frame = (now) => {
           if (!cv.isConnected) return;
-          const k = DG.ui.fitCanvas(cv, R.W, R.H); c.setTransform(k, 0, 0, k, 0, 0);
+          // same framing as the home screen on a phone: a strip of wall above the window, the furniture, then floor
+          const dpr = Math.min(2, window.devicePixelRatio || 1), cw = cv.clientWidth, ch = cv.clientHeight;
+          if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+          const TOP = 18, baseF = R.W < 700 ? 125 : 10, need = R.H - TOP + baseF;
+          let s = cw / R.W, ox = 0;
+          if (ch / s < need) { s = ch / need; ox = (cw - R.W * s) / 2; }
+          const F = ch / s - (R.H - TOP);
+          c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#f6e7d4'; c.fillRect(0, 0, cv.width, cv.height);
+          c.setTransform(s * dpr, 0, 0, s * dpr, ox * dpr, 0); c.translate(0, -TOP);
           const t = (now - t0) / 1000;
-          DG.draw.room(c, { t, decor: st.equipped.decor, toys: st.inventory.toys, home: h });
+          DG.draw.room(c, { t, decor: st.equipped.decor, toys: st.inventory.toys, home: h, bottom: F });
           const p = DG.pet();
           if (p) DG.draw.dumpling(c, { type: p.type, look: p.look, x: R.spots.home.x, y: R.spots.home.y, size: 150 * DG.stage().scale, t, stage: DG.stageIndex(),
             accessory: p.accessory, trait: p.trait, mood: 'happy', hop: Math.max(0, Math.sin(t * 3)) * 6, blink: (t % 3.4) < 0.12 });
           raf = requestAnimationFrame(frame);
         };
         raf = requestAnimationFrame(frame);
-        el.querySelectorAll('[data-hk]').forEach((b) => (b.onclick = () => {
-          const key = b.dataset.hk; h[key] = b.dataset.v; DG.audio.play('pop');
-          el.querySelectorAll(`[data-hk="${key}"]`).forEach((x) => x.classList.toggle('on', x === b));
-          DG.unlock('decorator'); DG.save();
-        }));
-        const wc = el.querySelector('#dc-wallcol');
-        wc.oninput = () => {
-          h.wallColor = wc.value; h.wall = 'custom';
-          const dot = el.querySelector('[data-hk="wall"][data-v="custom"] .dot'); if (dot) dot.style.background = wc.value;
-          el.querySelectorAll('[data-hk="wall"]').forEach((x) => x.classList.toggle('on', x.dataset.v === 'custom'));
-          DG.save();
+        const draw = () => {
+          pn.innerHTML = panel();
+          pn.querySelectorAll('[data-pg]').forEach((b) => (b.onclick = () => { page += +b.dataset.pg; DG.audio.play('click'); draw(); }));
+          pn.querySelectorAll('.dc-it').forEach((b) => (b.onclick = (e) => {
+            const id = b.dataset.id;
+            if (tab === 'decor') {
+              if (b.classList.contains('locked')) { DG.ui.toast(`${DG.DECOR[id].icon} ${DG.DECOR[id].name} is in the Shop for 🪙${DG.DECOR[id].price}`); return; }
+              const eq = st.equipped.decor, i = eq.indexOf(id); if (i >= 0) eq.splice(i, 1); else eq.push(id);
+            } else {
+              const key = { walls: 'wall', patterns: 'pattern', floors: 'floor' }[tab];
+              h[key] = id; DG.unlock('decorator');
+            }
+            DG.audio.play('pop'); DG.save(); draw();
+          }));
         };
-        el.querySelectorAll('[data-decor]').forEach((b) => (b.onclick = () => {
-          const d = b.dataset.decor, eq = st.equipped.decor, i = eq.indexOf(d);
-          if (i >= 0) eq.splice(i, 1); else eq.push(d);
-          b.classList.toggle('on', i < 0); DG.audio.play('pop'); DG.save();
+        draw();
+        el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => {
+          tab = b.dataset.tab; page = 0; DG.audio.play('click');
+          el.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('on', x === b)); draw();
         }));
+        el.querySelector('#dc-done').onclick = () => { DG.audio.play('click'); close(); };
+        el.querySelector('#dc-shop').onclick = () => { DG.audio.play('click'); close(); setTimeout(() => shop('decor'), 200); };
       },
     });
   }
@@ -601,5 +763,5 @@
     clearInterval(el._t); el._t = setInterval(() => { if (!el.hidden && !el.contains(document.activeElement)) render(); }, 2000);
   }
 
-  DG.Menus = { startOver, feed, toys, shop, closet, decorate, stats, trophies, settings, checkMilestones, celebrateStage, traitPick, welcomeBack, devPanel, buy };
+  DG.Menus = { arenaLook, welcomeHome, startOver, feed, toys, shop, closet, decorate, stats, trophies, settings, checkMilestones, celebrateStage, traitPick, welcomeBack, devPanel, buy };
 })(window.DG);

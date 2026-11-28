@@ -191,6 +191,16 @@ window.DG = window.DG || {};
   DG.FOOD_ORDER = ['rice', 'veg', 'tofu', 'noodle', 'butter', 'peach', 'broth', 'cake'];
   DG.FOOD_MENU = ['rice', 'veg', 'tofu', 'noodle', 'butter', 'peach']; // the feed menu's grid; extras show only when owned, cake sits centred below
 
+  /* Outfits: clothes worn on the body (art in img/of_<id>_body.webp). hat: its own hat picture; acc: borrows an accessory as its hat. */
+  DG.OUTFITS = {
+    cape:     { name: 'Royal Cape',      icon: '👑', price: 60, desc: 'A red velvet cape with a golden bow.' },
+    hoodie:   { name: 'Star Hoodie',     icon: '⭐', price: 45, desc: 'A cozy blue hoodie with a star.' },
+    overalls: { name: 'Garden Overalls', icon: '🌱', price: 45, desc: 'Green overalls for little gardeners.' },
+    sailor:   { name: 'Sailor Suit',     icon: '⚓', price: 55, hat: true, desc: 'Ahoy! A sailor collar and cap.' },
+    chef:     { name: 'Chef Whites',     icon: '👨‍🍳', price: 55, acc: 'chef', desc: 'A chef coat, red scarf and tall hat.' },
+    wizard:   { name: 'Wizard Robe',     icon: '🔮', price: 70, hat: true, desc: 'A starry robe and pointy hat.' },
+    hawaii:   { name: 'Aloha Shirt',     icon: '🌺', price: 50, acc: 'shades', desc: 'A flowery shirt and cool shades.' },
+  };
   DG.ACCESSORIES = {
     bow:      { name: 'Pink Bow',        icon: '🎀', price: 15, starter: true, tint: '#ff8fb4' },
     tinyhat:  { name: 'Tiny Top Hat',    icon: '🎩', price: 15, tint: '#7c7590' },

@@ -169,11 +169,17 @@
       ctx.beginPath(); ctx.ellipse(-0.5 * u, (g.mid - 0.25) * u, 0.13 * u, 0.07 * u, -0.6, 0, TAU); ctx.fill();
     }
 
+    // outfit: worn by the player's own dumpling (recognised by its look) unless one is passed in
+    const pet = DG.pet && DG.pet(), outfit = o.outfit !== undefined ? o.outfit : (pet && o.look && o.look === pet.look ? pet.outfit : null);
+    const OF = outfit && DG.OUTFITS && DG.OUTFITS[outfit];
+    if (OF && !o.back) wearOutfit(ctx, outfit, type, u, g);
     if (o.back) backView(ctx, o, u, g, col); else face(ctx, o, u, g, t); // seen from behind (running away from the camera): no face
     if (o.drum) drumArms(ctx, u, col, ol, o.drum);
     if (o.trait === 'strength') drawPowerBand(ctx, u, g, t, type);
     if (o.trait === 'agility') drawScarf(ctx, u, g, t);
-    if (o.accessory) accessory(ctx, o.accessory, u, g, t, type);
+    if (OF && OF.hat) outfitHat(ctx, outfit, type, u, g);
+    else if (OF && OF.acc) accessory(ctx, OF.acc, u, g, t, type);
+    else if (o.accessory) accessory(ctx, o.accessory, u, g, t, type);
     if ((o.stage || 0) >= 4) {
       for (let i = 0; i < 3; i++) {
         const a = t * 1.5 + i * 2.1;
@@ -182,6 +188,29 @@
     }
     ctx.restore();
   }
+
+  /* ---------- Outfits (art cut from the closet design) ---------- */
+  const OFIMG = {};
+  const ofImg = (n) => {
+    if (typeof Image === 'undefined') return null;
+    if (!OFIMG[n]) { const im = new Image(); im.decoding = 'async'; im.src = (window.DG_ASSETS && window.DG_ASSETS[`img/of_${n}.webp`]) || `img/of_${n}.webp?v=1`; OFIMG[n] = im; }
+    return OFIMG[n].complete && OFIMG[n].naturalWidth ? OFIMG[n] : null;
+  };
+  // where clothes sit on each body: top (in u, from the feet), bottom, width
+  const OF_FIT = { bao: { top: -0.46, bot: 0.1, w: 2.2 }, gyoza: { top: -0.2, bot: 0.15, w: 2.4 }, soup: { top: -0.48, bot: 0.1, w: 1.95 } };
+  function wearOutfit(ctx, id, type, u, g) {
+    const im = ofImg(id + '_body'); if (!im) return;
+    const F = OF_FIT[type] || OF_FIT.bao, w = F.w * u, h = (F.bot - F.top) * u;
+    ctx.drawImage(im, -w / 2, F.top * u, w, h);
+  }
+  const HAT_FIT = { sailor: { w: 1.05, lift: 0.18 }, wizard: { w: 1.85, lift: 0.3 } };
+  function outfitHat(ctx, id, type, u, g) {
+    const im = ofImg(id + '_hat'); if (!im) return;
+    const H = HAT_FIT[id] || { w: 1, lift: 0.2 }, w = H.w * u, h = w * im.naturalHeight / im.naturalWidth;
+    const base = (g.top + Math.min(H.lift, (g.eyeY - g.top) * 0.4)) * u; // the hat's bottom edge rests a little below the top of the head, clear of the eyes
+    ctx.drawImage(im, -w / 2, base - h, w, h);
+  }
+  DG.outfitArtReady = () => Object.keys(DG.OUTFITS || {}).every((id) => ofImg(id + '_body'));
 
   /** The back of the dumpling: a soft seam and a little shading where the face would be. */
   function backView(ctx, o, u, g, col) {

@@ -94,12 +94,13 @@
             <button role="radio" data-ctl="tap" aria-checked="${tapOn}" class="${tapOn ? 'on' : ''}">👆 Tap</button>
             <button role="radio" data-ctl="classic" aria-checked="${!tapOn}" class="${tapOn ? '' : 'on'}">🕹️ Classic</button>
           </div>
-          <div class="ar-setup-btns"><button class="ar-controls" id="a-specials">✨ Specials</button><button class="ar-controls" id="a-controls">🎮 How to play</button></div>
+          <div class="ar-setup-btns"><button class="ar-controls" id="a-specials">✨ Specials</button><button class="ar-controls" id="a-look">🏟️ Look</button><button class="ar-controls" id="a-controls">🎮 How to play</button></div>
         </div>
       </div>`;
     root.querySelector('#a-home').onclick = () => { DG.audio.play('click'); DG.ui.show('home'); };
     root.querySelector('#a-controls').onclick = () => { DG.audio.play('click'); DG.ui.modal({ title: tapOn ? '👆 Tap controls' : '🕹️ Classic controls', html: tapOn ? tapHelpHtml() : controlsHtml(), buttons: [{ label: 'Got it', cls: 'primary' }] }); };
     root.querySelector('#a-specials').onclick = () => { DG.audio.play('click'); specialsMenu(); };
+    root.querySelector('#a-look').onclick = () => { DG.audio.play('click'); DG.Menus.arenaLook(); };
     root.querySelectorAll('[data-ctl]').forEach((b) => (b.onclick = () => { DG.audio.play('click'); st.settings.arenaControls = b.dataset.ctl; DG.save(); lobby(); }));
     const pv = root.querySelector('#a-prev');
     root._stop = pv ? DG.ui.previewLoop(pv, (t) => ({ type: p.type, look: p.look, stage: si, size: 90, accessory: p.accessory, trait: p.trait, mood: 'joy', hop: Math.max(0, Math.sin(t * 4)) * 8 }), 140, 120) : null;
