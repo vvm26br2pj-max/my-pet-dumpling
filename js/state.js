@@ -34,7 +34,7 @@
       pet: null,
       coins: 25,
       inventory: {
-        food: { veg: 2, berry: 2, tofu: 1, noodle: 1, peach: 1 },
+        food: { veg: 2, tofu: 1, noodle: 1, peach: 1 },
         accessories: [],
         toys: ['ball', 'mushroom'],
         decor: [],
@@ -82,6 +82,10 @@
       if (inv.decor.includes('bunting')) { inv.decor = inv.decor.filter((d) => d !== 'bunting'); DG.state.coins += 20; }
       DG.state.equipped.decor = DG.state.equipped.decor.filter((d) => d !== 'bunting');
       if (!DG.CHEEKS[p.look.cheeks]) p.look.cheeks = 'blush'; // e.g. removed War Paint
+      // Berry Bites were removed: refund any left and pick a new favourite
+      if (inv.food.berry) { DG.state.coins += inv.food.berry * 6; delete inv.food.berry; }
+      if (!DG.FOODS[p.favoriteFood]) p.favoriteFood = 'peach';
+      if (p.foodBonus && !DG.FOODS[p.foodBonus.food]) p.foodBonus = null;
       DG.seedMoves();
     }
     return DG.state;
@@ -148,7 +152,7 @@
   DG.adopt = function (type, name, accessory, look) {
     const st = DG.STARTERS[type];
     const now = DG.now();
-    const favs = ['veg', 'tofu', 'noodle', 'broth', 'berry', 'peach'];
+    const favs = ['veg', 'tofu', 'noodle', 'broth', 'peach'];
     DG.state.pet = {
       type, name: (name || st.name).trim().slice(0, 14) || st.name, accessory: accessory || null,
       adoptedAt: now, lastUpdate: now, growMs: 0,
@@ -186,6 +190,8 @@
     return { stage: nx, index: i + 1, msLeft: nx.at - DG.growMs() };
   };
   /** Needs that are currently low enough to pause growth. */
+  /** Milliseconds left on a butter freeze (0 when none). */
+  DG.butterLeft = function () { const p = DG.pet(); return p && p.frozenUntil ? Math.max(0, p.frozenUntil - DG.now()) : 0; };
   DG.frozenNeeds = function () {
     const n = DG.pet().needs;
     return Object.keys(n).filter((k) => n[k] < DG.GROWTH_FREEZE);
@@ -230,9 +236,11 @@
     // being away over night means the dumpling put itself to bed
     if (offline && nightNow && !p.asleep) { p.asleep = true; p.autoSlept = true; p.nightAwake = false; }
     const awakeAtNight = !p.asleep && nightNow && !offline;
+    // butter freezes every need: no loss for the part of this gap before p.frozenUntil
+    const frozenK = p.frozenUntil > p.lastUpdate ? Math.min(1, (Math.min(now, p.frozenUntil) - p.lastUpdate) / gap) : 0, live = 1 - frozenK;
     const rates = {
-      fullness: RATES.fullness * (p.asleep ? 0.5 : 1), happiness: RATES.happiness, cleanliness: RATES.cleanliness,
-      energy: p.asleep ? -SLEEP_REFILL : awakeAtNight ? NIGHT_AWAKE_DRAIN : RATES.energy,
+      fullness: RATES.fullness * (p.asleep ? 0.5 : 1) * live, happiness: RATES.happiness * live, cleanliness: RATES.cleanliness * live,
+      energy: p.asleep ? -SLEEP_REFILL : (awakeAtNight ? NIGHT_AWAKE_DRAIN : RATES.energy) * live,
     };
 
     // Growth: counts only while every need stays at or above the freeze line.
@@ -355,7 +363,7 @@
       speed: 3.4 + st.agility * 0.035,
       dodgeCost: Math.max(15, 26 - st.agility * 0.1),
       blockRed: Math.min(0.85, 0.55 + st.defense * 0.004),
-      charge: (4 + st.focus * 0.09) * (cozy ? 1.1 : 1),
+      charge: (4 + st.focus * 0.09) * (cozy ? 1.1 : 1) * (bonusType === 'charge' ? 1.15 : 1),
     };
   };
 

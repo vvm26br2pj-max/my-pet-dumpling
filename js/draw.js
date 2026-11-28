@@ -894,6 +894,63 @@
   const sprReady = () => Object.keys(SPR).length && Object.values(SPR).every((o) => o.im.complete && o.im.naturalWidth);
   function spr(ctx, n, x, y) { const o = SPR[n]; if (o) ctx.drawImage(o.im, x, y, o.w, o.h); }
   function sprAt(ctx, n) { const p = ROOM.pos[n]; spr(ctx, n, p[0], p[1]); }
+  /* ===== The view through the window: live time of day and weather ===== */
+  DG.devSky = null; // dev-only: { hour, weather }
+  const frac = (x) => x - Math.floor(x);
+  /** Real sunrise and sunset for today (mid-northern latitude, ~40°N): days are ~9½ h in December and ~15 h in June.
+      Daylight saving moves the clock an hour later in summer. */
+  DG.sunTimes = function (d) {
+    d = d || new Date(DG.now());
+    const y0 = new Date(d.getFullYear(), 0, 1), doy = (d - y0) / 864e5;
+    const len = 12.15 + 2.85 * Math.sin(TAU * (doy - 80) / 365.25);
+    const jan = new Date(d.getFullYear(), 0, 1).getTimezoneOffset(), jul = new Date(d.getFullYear(), 6, 1).getTimezoneOffset();
+    const dst = Math.max(jan, jul) !== d.getTimezoneOffset() ? 1 : 0, noon = 12 + dst;
+    return { rise: noon - len / 2, set: noon + len / 2, noon };
+  };
+  /** Converts the real clock into the sky's own day (sun up at 6.2, high at 12.7, down at 19.2), so the window matches the real sunrise and sunset. */
+  function skyHour(d) {
+    const h = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600, { rise, set, noon } = DG.sunTimes(d);
+    if (h >= rise && h <= noon) return 6.2 + (h - rise) / (noon - rise) * 6.5;
+    if (h > noon && h <= set) return 12.7 + (h - noon) / (set - noon) * 6.5;
+    const nightLen = 24 - (set - rise), since = h > set ? h - set : h + 24 - set; // through the night
+    return (19.2 + since / nightLen * 11) % 24;
+  }
+  /** Local hour (fractional) and the weather. Weather (clear or rain) changes every 3 hours, fading over 10 minutes. */
+  DG.skyNow = function () {
+    const now = DG.now(), d = new Date(now);
+    let h = skyHour(d);
+    if (DG.devSky && DG.devSky.hour != null) h = DG.devSky.hour; else if (DG.devNight != null) h = DG.devNight ? 23 : 13;
+    const BL = 3 * 3600e3, blk = Math.floor(now / BL), wet = (b) => frac(Math.sin(b * 12.9898 + 4.1) * 43758.5453) < 0.2;
+    let w = wet(blk) ? 'rain' : 'clear';
+    const into = (now - blk * BL) / 60e3, left = 180 - into; // minutes into / left in this spell
+    let rain = w === 'rain' ? Math.min(1, wet(blk - 1) ? 1 : into / 10, wet(blk + 1) ? 1 : left / 10) : 0;
+    if (DG.devSky && DG.devSky.weather) { w = DG.devSky.weather; rain = w === 'rain' ? 1 : 0; }
+    return { h, w, rain };
+  };
+  /** 0 at night … 1 in full day, and how golden the light is (sunrise / sunset). */
+  DG.skyLight = function () {
+    const { h, w, rain } = DG.skyNow();
+    const day = h < 5.5 || h > 20.8 ? 0 : h < 7.5 ? (h - 5.5) / 2 : h > 18.5 ? (20.8 - h) / 2.3 : 1;
+    const warm = Math.max(0, 1 - Math.abs(h - 6.6) / 1.2, 1 - Math.abs(h - 18.9) / 1.3);
+    return { day, warm, wet: rain > 0.5, rain, w };
+  };
+  /* Night and rainy versions of the door and window (your art), faded in over the day ones. */
+  const SKYV = {};
+  if (typeof Image !== 'undefined') ['door_night', 'door_rain', 'window_night', 'window_rain'].forEach((n) => {
+    const im = new Image(); im.decoding = 'async'; im.src = (window.DG_ASSETS && window.DG_ASSETS[`img/rm_${n}.webp`]) || `img/rm_${n}.webp?v=1`; SKYV[n] = im;
+  });
+  const vOk = (n) => SKYV[n] && SKYV[n].complete && SKYV[n].naturalWidth;
+  /** Draws the door or window for the current light: day art, with rain and night versions faded on top. */
+  function skyVariant(ctx, n) {
+    sprAt(ctx, n);
+    const L = DG.skyLight(), p = ROOM.pos[n], o = SPR[n];
+    const night = 1 - L.day, rain = L.rain * L.day;
+    ctx.save();
+    if (rain > 0.01 && vOk(n + '_rain')) { ctx.globalAlpha = Math.min(1, rain); ctx.drawImage(SKYV[n + '_rain'], p[0], p[1], o.w, o.h); }
+    if (night > 0.01 && vOk(n + '_night')) { ctx.globalAlpha = Math.min(1, night); ctx.drawImage(SKYV[n + '_night'], p[0], p[1], o.w, o.h); }
+    ctx.restore();
+  }
+
   /** A cream part (curtains, door frame) recoloured toward the wall colour; cached per colour. */
   const TINTS = {};
   function tinted(n, color) {
@@ -1207,17 +1264,16 @@
       // soft light on the wall around the window, and a cream skirting board
       const wp = ROOM.pos.window, wcx = wp[0] + SPR.window.w / 2;
       const wl = ctx.createRadialGradient(wcx, 150, 20, wcx, 150, W * 0.55);
-      wl.addColorStop(0, night ? 'rgba(160,170,255,0.12)' : 'rgba(255,250,235,0.45)'); wl.addColorStop(1, 'rgba(255,250,235,0)');
+      const SL = DG.skyLight(), wlc = SL.day < 0.35 ? 'rgba(160,170,255,0.12)' : SL.warm > 0.3 ? `rgba(255,190,130,${0.3 * SL.day + 0.1})` : `rgba(255,250,235,${(SL.wet ? 0.18 : 0.45) * SL.day})`;
+      wl.addColorStop(0, wlc); wl.addColorStop(1, 'rgba(255,250,235,0)');
       ctx.fillStyle = wl; ctx.fillRect(0, -E, W, floorY + E);
       const sk = ctx.createLinearGradient(0, floorY - 14, 0, floorY); sk.addColorStop(0, '#fffaf2'); sk.addColorStop(1, '#ecd6bd');
       ctx.fillStyle = sk; ctx.fillRect(0, floorY - 14, W, 14);
       ctx.fillStyle = 'rgba(150,90,50,0.18)'; ctx.fillRect(0, floorY - 15, W, 1.5); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(0, floorY - 13.5, W, 1.5);
       ctx.fillStyle = 'rgba(110,60,30,0.22)'; ctx.fillRect(0, floorY, W, 3); // where the floor meets the board
-      sprAt(ctx, 'window'); // cream curtains
-
-      if (night) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgba(70,80,170,0.5)'; ctx.fillRect(wp[0] + 20, wp[1] + 8, SPR.window.w - 40, SPR.window.h - 26); ctx.restore(); }
+      skyVariant(ctx, 'window'); // day, rain or night art
       // the door, with the garden showing through as it swings open
-      const dp = ROOM.pos.door; sprAt(ctx, 'door');
+      const dp = ROOM.pos.door; skyVariant(ctx, 'door');
       if (o.doorOpen > 0.02) {
         const dx = dp[0] + SPR.door.w * 0.2, dw = SPR.door.w * 0.6, dy = dp[1] + SPR.door.h * 0.14, dh = SPR.door.h * 0.8;
         ctx.save(); ctx.globalAlpha = Math.min(1, o.doorOpen * 1.3);
@@ -1508,7 +1564,8 @@
       [[0, 0.9], [0.38, 0.65], [0.7, 0.8]].forEach(([k, a], i) => {
         const xa = x0 + (x1 - x0) * k, sw = 26 + i * 6, drift = W * 0.32, pulse = 0.75 + 0.25 * Math.sin(t * 0.8 + i * 1.7);
         const g = ctx.createLinearGradient(0, y0, 0, Hf);
-        g.addColorStop(0, night ? `rgba(150,170,255,${0.18 * a * pulse})` : `rgba(255,245,210,${0.42 * a * pulse})`); g.addColorStop(1, 'rgba(255,245,210,0)');
+        const SL = DG.skyLight(), bk = SL.wet ? 0.35 : 1;
+        g.addColorStop(0, SL.day < 0.35 ? `rgba(150,170,255,${0.18 * a * pulse})` : SL.warm > 0.3 ? `rgba(255,185,120,${0.4 * a * pulse * SL.day * bk})` : `rgba(255,245,210,${0.42 * a * pulse * SL.day * bk})`); g.addColorStop(1, 'rgba(255,245,210,0)');
         ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(xa, y0); ctx.lineTo(xa + sw, y0); ctx.lineTo(xa + sw * 3 + drift, Hf); ctx.lineTo(xa + drift, Hf); ctx.closePath(); ctx.fill();
       });
       for (let i = 0; i < 22; i++) {

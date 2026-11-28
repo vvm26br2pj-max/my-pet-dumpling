@@ -343,8 +343,10 @@
     drawNeedIcon(); drawHudPic(); tintHud(p); tintDock();
     CAM.measured = false;
     const bonus = root.querySelector('#h-bonus');
-    if (p.foodBonus) { bonus.hidden = false; bonus.innerHTML = `${DG.FOODS[p.foodBonus.food].icon} Next battle: <b>${p.foodBonus.label}</b>`; }
-    else bonus.hidden = true;
+    const bl = DG.butterLeft(), parts = [];
+    if (p.foodBonus) parts.push(`${DG.FOODS[p.foodBonus.food].icon} Next battle: <b>${p.foodBonus.label}</b>`);
+    if (bl > 0) parts.push(`❄️ Needs frozen: <b>${Math.ceil(bl / DG.HOUR)}h</b> left`);
+    bonus.hidden = !parts.length; bonus.innerHTML = parts.join(' · ');
     const sb = root.querySelector('#h-sleep');
     if (sb) {
     sb.innerHTML = p.asleep ? '<span>☀️</span>' : '<span>🛏️</span>';
@@ -426,7 +428,7 @@
     const p = DG.pet(), f = DG.FOODS[id];
     if (busy || play) { DG.ui.toast('One thing at a time! 🥟'); return false; }
     wakeIfAsleep();
-    const snack = id === 'berry' || id === 'peach' || id === 'cake';
+    const snack = id === 'peach' || id === 'cake' || id === 'butter';
     if (p.needs.fullness >= 96 && !snack) {
       say("I'm stuffed!"); DG.ui.toast(`${pname()} is full! Try a light snack, or play instead.`); DG.audio.play('bad'); return false;
     }
@@ -454,6 +456,10 @@
       p.foodBonus = { food: id, type: f.bonus.type, label: f.bonus.label };
       msg += `<br>💪 Next-battle bonus: <b>${f.bonus.label}</b>`;
       if (prev && prev.food !== id) msg += ` <small>(replaces ${DG.FOODS[prev.food].name})</small>`;
+    }
+    if (f.freeze) {
+      DG.updateNeeds(); p.frozenUntil = DG.now() + f.freeze * DG.HOUR;
+      msg += `<br>❄️ Needs frozen for <b>${f.freeze} hours</b>!`;
     }
     if (id === p.favoriteFood) {
       DG.addNeeds({ happiness: 10 });

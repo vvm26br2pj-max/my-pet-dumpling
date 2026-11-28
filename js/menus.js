@@ -145,23 +145,37 @@
 
   /* ================= Feed & toys ================= */
   function feed() {
-    const p = DG.pet(), inv = DG.state.inventory.food;
+    const p = DG.pet(), inv = DG.state.inventory.food, coins = DG.state.coins;
+    const ids = DG.FOOD_MENU.concat(DG.FOOD_ORDER.filter((id) => !DG.FOOD_MENU.includes(id) && id !== 'cake' && inv[id] > 0));
+    const art = (id) => ['rice', 'veg', 'tofu', 'noodle', 'butter', 'peach', 'cake'].includes(id) ? `<img src="${(window.DG_ASSETS && window.DG_ASSETS[`img/fd_${id}.webp`]) || `img/fd_${id}.webp?v=2`}" alt="">` : `<span class="fd-emoji">${DG.FOODS[id].icon}</span>`;
+    const card = (id) => {
+      const f = DG.FOODS[id], have = f.free ? '∞' : inv[id] || 0, fav = p.favoriteKnown && p.favoriteFood === id;
+      return `<div class="fd-card fd-${id} ${fav ? 'fav' : ''}">
+        ${fav ? '<span class="fd-fav">⭐ Favorite</span>' : ''}
+        <div class="fd-art">${art(id)}</div>
+        <div class="fd-body">
+          <h4 class="fd-name">${f.name}</h4>
+          <p class="fd-desc">${f.desc}</p>
+          <p class="fd-have">Have: <b>${have}</b></p>
+          <button class="fd-feed" data-feed="${id}" ${!f.free && !inv[id] ? 'disabled' : ''}>Feed</button>
+          ${f.free ? '<span class="fd-free">Free!</span>' : `<button class="fd-buy" data-buy="${id}" ${coins < f.price ? 'disabled' : ''}>Buy <i class="fd-coin"></i>${f.price}</button>`}
+        </div></div>`;
+    };
     const close = DG.ui.modal({
-      title: '🍚 What should we eat?', wide: true,
-      html: `${p.foodBonus ? `<p class="note">Active battle bonus: ${DG.FOODS[p.foodBonus.food].icon} <b>${p.foodBonus.label}</b> (lasts one battle; a new bonus food replaces it).</p>` : '<p class="note">Tofu Bites and Noodle Nests give a bonus for your next battle (one at a time).</p>'}
-        <div class="food-grid">${DG.FOOD_ORDER.map((id) => {
-          const f = DG.FOODS[id], have = f.free ? '∞' : inv[id] || 0;
-          const fav = p.favoriteKnown && p.favoriteFood === id;
-          return `<div class="food-card ${fav ? 'fav' : ''}">
-            <div class="food-ico">${f.icon}</div>
-            <div class="food-info"><b>${f.name}</b>${fav ? ' <span class="fav-tag">⭐ Favorite</span>' : ''}<small class="desc">${f.desc}</small><small class="own">Have: <b>${have}</b></small></div>
-            <div class="food-btns">
-              <button class="btn small primary" data-feed="${id}" ${!f.free && !inv[id] ? 'disabled' : ''}>Feed</button>
-              ${f.free ? '<span class="free">Free!</span>' : `<button class="btn small" data-buy="${id}" ${DG.state.coins < f.price ? 'disabled' : ''}>Buy 🪙${f.price}</button>`}
-            </div></div>`;
-        }).join('')}</div>
-        <p class="fine">🪙 You have <b>${DG.state.coins}</b> Dumpling Coins.</p>`,
+      cls: 'fd-modal', wide: true,
+      html: `<div class="fd">
+          <div class="fd-sign"><span class="fd-bowl" aria-hidden="true">🍚</span><h2>What should we eat?</h2></div>
+          <div class="fd-grid">${ids.map(card).join('')}</div>
+          <div class="fd-cake-row">${card('cake')}</div>
+        </div>`,
       onOpen(el, cl) {
+        // shrink the whole menu to fit the screen, so it never needs scrolling
+        const box = el.querySelector('.fd'), fit = () => {
+          box.style.zoom = 1;
+          const need = box.offsetHeight + 46, room = window.innerHeight - 12;
+          if (need > room) box.style.zoom = Math.max(0.6, room / need).toFixed(3);
+        };
+        fit(); el.querySelectorAll('.fd-art img').forEach((im) => { if (!im.complete) im.addEventListener('load', fit, { once: true }); });
         el.querySelectorAll('[data-feed]').forEach((b) => (b.onclick = () => { if (DG.Home.feed(b.dataset.feed)) cl(); }));
         el.querySelectorAll('[data-buy]').forEach((b) => (b.onclick = () => { if (buy('food', b.dataset.buy)) { cl(); feed(); } }));
       },
@@ -549,7 +563,8 @@
         <div class="dev-row"><label>Preview stage <select id="dv-stage"><option value="">Actual</option>${DG.STAGES.map((s, i) => `<option value="${i}" ${DG.devPreviewStage === i ? 'selected' : ''}>${s.name}</option>`).join('')}</select></label></div>
         <div class="dev-row"><button data-d="away">Simulate 12h away</button><button data-d="coins">+100 coins</button></div>
         <div class="dev-row"><button data-d="low">Lower needs</button><button data-d="fill">Fill needs</button></div>
-        <div class="dev-row"><button data-d="night">Toggle fake night</button><button data-d="lowEnergy">Energy to 30</button></div>` : '<div class="dev-info">No pet adopted yet.</div>'}
+        <div class="dev-row"><button data-d="night">Toggle fake night</button><button data-d="lowEnergy">Energy to 30</button></div>
+        <div class="dev-row"><button data-d="sky">Window: next time of day</button><button data-d="wx">Window: next weather</button></div>` : '<div class="dev-info">No pet adopted yet.</div>'}
         <div class="dev-row"><button data-d="reset" class="danger">Reset test save</button></div>`;
       el.querySelector('#dv-x').onclick = () => (el.hidden = true);
       const sel = el.querySelector('#dv-stage');
@@ -562,6 +577,11 @@
         if (d === 'fill') { Object.keys(pt.needs).forEach((k) => (pt.needs[k] = 100)); DG.save(); }
         if (d === 'low') { Object.keys(pt.needs).forEach((k) => (pt.needs[k] = 15)); DG.save(); }
         if (d === 'lowEnergy') { pt.needs.energy = 30; DG.save(); }
+        if (d === 'sky' || d === 'wx') {
+          const cur = DG.devSky || {}, HRS = [6.2, 7, 12, 18.3, 19.4, 23], WX = ['clear', 'rain'];
+          if (d === 'sky') cur.hour = HRS[(HRS.indexOf(cur.hour) + 1) % HRS.length]; else cur.weather = WX[(WX.indexOf(cur.weather) + 1) % WX.length];
+          DG.devSky = cur; DG.ui.toast(`🛠️ Window: ${cur.hour != null ? cur.hour + ':00-ish' : 'real time'} · ${cur.weather || 'real weather'}`);
+        }
         if (d === 'night') { DG.devNight = DG.devNight == null ? !DG.isNight() : null; DG.ui.toast(DG.devNight == null ? '🛠️ Using the real clock' : DG.devNight ? '🛠️ Pretending it is night' : '🛠️ Pretending it is day'); }
         if (d === 'away') {
           const stageBefore = DG.realStageIndex();

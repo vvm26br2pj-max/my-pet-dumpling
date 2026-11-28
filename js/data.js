@@ -180,14 +180,16 @@ window.DG = window.DG || {};
               desc: 'Fullness + small stamina boost for the next battle.' },
     broth:  { name: 'Warm Broth',        icon: '🥣', price: 8,  full: 12, hap: 3, en: 18,
               desc: 'Some fullness + extra energy.' },
-    berry:  { name: 'Berry Bites',       icon: '🫐', price: 6,  full: 6,  hap: 14, en: 0,
-              desc: 'Light snack that lifts happiness.' },
+    butter: { name: '4 oz Stick of Butter', icon: '🧈', price: 20, full: 12, hap: 10, en: 0, freeze: 24,
+              bonus: { type: 'charge', label: '+15% special charge' },
+              desc: "Dumpling's love butter! Freezes needs for 24 hours." },
     peach:  { name: 'Peach Slices',      icon: '🍑', price: 8,  full: 6,  hap: 8, en: 7,
               desc: 'Refreshing! A little energy and happiness.' },
     cake:   { name: 'Celebration Cake',  icon: '🎂', price: 40, full: 10, hap: 35, en: 0, rare: true,
               desc: 'Rare treat: huge happiness and a party!' },
   };
-  DG.FOOD_ORDER = ['rice', 'veg', 'tofu', 'noodle', 'broth', 'berry', 'peach', 'cake'];
+  DG.FOOD_ORDER = ['rice', 'veg', 'tofu', 'noodle', 'butter', 'peach', 'broth', 'cake'];
+  DG.FOOD_MENU = ['rice', 'veg', 'tofu', 'noodle', 'butter', 'peach']; // the feed menu's grid; extras show only when owned, cake sits centred below
 
   DG.ACCESSORIES = {
     bow:      { name: 'Pink Bow',        icon: '🎀', price: 15, starter: true, tint: '#ff8fb4' },

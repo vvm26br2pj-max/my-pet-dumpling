@@ -1651,3 +1651,92 @@ img.bt-face { object-fit: cover; object-position: 50% 62%; }
   .ar-setup { margin-top: 10px; padding: 8px; gap: 8px; }
   #screen-arena .ar { margin-bottom: 0; padding-bottom: 8px; }
 }
+
+/* ---------- Feed menu (from the "What should we eat?" design) ---------- */
+.modal.fd-modal { max-width: 620px; padding: 0; overflow: visible auto; background: transparent; box-shadow: none; }
+.fd-modal .modal-x { top: 8px; right: 6px; z-index: 4; width: 50px; height: 50px; font-size: 1.4em; font-weight: 900; color: #fff;
+  background: radial-gradient(circle at 40% 30%, #ff8a78, #e2453a); border: 4px solid #fff3e4; box-shadow: 0 3px 0 #b8322a, 0 4px 10px rgba(120, 40, 20, 0.35); }
+.fd { position: relative; margin-top: 34px; padding: 44px 14px 14px; border-radius: 30px; color: #5a3a24;
+  background: radial-gradient(ellipse at 50% 10%, #fffaf0, #fbefdc 70%); border: 5px solid #e9c38f;
+  box-shadow: 0 0 0 3px #fff6e8 inset, 0 6px 0 #b98450, 0 18px 40px rgba(90, 50, 20, 0.35); }
+.fd-sign { position: absolute; left: 50%; top: -30px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 6px 26px 8px 16px; border-radius: 20px;
+  background: linear-gradient(180deg, #e9b77b, #cf9257); border: 3px solid #8c5a2e; box-shadow: inset 0 3px 0 rgba(255, 240, 210, 0.6), 0 5px 0 #8c5a2e; white-space: nowrap; }
+.fd-sign::before, .fd-sign::after { content: '🌿'; position: absolute; top: 50%; transform: translateY(-50%); font-size: 1.5em; }
+.fd-sign::before { left: -26px; transform: translateY(-50%) scaleX(-1); } .fd-sign::after { right: -26px; }
+.fd-sign h2 { margin: 0; font-size: clamp(1.3em, 6vw, 1.9em); color: #fff; -webkit-text-stroke: 1.5px #6b3f1c; paint-order: stroke fill; text-shadow: 0 3px 0 #6b3f1c; }
+.fd-bowl { font-size: 1.7em; filter: drop-shadow(0 2px 0 rgba(90, 50, 20, 0.35)); }
+.fd-note { display: flex; align-items: center; gap: 10px; margin: 0 2px 12px; padding: 8px 12px; border: 2px dashed #e6c9a1; border-radius: 16px; background: #fffaf2; }
+.fd-note p { margin: 0; flex: 1; text-align: center; font-size: 0.92em; line-height: 1.3; }
+.fd-swords { font-size: 1.6em; }
+.fd-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.fd-cake-row { display: flex; justify-content: center; margin-top: 12px; }
+.fd-card { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; border-radius: 22px; overflow: hidden;
+  background: linear-gradient(180deg, #fff2d6, #fffaf1 45%); border: 3px solid #f2d7ae; box-shadow: 0 3px 0 #e3c194, 0 6px 14px rgba(120, 70, 30, 0.12); }
+.fd-card.fd-veg { background: linear-gradient(180deg, #e3efc2, #fffaf1 45%); }
+.fd-card.fd-peach { background: linear-gradient(180deg, #ffd9c4, #fffaf1 45%); border-color: #f6c6ad; }
+.fd-card.fd-butter { background: linear-gradient(180deg, #5bb7f6, #cfeaff 40%, #eef8ff); border-color: #7cc8ff; box-shadow: 0 0 0 3px #d8f0ff, 0 3px 0 #69b2e8, 0 0 18px rgba(80, 170, 255, 0.55); }
+.fd-card.fav { border-color: #ffcf4a; box-shadow: 0 0 0 3px #fff0b3, 0 3px 0 #e3c194; }
+.fd-snow { position: absolute; top: 4px; right: 6px; z-index: 2; font-size: 1.4em; filter: drop-shadow(0 1px 1px rgba(0, 60, 120, 0.4)); }
+.fd-fav { position: absolute; top: 4px; left: 6px; z-index: 2; font-size: 0.7em; font-weight: 800; padding: 2px 6px; border-radius: 999px; background: #ffe58a; color: #6b4a00; }
+.fd-art { width: 100%; aspect-ratio: 2 / 1.05; display: flex; align-items: center; justify-content: center; }
+.fd-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fd-emoji { font-size: 3.2em; }
+.fd-body { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; padding: 0 6px 10px; }
+.fd-name { margin: -10px 0 2px; position: relative; padding: 3px 12px; min-width: 82%; border-radius: 12px; font-size: 1.02em; line-height: 1.1; color: #5a2e14;
+  background: linear-gradient(180deg, #fff1cf, #f4d59e); border: 2px solid #e2b877; box-shadow: 0 2px 0 #c9975a; }
+.fd-desc { margin: 0; font-size: 0.8em; line-height: 1.25; min-height: 3.75em; color: #5a4636; }
+.fd-have { margin: 0; font-weight: 800; font-size: 0.95em; }
+.fd-feed { width: 88%; padding: 6px 0; border: none; border-radius: 999px; font: inherit; font-weight: 800; font-size: 1.15em; color: #fff; cursor: pointer;
+  background: linear-gradient(180deg, #ff8a4c, #ec4f1f); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 3px 0 #b8380f; text-shadow: 0 1px 0 rgba(120, 30, 0, 0.5); }
+.fd-feed:disabled { background: linear-gradient(180deg, #ffc1aa, #f3a790); box-shadow: 0 3px 0 #d9907a; cursor: default; }
+.fd-buy { display: inline-flex; align-items: center; gap: 5px; padding: 4px 16px; border-radius: 999px; font: inherit; font-weight: 800; font-size: 1em; color: #4a2c1a; cursor: pointer;
+  background: linear-gradient(180deg, #fffdf7, #f2e6d2); border: 2px solid #e6d2b2; box-shadow: 0 2px 0 #d7bf99; }
+.fd-buy:disabled { opacity: 0.55; cursor: default; }
+.fd-coin { display: inline-block; width: 1.05em; height: 1.05em; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffffff, #b9c0c9 45%, #6d7682); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25); }
+.fd-coin.big { width: 1.4em; height: 1.4em; }
+.fd-free { padding: 3px 18px; border-radius: 8px; font-weight: 900; color: #fff; background: linear-gradient(180deg, #5fc35a, #2f9a37); box-shadow: 0 2px 0 #23772a; text-shadow: 0 1px 0 rgba(0, 60, 0, 0.5); transform: rotate(-3deg); }
+.fd-free::before, .fd-free::after { content: '✨'; margin: 0 4px; font-size: 0.8em; }
+/* the cake: one wide card, centred, picture on the left */
+.fd-cake-row .fd-card { flex-direction: row; width: min(100%, 420px); }
+.fd-cake-row .fd-art { width: 42%; aspect-ratio: auto; align-self: stretch; }
+.fd-cake-row .fd-art img { object-fit: contain; }
+.fd-cake-row .fd-body { flex: 1; padding: 10px 8px; }
+.fd-cake-row .fd-name { margin-top: 0; }
+.fd-cake-row .fd-desc { min-height: 0; }
+.fd-cake-row .fd-feed { width: 80%; }
+.fd-coins { display: flex; align-items: center; justify-content: center; gap: 8px; width: fit-content; margin: 14px auto 0; padding: 8px 18px; border-radius: 999px;
+  color: #fff; font-weight: 700; background: linear-gradient(180deg, #7a4a2a, #5a321a); box-shadow: 0 3px 0 #3a1e0c; }
+.fd-coins b { color: #ffd84a; font-size: 1.15em; }
+@media (max-width: 600px) {
+  .fd { padding: 40px 7px 10px; border-width: 4px; }
+  .fd-grid { gap: 6px; }
+  .fd-card { border-radius: 16px; border-width: 2px; }
+  .fd-name { font-size: 0.82em; padding: 2px 6px; min-width: 90%; }
+  .fd-desc { font-size: 0.68em; min-height: 4.6em; }
+  .fd-have { font-size: 0.8em; }
+  .fd-feed { font-size: 0.95em; padding: 5px 0; }
+  .fd-buy { font-size: 0.85em; padding: 3px 10px; }
+  .fd-free { font-size: 0.85em; padding: 2px 8px; }
+  .fd-note p { font-size: 0.78em; }
+  .fd-sign { padding: 5px 16px 6px 10px; } .fd-sign::before, .fd-sign::after { display: none; }
+  .fd-modal .modal-x { width: 42px; height: 42px; top: 4px; right: 2px; }
+}
+.fd-grid .fd-body { flex: 1; }
+.fd-grid .fd-desc { flex: 1; min-height: 0; }
+/* feed menu v2: plain butter card, no note or coin bar, compact enough to fit a phone */
+.fd-card.fd-butter { background: linear-gradient(180deg, #fff3c6, #fffaf1 45%); border-color: #f2d7ae; box-shadow: 0 3px 0 #e3c194, 0 6px 14px rgba(120, 70, 30, 0.12); }
+.fd-card.fd-butter .fd-art img { object-fit: contain; padding: 2px 2px 0; box-sizing: border-box; }
+.modal-wrap:has(.fd-modal) { align-items: flex-start; }
+.modal.fd-modal { overflow: visible; max-height: none; margin-top: 4px; }
+.fd { margin-top: 30px; padding-top: 38px; }
+.fd-art { aspect-ratio: 2 / 0.95; }
+@media (max-width: 600px) {
+  .fd { padding: 34px 6px 8px; }
+  .fd-grid { gap: 6px; }
+  .fd-body { gap: 3px; padding: 0 4px 7px; }
+  .fd-name { margin-top: -8px; }
+  .fd-desc { font-size: 0.66em; }
+  .fd-feed { padding: 4px 0; }
+  .fd-cake-row { margin-top: 8px; }
+  .fd-cake-row .fd-body { padding: 6px; }
+}
