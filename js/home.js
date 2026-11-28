@@ -303,7 +303,15 @@
     else if (a === 'wash') openBath();
     else if (a === 'sleep') goSleep();
     else if (a === 'train') { wakeIfAsleep(); endPlay(); DG.ui.show('train'); }
-    else if (a === 'arena') { wakeIfAsleep(); endPlay(); DG.ui.show('arena'); }
+    else if (a === 'arena') {
+      if (DG.stageIndex() < 1) { // the arena stays shut until your dumpling reaches the Small stage
+        const nx = DG.nextStage();
+        DG.audio.play('bad'); say('Too little to battle!', 1.6);
+        DG.ui.toast(`🔒 The Arena opens when ${pname()} is a <b>Small</b> dumpling${nx ? ` — in <b>${DG.fmtDuration(nx.msLeft)}</b>` : ''}.`);
+        return;
+      }
+      wakeIfAsleep(); endPlay(); DG.ui.show('arena');
+    }
     else if (a === 'shop') DG.Menus.shop();
     else if (a === 'closet') DG.Menus.closet();
     else if (a === 'decorate') DG.Menus.decorate();
@@ -341,6 +349,7 @@
       f.style.background = v < 25 ? 'linear-gradient(180deg,#ff9f96,#f06a5e)' : v < 50 ? 'linear-gradient(180deg,#ffd77a,#f5b23c)' : 'linear-gradient(180deg,#7fe08f,#3fbf5a)';
     });
     drawNeedIcon(); drawHudPic(); tintHud(p); tintDock();
+    const arBtn = root.querySelector('[data-a="arena"]'); if (arBtn) arBtn.classList.toggle('is-locked', DG.stageIndex() < 1);
     CAM.measured = false;
     const bonus = root.querySelector('#h-bonus');
     const bl = DG.butterLeft(), parts = [];

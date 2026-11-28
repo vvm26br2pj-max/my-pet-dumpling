@@ -35,7 +35,7 @@ window.DG = window.DG || {};
     pleatflurry: { name: 'Pleat Flurry', desc: 'A quick flurry of three pleat-slaps.' },
     ladlesplash: { name: 'Ladle Splash', desc: 'Sends a rolling wave of warm broth forward.' },
     grandsteamer:{ name: 'Grand Steamer',     desc: 'ULTIMATE: a giant steam eruption that blasts the whole area.' },
-    goldenfry:   { name: 'Golden Fry Tornado',desc: 'ULTIMATE: a sizzling golden whirlwind.' },
+    goldenfry:   { name: 'Fiery Breath',      desc: 'ULTIMATE: unleashes a stream of searing flames that burns opponents for extra damage.' },
     hotpot:      { name: 'Hot Pot Tsunami',   desc: 'ULTIMATE: a cozy tidal wave of broth.' },
   };
 
@@ -51,7 +51,7 @@ window.DG = window.DG || {};
     brothbubble:  { icon: '🫧', price: 60,  minStage: 1, species: null,   cost: 50, cd: 3.5, power: 1.4, starter: 'soup' },
     ladlesplash:  { icon: '🥣', price: 60,  minStage: 1, species: null,   cost: 50, cd: 2.5, power: 1.6, starter: 'soup' },
     grandsteamer: { icon: '🌋', price: 150, minStage: 2, species: 'bao',   cost: 50, cd: 6,   power: 2.1 },
-    goldenfry:    { icon: '🌪️', price: 150, minStage: 2, species: 'gyoza', cost: 50, cd: 6,   power: 2.1 },
+    goldenfry:    { icon: '🔥', price: 150, minStage: 2, species: 'gyoza', cost: 50, cd: 6,   power: 2.1 },
     hotpot:       { icon: '🌊', price: 150, minStage: 2, species: 'soup',  cost: 50, cd: 6,   power: 2.1 },
   };
   /** The two specials each species starts with, in slot order. */

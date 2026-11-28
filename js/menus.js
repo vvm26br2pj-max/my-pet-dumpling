@@ -251,16 +251,14 @@
       outfits:     { label: 'Outfits',     note: 'Dress up! Outfits are cosmetic and can be worn in the Closet.' },
       accessories: { label: 'Accessories', note: 'Build your style! Accessories are cosmetic and can be equipped in the Closet.' },
       toys:        { label: 'Toys',        note: 'Toys go in the toy basket. Playing makes your dumpling happy!' },
-      decor:       { label: 'Decor',       note: 'Show or hide decorations with the House button. Arena looks change your battle arena.' },
-      abilities:   { label: 'Abilities',   note: 'Special moves for tap battles. Equip two in the Arena under ✨ Specials.' },
+      decor:       { label: 'Decor',       note: 'Show or hide decorations with the House button.' },
     };
     const items = () => {
       if (tab === 'outfits') return Object.entries(DG.OUTFITS).map(([id, x]) => ({ cat: 'outfits', id, name: x.name, price: x.price, own: inv.outfits.includes(id), art: `<canvas class="sh-cv" data-outfit="${id}" width="160" height="120"></canvas>` }));
       if (tab === 'accessories') return Object.entries(DG.ACCESSORIES).map(([id, x]) => ({ cat: 'accessories', id, name: x.name, price: x.price, own: inv.accessories.includes(id), art: `<img src="${A(`img/col/a-${id}.webp`)}" alt="">` }));
       if (tab === 'toys') return Object.entries(DG.TOYS).filter(([, x]) => x.price > 0).map(([id, x]) => ({ cat: 'toys', id, name: x.name, price: x.price, own: inv.toys.includes(id), art: `<canvas class="sh-cv" data-toy="${id}" width="120" height="120"></canvas>` }));
       if (tab === 'decor') return Object.entries(DG.DECOR).map(([id, x]) => ({ cat: 'decor', id, name: x.name, price: x.price, own: inv.decor.includes(id),
-        art: RM.includes(id) ? `<img src="${A(`img/rm_${id}.webp`)}" alt="">` : `<span class="sh-emoji">${x.icon}</span>` }))
-        .concat(Object.entries(DG.ARENAS).filter(([, x]) => x.price > 0).map(([id, x]) => ({ cat: 'arenas', id, name: x.name, price: x.price, own: inv.arenas.includes(id), tag: 'Arena', art: `<span class="sh-emoji">${x.icon}</span>` })));
+        art: RM.includes(id) ? `<img src="${A(`img/rm_${id}.webp`)}" alt="">` : `<span class="sh-emoji">${x.icon}</span>` }));
       return Object.entries(DG.TAP_MOVES).map(([id, x]) => {
         const can = DG.canUseMove(id), o = ORB[id] || ['#ffb34a', ''];
         return { cat: 'abilities', id, name: DG.MOVES[id].name, price: x.price, own: st.moves && st.moves.owned.includes(id), why: can.ok ? '' : can.why,

@@ -111,15 +111,18 @@
   /** Fills in owned / equipped specials for saves that don't have them (or have invalid ones). Safe to call any time. */
   DG.seedMoves = function () {
     const p = DG.pet(); if (!p) return;
-    const st = DG.state, starters = DG.TAP_STARTERS[p.type] || DG.TAP_STARTERS.bao;
+    const st = DG.state, starters = ['steampuff']; // every dumpling starts with Steam Puff; the rest are bought in Special Attacks
     if (!st.moves || typeof st.moves !== 'object') st.moves = {};
     const m = st.moves;
     m.owned = Array.isArray(m.owned) ? m.owned.filter((id) => DG.TAP_MOVES[id]) : [];
     starters.forEach((id) => { if (!m.owned.includes(id)) m.owned.push(id); });
     m.owned = [...new Set(m.owned)];
-    const eq = Array.isArray(m.equipped) ? m.equipped.filter((id) => m.owned.includes(id) && DG.canUseMove(id).ok) : [];
-    m.equipped = [...new Set(eq)].slice(0, 2);
-    for (const id of starters) if (m.equipped.length < 2 && !m.equipped.includes(id)) m.equipped.push(id);
+    const ok = (id) => id && m.owned.includes(id) && DG.canUseMove(id).ok;
+    const eq = Array.isArray(m.equipped) ? m.equipped.slice(0, 2).map((id) => (ok(id) ? id : null)) : [];
+    if (eq[0] && eq[0] === eq[1]) eq[1] = null;
+    while (eq.length < 2) eq.push(null);
+    if (!eq[0] && !eq[1]) eq[0] = 'steampuff'; // never go into battle empty-handed
+    m.equipped = eq; // two slots; a slot can be empty until you buy more abilities
   };
   /** Can this dumpling use (or buy) a move right now? {ok, why} */
   DG.canUseMove = function (id) {
@@ -146,7 +149,8 @@
     const other = 1 - slot;
     if (m.equipped[other] === id) m.equipped[other] = m.equipped[slot];
     m.equipped[slot] = id;
-    if (m.equipped[0] === m.equipped[1]) return { ok: false, why: 'Pick two different moves' };
+    if (m.equipped[0] && m.equipped[0] === m.equipped[1]) return { ok: false, why: 'Pick two different moves' };
+    if (!m.equipped[0] && !m.equipped[1]) m.equipped[slot] = id;
     DG.save(); return { ok: true };
   };
 

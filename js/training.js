@@ -48,7 +48,7 @@
   const GAMES = {
     /* ---------- 1. Jump rope: stamina ---------- */
     jumprope: {
-      name: 'Dumpling Jump Rope', stat: 'stamina', icon: '🪢', duration: 40,
+      name: 'Dumpling Jump Rope', stat: 'stamina', icon: '🪢', duration: 35,
       desc: 'Jump as the rope swings under your feet. Chain jumps to build a score multiplier!',
       how: '<b>Tap</b> or <b>swipe up</b> (or press <b>Space</b>) just before the rope reaches your feet. When the marker on the timing bar is in the <b style="color:#2a9d6f">green zone</b>, jump! The dark center is a <b>perfect</b> jump.',
       keys: { Space: 'jump', ArrowUp: 'jump', KeyW: 'jump', KeyJ: 'jump' },
@@ -168,13 +168,13 @@
 
     /* ---------- 2. Chopstick hurdles: agility (3-lane runner) ---------- */
     hurdles: {
-      name: 'Chopstick Hurdles', stat: 'agility', icon: '🥢', duration: 40, lives: true,
+      name: 'Chopstick Hurdles', stat: 'agility', icon: '🥢', duration: 35, lives: true,
       desc: 'Dash down the kitchen track! Jump, slide and switch lanes past all kinds of obstacles, and catch butterflies.',
       how: '<b>Swipe left / right</b> to switch lanes · <b>swipe up</b> to jump · <b>swipe down</b> to slide. On a keyboard use the <b>arrow keys</b> (or WASD). Catch 🦋 butterflies for points. You have <b>3 stars</b>: bump into 3 obstacles and you have to restart!',
       keys: { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', Space: 'up', ArrowDown: 'down', KeyS: 'down' },
       gestures: { left: 'left', right: 'right', up: 'up', down: 'down' },
       create(d) {
-        const JUMP = 0.62, SLIDE = 0.7, DUR = 40;
+        const JUMP = 0.62, SLIDE = 0.7, DUR = 35;
         const KIND = { chop: 'jump', puddle: 'jump', bowl: 'jump', spoon: 'slide', lantern: 'slide', noodles: 'slide', teapot: 'dodge', steamer: 'dodge', bottle: 'dodge', roller: 'dodge' };
         const POOL = {
           jump: d === 0 ? ['chop', 'chop', 'puddle'] : ['chop', 'puddle', 'bowl'],
@@ -523,7 +523,7 @@
 
     /* ---------- 3. Rice sack push: strength ---------- */
     ricesack: {
-      name: 'Rice Sack Push', stat: 'strength', icon: '🍙', duration: 40, mash: true,
+      name: 'Rice Sack Push', stat: 'strength', icon: '🍙', duration: 35, mash: true,
       desc: 'Tap as fast as you can to shove a heavy rice sack up the hill before it slides back down!',
       how: '<b>Tap rapidly</b> anywhere (or press <b>Space</b> over and over) to push the sack up the hill. Stop and it slides back down! Each sack you deliver is a little heavier. When the bar glows <b style="color:#d68a00">HEAVE!</b>, every tap counts double.',
       keys: { Space: 'push', KeyJ: 'push', Enter: 'push', ArrowUp: 'push', KeyW: 'push' },
@@ -558,7 +558,7 @@
           if (g.heave) { g.heave.t += dt; if (g.heave.t > g.heave.len) { g.heave = null; g.heaveT = 4 + Math.random() * 3; } }
           else if ((g.heaveT -= dt) <= 0) { g.heave = { t: 0, len: [1.8, 1.5, 1.2][d] }; pop('HEAVE! ×2', '#d68a00', W / 2, H * 0.45); sfx('special'); }
         };
-        g.perf = () => clamp((g.sacks + g.prog / 100) / [5, 4, 3.2][d], 0, 1);
+        g.perf = () => clamp((g.sacks + g.prog / 100) / [4.4, 3.5, 2.8][d], 0, 1);
         g.hud = () => `Sacks <b>${g.sacks}</b> · <b>${g.rate}</b>/s`;
         g.summary = () => `${g.sacks} sacks delivered · ${g.taps} pushes · best ${g.best} taps/second`;
         g.draw = () => {
@@ -613,7 +613,7 @@
 
     /* ---------- 4. Pea dodge: defense ---------- */
     peadodge: {
-      name: 'Pea Dodge', stat: 'defense', icon: '🟢', duration: 40, repeatKeys: true, lives: true,
+      name: 'Pea Dodge', stat: 'defense', icon: '🟢', duration: 35, repeatKeys: true, lives: true,
       crash: { title: '💫 Bonked three times!', text: (n) => `${n} got bonked by 3 peas, so this round doesn't count and earns no rewards. Try again — no extra energy needed.` },
       desc: 'Peas roll across the tray and drop from above. Every wave aims at you, so keep hopping to a safe square!',
       how: '<b>Swipe</b> up, down, left or right to hop one square (or use the <b>arrow keys / WASD</b>). <b style="color:#e8607a">Red arrows</b> show rows and columns where peas will roll, and <b>growing shadows</b> show where big peas will land. Every wave aims at your square, so you have to move! Grab ✨ <b>golden peas</b> for bonus points. You have <b>3 stars</b>: get bonked 3 times and the round earns no rewards.',
@@ -796,7 +796,7 @@
 
     /* ---------- 5. Steamer balance: focus ---------- */
     balance: {
-      name: 'Steamer Balance', stat: 'focus', icon: '⭐', duration: 40, drag: true, tilt: true,
+      name: 'Steamer Balance', stat: 'focus', icon: '⭐', duration: 35, drag: true, tilt: true,
       desc: 'Balance on a wobbly steamer lid, stay near the middle and collect floating stars.',
       how: '<b>Hold your finger down and slide it</b> left or right to shuffle (or hold <b>←/→</b> / A/D). Grab the ⭐ stars that float beside you on the lid (gold stars near the edge are worth more), stay in the green middle zone for bonus points, and brace for 💨 <b>steam gusts</b> — the arrow shows which way they\'ll push you. Falling off costs points. Focus makes your special move recharge faster in battle!',
       keys: { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' },
@@ -965,7 +965,7 @@
           <h2 class="tg-sign img"><img src="img/tg_sign.webp?v=1" alt="Training Grounds"></h2>
           <div class="tg-energy">${BOLT}<span>Energy <b>${Math.round(p.needs.energy)}</b></span></div>
         </header>
-        <p class="tg-info">Each game lasts about <b>40</b> seconds and trains one stat. Everyone gets progress for joining in — great play earns more! Stats can reach <b>${cap}</b> at the ${DG.STAGES[si].name} stage.</p>
+        <p class="tg-info">Each game lasts about <b>35</b> seconds and trains one stat. Everyone gets progress for joining in — great play earns more! Stats can reach <b>${cap}</b> at the ${DG.STAGES[si].name} stage.</p>
         <div class="tg-list">
           ${Object.entries(GAMES).map(([id, gm]) => {
             const s2 = DG.STAT_INFO[gm.stat], v = Math.floor(p.stats[gm.stat]);
@@ -983,7 +983,6 @@
             </div>`;
           }).join('')}
         </div>
-        <p class="tg-note">Medium difficulty unlocks at the Medium stage.<br>Hard training unlocks at the Large stage.</p>
       </div>`;
     root.querySelector('#t-home').onclick = () => { DG.audio.play('click'); DG.ui.show('home'); };
     root.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => {

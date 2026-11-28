@@ -11,6 +11,10 @@
   const MATCH_TIME = 90;
   /* Tap combat (single-player default). All times are in fight-seconds (they pause and slow with the match). */
   const TAP = {
+    hitCharge: 12.5,   // each of your normal hits that lands fills this much of the special meter (4 hits = one special)
+    eHitCharge: 22, eDefCharge: 9, // the rival charges when its attacks land / when you defend them
+    spWarn: 0.9,       // warning before a rival special
+    spBlock: 0.35,     // damage you still take from a rival special while blocking
     windup: 0.65,      // enemy wind-up before impact (lower tiers get longer: see tapWindup)
     recover: 0.45,     // enemy recovery after an attack
     counter: 0.6,      // extra opening after you correctly dodge a red attack
@@ -46,7 +50,7 @@
     const STYLE_IMG = { charger: 'img/ar_style_charger.webp?v=1', blocker: 'img/ar_style_blocker.webp?v=1', dodger: 'img/ar_style_dodger.webp?v=1', mixed: 'img/ar_style_champion.webp?v=1' };
     const STYLE_TINT = { charger: '#ffe2cf', blocker: '#fff0c4', dodger: '#e3ecff', mixed: '#fff0b8' };
     const useViking = p.accessory === 'viking';
-    const tapOn = st.settings.arenaControls !== 'classic';
+    const tapOn = true; // solo battles always use tap controls
     root.innerHTML = `
       <div class="ar">
         <div class="ar-hero">
@@ -89,26 +93,64 @@
           <p class="ar-fine">Same Wi‑Fi only · just for fun · classic controls.</p>
         </div>
         <div class="ar-section ar-setup">
-          <div class="ar-seg" role="radiogroup" aria-label="Arena controls">
-            <span>Controls</span>
-            <button role="radio" data-ctl="tap" aria-checked="${tapOn}" class="${tapOn ? 'on' : ''}">👆 Tap</button>
-            <button role="radio" data-ctl="classic" aria-checked="${!tapOn}" class="${tapOn ? '' : 'on'}">🕹️ Classic</button>
-          </div>
-          <div class="ar-setup-btns"><button class="ar-controls" id="a-specials">✨ Specials</button><button class="ar-controls" id="a-look">🏟️ Look</button><button class="ar-controls" id="a-controls">🎮 How to play</button></div>
+          <button class="ar-spbig" id="a-specials"><span class="ar-sp-orbs" aria-hidden="true"><i></i><i></i></span><span class="ar-sp-txt"><b>✨ Special Attacks</b><small>Buy &amp; equip your abilities</small></span><span class="ar-sp-go" aria-hidden="true">›</span></button>
+          <button class="ar-controls ar-howto" id="a-controls"><span style="font-size:1.6em">🎮</span>How to play</button>
         </div>
       </div>`;
     root.querySelector('#a-home').onclick = () => { DG.audio.play('click'); DG.ui.show('home'); };
-    root.querySelector('#a-controls').onclick = () => { DG.audio.play('click'); DG.ui.modal({ title: tapOn ? '👆 Tap controls' : '🕹️ Classic controls', html: tapOn ? tapHelpHtml() : controlsHtml(), buttons: [{ label: 'Got it', cls: 'primary' }] }); };
+    root.querySelector('#a-controls').onclick = () => { DG.audio.play('click'); if (tapOn) battleTutorial(); else DG.ui.modal({ title: '🕹️ Classic controls', html: controlsHtml(), buttons: [{ label: 'Got it', cls: 'primary' }] }); };
     root.querySelector('#a-specials').onclick = () => { DG.audio.play('click'); specialsMenu(); };
-    root.querySelector('#a-look').onclick = () => { DG.audio.play('click'); DG.Menus.arenaLook(); };
-    root.querySelectorAll('[data-ctl]').forEach((b) => (b.onclick = () => { DG.audio.play('click'); st.settings.arenaControls = b.dataset.ctl; DG.save(); lobby(); }));
     const pv = root.querySelector('#a-prev');
     root._stop = pv ? DG.ui.previewLoop(pv, (t) => ({ type: p.type, look: p.look, stage: si, size: 90, accessory: p.accessory, trait: p.trait, mood: 'joy', hop: Math.max(0, Math.sin(t * 4)) * 8 }), 140, 120) : null;
-    root.querySelectorAll('[data-fight]').forEach((b) => (b.onclick = () => { DG.audio.unlock(); startMatch({ opp: +b.dataset.fight }); }));
+    root.querySelectorAll('[data-fight]').forEach((b) => (b.onclick = () => {
+      DG.audio.unlock();
+      const go = () => startMatch({ opp: +b.dataset.fight });
+      if (tapOn && !st.settings.battleTutDone) battleTutorial(go); else go(); // first tap battle: learn the basics first
+    }));
     root.querySelector('#a-host').onclick = () => { DG.audio.unlock(); hostGame(); };
     root.querySelector('#a-join').onclick = () => { DG.audio.unlock(); joinGame(); };
   }
 
+  /** Battle tutorial: a few illustrated slides. Shown before your first tap battle and from "How to play". */
+  function battleTutorial(onDone) {
+    const eq = (DG.state.moves && DG.state.moves.equipped) || [], sp = eq[0] || 'steampuff', orb = ORB[sp] || ['#ffb34a', 'e-gold-sparks'];
+    const img = (n) => `<img src="${colSrc(n)}" alt="">`;
+    const SL = [
+      { art: `<div class="tu-art tu-hit">${img('e-attack-slash')}<div class="tu-meter"><i></i></div></div>`, t: 'Tap to attack',
+        p: `${DG.ui.isTouch() ? 'Tap' : 'Click'} your rival to attack. <b>Every hit that lands fills your ✨ special meter.</b> It starts empty, and four hits charge one special.` },
+      { art: `<div class="tu-art tu-blue">${img('e-block-shield')}</div>`, t: 'Blue glow = Block',
+        p: 'When your rival glows <b style="color:#2e6fe0">blue</b>, it\'s about to attack. Tap 🛡️ <b>Block</b> before it strikes and you take no damage.' },
+      { art: `<div class="tu-art tu-red">${img('e-attack-warning')}${img('e-dodge-chevron')}</div>`, t: 'Red glow = Dodge',
+        p: 'A <b style="color:#e0342a">red</b> glow means a heavy attack that smashes through blocks. Tap 💨 <b>Dodge</b> to hop away. Dodging is tiring: it uses a quarter of your special meter.' },
+      { art: `<div class="tu-art tu-sp"><span class="tu-orb" style="--oc:${orb[0]}">${img(orb[1])}</span><span class="tu-rune">〰</span></div>`, t: 'Special attacks',
+        p: 'When the meter says <b>SPECIAL READY</b>, tap a special button. Time stops: <b>trace the glowing rune</b> with your finger. A neater trace hits harder!' },
+      { art: `<div class="tu-art tu-rival">${img('e-purple-tornado')}${img('e-block-shield')}</div>`, t: 'Rival specials',
+        p: 'Your rival charges up specials too. When it glows <b style="color:#8a4be0">purple</b> with <b>SPECIAL — BLOCK!</b>, you can\'t dodge it, but tapping <b>Block</b> keeps your shield up and cuts the damage a lot.' },
+      { art: `<div class="tu-art tu-mash"><span>💫</span><span class="tu-birds">🐦🐦</span></div>`, t: 'Don\'t just mash!',
+        p: 'Tapping nonstop is easy to read. Your rival will block, and you\'ll stumble while it gets free hits. Mix in blocks, dodges and specials!' },
+    ];
+    let i = 0;
+    DG.ui.modal({
+      cls: 'tu-modal', dismissable: false,
+      html: `<div class="tu"><div class="tu-slide" id="tu-slide"></div><div class="tu-dots" id="tu-dots"></div>
+        <div class="tu-btns"><button class="btn ghost" id="tu-back">← Back</button><button class="btn primary" id="tu-next">Next →</button></div>
+        <button class="tu-skip" id="tu-skip">Skip</button></div>`,
+      onOpen(el, close) {
+        const done = () => { DG.state.settings.battleTutDone = true; DG.save(); close(); if (onDone) setTimeout(onDone, 230); };
+        const show = () => {
+          const s = SL[i];
+          el.querySelector('#tu-slide').innerHTML = `${s.art}<h3>${s.t}</h3><p>${s.p}</p>`;
+          el.querySelector('#tu-dots').innerHTML = SL.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('');
+          el.querySelector('#tu-back').style.visibility = i ? 'visible' : 'hidden';
+          el.querySelector('#tu-next').textContent = i === SL.length - 1 ? (onDone ? "Let's fight! ⚔️" : 'Got it!') : 'Next →';
+        };
+        el.querySelector('#tu-next').onclick = () => { DG.audio.play('click'); if (i < SL.length - 1) { i++; show(); } else done(); };
+        el.querySelector('#tu-back').onclick = () => { DG.audio.play('click'); if (i) { i--; show(); } };
+        el.querySelector('#tu-skip').onclick = () => { DG.audio.play('click'); done(); };
+        show();
+      },
+    });
+  }
   function tapHelpHtml() {
     const eq = (DG.state.moves && DG.state.moves.equipped || []).map((id) => DG.MOVES[id].name).join(' and ');
     return `<ul class="nice-list small">
@@ -124,33 +166,73 @@
   /** Buy and equip the two tap-combat specials. */
   function specialsMenu() {
     DG.seedMoves();
-    const draw = (el) => {
-      const st = DG.state, m = st.moves;
-      el.querySelector('.sp-coins').innerHTML = `🪙 <b>${st.coins}</b>`;
-      el.querySelector('.sp-list').innerHTML = Object.entries(DG.TAP_MOVES).map(([id, mv]) => {
-        const owned = m.owned.includes(id), can = DG.canUseMove(id), slot = m.equipped.indexOf(id);
-        let act;
-        if (!can.ok) act = `<span class="sp-lock">🔒 ${can.why}</span>`;
-        else if (!owned) act = `<button class="btn small primary" data-buy="${id}" ${st.coins < mv.price ? 'disabled' : ''}>Buy · 🪙${mv.price}</button>`;
-        else act = `<button class="btn small ${slot === 0 ? 'primary' : ''}" data-eq="0" data-id="${id}">${slot === 0 ? '✓ Slot 1' : 'Slot 1'}</button><button class="btn small ${slot === 1 ? 'primary' : ''}" data-eq="1" data-id="${id}">${slot === 1 ? '✓ Slot 2' : 'Slot 2'}</button>`;
-        return `<div class="sp-row ${slot >= 0 ? 'eq' : ''}"><span class="sp-ico">${mv.icon}</span><div class="sp-txt"><b>${DG.MOVES[id].name}</b><small>${DG.MOVES[id].desc.replace('ULTIMATE: ', '')}</small><small class="sp-num">⚡${mv.cost} charge · ${mv.cd}s cooldown · ${Math.round(mv.power * 100)}% power</small></div><div class="sp-act">${act}</div></div>`;
-      }).join('');
-      el.querySelectorAll('[data-buy]').forEach((b) => (b.onclick = () => {
-        const r = DG.buyMove(b.dataset.buy);
-        if (r.ok) { DG.audio.play('coin'); DG.ui.toast(`✨ Learned ${DG.MOVES[b.dataset.buy].name}!`); } else { DG.audio.play('bad'); DG.ui.toast(r.why); }
-        draw(el);
-      }));
-      el.querySelectorAll('[data-eq]').forEach((b) => (b.onclick = () => {
-        const r = DG.equipMove(+b.dataset.eq, b.dataset.id);
-        DG.audio.play(r.ok ? 'pop' : 'bad'); if (!r.ok) DG.ui.toast(r.why);
-        draw(el);
-      }));
+    const A = (n) => assetSrc(`img/${n}.webp`, 2);
+    const ids = Object.keys(DG.TAP_MOVES);
+    const fmtCd = (s) => `${s}s`;
+    const card = (id) => {
+      const st = DG.state, m = st.moves, mv = DG.TAP_MOVES[id], owned = m.owned.includes(id), can = DG.canUseMove(id), slot = m.equipped.indexOf(id);
+      let act;
+      if (!can.ok) act = `<span class="ab-lock">🔒 ${DG.ui.esc(can.why)}</span>`;
+      else if (!owned) act = `<button class="ab-buy" data-buy="${id}" ${st.coins < mv.price ? 'data-poor="1"' : ''}>Buy <i class="fd-coin"></i>${mv.price}</button>`;
+      else act = `<button class="ab-slot ${slot === 0 ? 'on' : ''}" data-eq="0" data-id="${id}">${slot === 0 ? '✓ ' : ''}Slot 1</button><button class="ab-slot ${slot === 1 ? 'on' : ''}" data-eq="1" data-id="${id}">${slot === 1 ? '✓ ' : ''}Slot 2</button>`;
+      return `<div class="ab-card ${slot >= 0 ? 'eq' : ''}" data-card="${id}">
+        <div class="ab-art"><img src="${A(`ab_${id}`)}" alt=""></div>
+        <h4>${DG.ui.esc(DG.MOVES[id].name)}</h4>
+        <p>${DG.ui.esc(((d) => d.charAt(0).toUpperCase() + d.slice(1))(DG.MOVES[id].desc.replace('ULTIMATE: ', '')))}</p>
+        <div class="ab-stats"><span>⚡${mv.cost}</span><span>⏳${fmtCd(mv.cd)}</span><span>💥${Math.round(mv.power * 100)}%</span></div>
+        <div class="ab-act">${act}</div>
+      </div>`;
     };
     DG.ui.modal({
-      title: '✨ Specials', wide: true,
-      html: `<p class="fine">Equip two different specials for tap battles. Each uses charge from your meter. <span class="sp-coins"></span></p><div class="sp-list"></div>`,
-      buttons: [{ label: 'Done', cls: 'primary', onClick: () => lobby() }],
-      onOpen(el) { draw(el); },
+      cls: 'ab-modal', wide: true,
+      html: `<div class="ab">
+          <div class="ab-ribbon"><h2>✨ Abilities ✨</h2></div>
+          <div class="ab-sub"><p>Equip two special moves for tap battles!</p><span class="ab-coins"><i class="fd-coin big"></i><b id="ab-coins"></b></span></div>
+          <div class="ab-car">
+            <button class="dc-arrow ab-prev" aria-label="Previous">‹</button>
+            <div class="ab-track" id="ab-track">${ids.map(card).join('')}</div>
+            <button class="dc-arrow ab-next" aria-label="Next">›</button>
+          </div>
+          <div class="dc-dots" id="ab-dots"></div>
+          <div class="ab-foot"><img class="ab-mascot" src="${A('ab_mascot')}" alt=""><div class="ab-note"><i class="sh-i">i</i>Each ability uses charge from your meter. Your hits fill it up!</div>
+            <button class="dc-done ab-done" id="ab-done">Done</button></div>
+        </div>`,
+      onClose() { lobby(); },
+      onOpen(el, close) {
+        const track = el.querySelector('#ab-track');
+        const step = () => { const c = track.querySelector('.ab-card'); return c ? c.offsetWidth + 10 : 200; };
+        const pages = () => Math.max(1, Math.round((track.scrollWidth - track.clientWidth) / step()) + 1);
+        const dots = () => {
+          const n = pages(), cur = Math.min(n - 1, Math.round(track.scrollLeft / step()));
+          el.querySelector('#ab-dots').innerHTML = Array.from({ length: n }, (_, i) => `<i class="${i === cur ? 'on' : ''}"></i>`).join('');
+          el.querySelector('.ab-prev').disabled = cur <= 0; el.querySelector('.ab-next').disabled = cur >= n - 1;
+        };
+        const refresh = () => {
+          el.querySelector('#ab-coins').textContent = DG.state.coins;
+          ids.forEach((id) => { const old = track.querySelector(`[data-card="${id}"]`); const tmp = document.createElement('div'); tmp.innerHTML = card(id).trim(); old.replaceWith(tmp.firstChild); });
+          wire();
+        };
+        const wire = () => {
+          track.querySelectorAll('[data-buy]').forEach((b) => (b.onclick = () => {
+            const r = DG.buyMove(b.dataset.buy);
+            if (r.ok) { DG.audio.play('coin'); DG.ui.toast(`✨ Learned ${DG.MOVES[b.dataset.buy].name}!`); } else { DG.audio.play('bad'); DG.ui.toast(r.why.startsWith('Needs') ? 'Not enough Dumpling Coins yet!' : r.why); }
+            refresh();
+          }));
+          track.querySelectorAll('[data-eq]').forEach((b) => (b.onclick = () => {
+            const r = DG.equipMove(+b.dataset.eq, b.dataset.id);
+            DG.audio.play(r.ok ? 'pop' : 'bad'); if (!r.ok) DG.ui.toast(r.why);
+            refresh();
+          }));
+        };
+        el.querySelector('.ab-prev').onclick = () => { DG.audio.play('click'); track.scrollBy({ left: -step(), behavior: 'smooth' }); };
+        el.querySelector('.ab-next').onclick = () => { DG.audio.play('click'); track.scrollBy({ left: step(), behavior: 'smooth' }); };
+        track.addEventListener('scroll', () => { clearTimeout(track._t); track._t = setTimeout(dots, 60); }, { passive: true });
+        el.querySelector('#ab-done').onclick = () => { DG.audio.play('click'); close(); };
+        refresh();
+        // start on your equipped moves
+        const first = track.querySelector('.ab-card.eq'); if (first) track.scrollLeft = first.offsetLeft - track.offsetLeft - 4;
+        requestAnimationFrame(dots);
+      },
     });
   }
 
@@ -658,6 +740,23 @@
   function applyHit(att, def, dmg, o) {
     if (def.state === 'ko' || match.over) return 'none';
     const S = match.S;
+    if (match.mode === 'tap' && !att.isPlayer && att.state === 'move' && att.mvMul) { // a rival special: no dodging it, but a shield helps
+      dmg *= att.mvMul;
+      const guarded = def.blocking || def.shieldT > 0 || def.spGuard;
+      let d2 = Math.max(1, Math.round(dmg * (guarded ? TAP.spBlock : 1)));
+      if (def.state === 'dodge') { setState(def, 'idle'); def.dodgeTo = null; def.hopY = 0; }
+      def.invuln = 0;
+      def.hp = Math.max(0, def.hp - d2);
+      if (guarded) { floatText(def, 'Blocked! −' + d2, '#9fc4ff', true); sfx('block'); def.shieldHit = 0.3; btBadge(def, 'blockbadge'); match.stats.blocks++; }
+      else {
+        floatText(def, '-' + d2, '#ff6b6b', true); sfx('crit'); def.flash = 0.18; sparks(def.pos); burst3d(def.pos, 3, 0xffffff);
+        if (def.state !== 'move') { setState(def, 'stun'); def.stunDur = o.stun || 0.4; }
+        def.kb.copy(dirTo(att, def)).multiplyScalar((o.kb || 3) * S * 3);
+        match.shake = Math.max(match.shake, 0.3 * S); flashScreen();
+      }
+      if (def.hp <= 0) endMatch(def === F[0] ? 'lose' : 'win', 'ko');
+      return guarded ? 'blocked' : 'hit';
+    }
     if (def.invuln > 0) {
       if (def.state === 'dodge' && def.stT < 0.17 && !def.perfectUsed) perfectDodge(def);
       else if (def.msgT <= 0) { floatText(def, 'Dodged!', '#6fd3b5'); def.msgT = 0.4; }
@@ -695,8 +794,8 @@
     def.hp = Math.max(0, def.hp - d);
     floatText(def, (crit ? 'CRIT! ' : '') + '-' + d, result === 'hit' ? (crit ? '#ffd36a' : '#ff6b6b') : '#ffffff', crit || (o.heavy && result === 'hit'));
     def.kb.copy(dirTo(att, def)).multiplyScalar(kb * 3);
-    if (att.canSpecial) att.special = Math.min(100, att.special + (result === 'hit' ? 8 : 4));
-    if (def.canSpecial) def.special = Math.min(100, def.special + 4);
+    if (att.canSpecial && match.mode !== 'tap') att.special = Math.min(100, att.special + (result === 'hit' ? 8 : 4)); // tap battles charge only from landed normal hits (see tapPlayerImpact / tapEnemyImpact)
+    if (def.canSpecial && match.mode !== 'tap') def.special = Math.min(100, def.special + 4);
     if (def.hp <= 0) knockout(def, att);
     return result;
   }
@@ -711,7 +810,7 @@
   function parry(f, att) {
     att.mv = null; att.spin = false; att.lockFacing = false; att.hopY = 0; att.combo = 0; att.heavy = 0;
     setState(att, 'stun'); att.stunDur = 0.8; att.kb.copy(dirTo(f, att)).multiplyScalar(4 * match.S);
-    f.crit = true; if (f.canSpecial) f.special = Math.min(100, f.special + 12);
+    f.crit = true; if (f.canSpecial && !(match && match.mode === 'tap')) f.special = Math.min(100, f.special + 12);
     floatText(f, 'PARRY!', '#ffe066', true); sfx('parry');
     const mid = { x: (f.pos.x + att.pos.x) / 2, z: (f.pos.z + att.pos.z) / 2 };
     burst3d(mid, 3, 0xbfe6ff); match.hitstop = 0.12; match.shake = Math.max(match.shake, 0.18 * match.S);
@@ -1171,13 +1270,6 @@
         sprite('e-purple-tornado', { at: at(o, H(o) + 0.6), delay: 0.6, size: 7.5 * S, life: 0.9, z: 8, anim: (k) => ({ s: ease.pop(Math.min(1, k * 1.4)), r: Math.sin(k * 26) * 0.08, y: k * 0.6 * S, o: fade(k, 0.6) }) });
         sprite('e-lightning-strike', { at: at(o, H(o)), delay: 0.75, size: 4 * S, life: 0.3, z: 9, anim: (k) => ({ o: k < 0.5 ? 1 : 0 }) });
         break;
-      case 'goldenfry': {
-        const from = at(f, H(f) + 1.2), to = at(o, H(o));
-        sprite('e-fire-dragon', { at: from, delay: 0.1, size: 7 * S, life: 0.8, z: 8, flip: to.x < from.x,
-          anim: (k) => ({ x: (to.x - from.x) * ease.out(k), z: (to.z - from.z) * ease.out(k), y: Math.sin(k * Math.PI) * 1.4 * S - k * 1.2 * S, s: 0.55 + k * 0.6, r: (to.x < from.x ? 1 : -1) * (0.25 - k * 0.5), o: k < 0.12 ? k * 8 : fade(k, 0.8) }) });
-        sprite('e-gold-sparks', { at: to, delay: 0.72, size: 5 * S, life: 0.6, z: 9, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
-        break;
-      }
       case 'hotpot':
         sprite('e-ice-burst', { at: at(o, H(o)), delay: 0.7, size: 6 * S, life: 0.85, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.65) }) });
         sprite('e-lightning-strike', { at: at(o, H(o) + 1), delay: 0.78, size: 4.6 * S, life: 0.35, z: 9, anim: (k) => ({ o: k < 0.55 ? 1 : 0 }) });
@@ -1215,15 +1307,6 @@
         sprite('impact3', { at: atO, delay: 0.72, size: 5 * S, life: 0.5, z: 8, anim: (k) => ({ s: ease.pop(k), r: k, o: fade(k, 0.5) }) });
         sprite('halo', { at: at(o, 2.6), delay: 0.8, size: 3 * S, life: 0.8, z: 8, anim: (k) => ({ r: k * 4, o: fade(k, 0.5) }) });
         break;
-      case 'goldenfry': {
-        const from = at(f, 1.4), to = at(o, 1.0);
-        sprite('dragon', { at: from, delay: 0.15, size: 7 * S, life: 0.7, z: 7, flip: to.x < from.x,
-          anim: (k) => ({ x: (to.x - from.x) * ease.out(k) * 1.1, z: (to.z - from.z) * ease.out(k), y: Math.sin(k * Math.PI) * 1.2 * S, s: 0.6 + k * 0.5, o: k < 0.1 ? k * 10 : fade(k, 0.75) }) });
-        sprite('fireburst', { at: atO, delay: 0.7, size: 6 * S, life: 0.6, z: 8, anim: (k) => ({ s: ease.pop(k), y: k * 0.5 * S, o: fade(k, 0.5) }) });
-        sprite('impact1', { at: atO, delay: 0.72, size: 4.6 * S, life: 0.45, z: 9, anim: (k) => ({ s: ease.pop(k), r: k, o: fade(k, 0.5) }) });
-        sprite('goldring', { at: at(o, 0.1), delay: 0.72, size: 4 * S, life: 0.7, z: 1, anim: (k) => ({ s: 0.4 + ease.out(k) * 2, o: fade(k, 0.3) }) });
-        break;
-      }
       case 'hotpot':
         sprite('ring_b2', { at: at0, size: 4 * S, life: 0.7, z: 3, anim: (k) => ({ s: 0.4 + k, r: k * 3, o: fade(k, 0.6) }) });
         sprite('ice2', { at: at(o, 0.9), delay: 0.7, size: 5.6 * S, life: 0.8, z: 7, anim: (k) => ({ s: ease.pop(k), y: -0.3 * S * (1 - k), o: fade(k, 0.65) }) });
@@ -1410,7 +1493,7 @@
       ctx.drawImage(plate, V.px, V.py, V.pw, V.ph);
       try { colCrowd(ctx, plate, V); } catch (err) { /* decoration only: never let it break the arena */ }
     }
-    const e = F[1], a = e && e.tap && e.tap.atk, warn = a && !a.resolved && e.state === 'windup';
+    const e = F[1], sw = e && e.spWarn, a = sw ? { color: 'special' } : e && e.tap && e.tap.atk, warn = sw || (a && !a.resolved && e.state === 'windup');
     // fighters, back to front
     const order = F.slice().sort((p, q) => p.pos.z - q.pos.z);
     order.forEach((f) => {
@@ -1447,14 +1530,14 @@
         ctx.drawImage(colImg('e-dodge-trail'), -D * 0.95, -D * 0.25, D * 0.7, D * 0.5); ctx.restore();
       }
       if (f === e && warn) { // a coloured aura behind the rival while it winds up
-        const kk = Math.min(1, e.stT / e.windup), pul = 0.75 + 0.25 * Math.sin(T * 18), cx0 = p.x, cy0 = p.y - lift - D * 0.3, rr = D * (0.5 + 0.08 * kk);
+        const kk = sw ? Math.min(1, sw.t / TAP.spWarn) : Math.min(1, e.stT / e.windup), pul = 0.75 + 0.25 * Math.sin(T * 18), cx0 = p.x, cy0 = p.y - lift - D * 0.3, rr = D * (0.5 + 0.08 * kk);
         const ag = ctx.createRadialGradient(cx0, cy0, rr * 0.25, cx0, cy0, rr);
-        const c0 = a.color === 'blue' ? '70,150,255' : '255,60,45';
+        const c0 = a.color === 'blue' ? '70,150,255' : a.color === 'special' ? '160,80,255' : '255,60,45';
         ag.addColorStop(0, `rgba(${c0},${0.7 * pul})`); ag.addColorStop(0.55, `rgba(${c0},${0.5 * pul})`); ag.addColorStop(1, `rgba(${c0},0)`);
         ctx.save(); ctx.fillStyle = ag; ctx.beginPath(); ctx.ellipse(cx0, cy0, rr, rr * 0.85, 0, 0, TAU); ctx.fill(); ctx.restore();
       }
-      const glow = f.meteor ? 'rgba(255,120,30,0.95)' : f.onFire ? `rgba(255,${90 + 40 * Math.sin(T * 30) | 0},20,0.95)` : f === e && warn ? (a.color === 'blue' ? `rgba(70,150,255,${0.75 + 0.25 * Math.sin(T * 20)})` : `rgba(255,60,50,${0.75 + 0.25 * Math.sin(T * 20)})`) : null;
-      const warnTint = f === e && warn ? (a.color === 'blue' ? '#5f9dff' : '#ff6a5a') : null; // the rival turns blue or red
+      const glow = f.meteor ? 'rgba(255,120,30,0.95)' : f.onFire ? `rgba(255,${90 + 40 * Math.sin(T * 30) | 0},20,0.95)` : f === e && warn ? (a.color === 'blue' ? `rgba(70,150,255,${0.75 + 0.25 * Math.sin(T * 20)})` : a.color === 'special' ? `rgba(170,90,255,${0.8 + 0.2 * Math.sin(T * 24)})` : `rgba(255,60,50,${0.75 + 0.25 * Math.sin(T * 20)})`) : null;
+      const warnTint = f === e && warn ? (a.color === 'blue' ? '#5f9dff' : a.color === 'special' ? '#b98aff' : '#ff6a5a') : null; // the rival turns blue, red or purple
       drawDumpling2D(ctx, p.x + dx, p.y - lift, { species: f.shape, pose, size: D, mirror: f.mirror2d, tint: warnTint || bodyTint(f), acc: f.accessory, glow, flash: f.flash, sx: sxk, sy: syk, rot,
         alpha: f.state === 'ko' && f.stT > 2.4 ? Math.max(0.4, 1 - (f.stT - 2.4)) : 1 });
       if (f.stumbling && f.state === 'stun') { // dazed: little birds flap in circles around the head
@@ -1713,6 +1796,45 @@
       return false;
     }, t: () => t };
   }
+  /** Fiery Breath: puff up, then pour a stream of fire across the ring — several scorching hits and a final blast. */
+  function tapFieryBreath(f, o) {
+    const S = match.S, TICKS = 5;
+    let t = 0, flameT = 0, n = 0, ended = false;
+    f.lockFacing = true;
+    return { update(dt) {
+      t += dt; f.vel.set(0, 0, 0);
+      f.mvFace = o.pos.x >= f.pos.x ? 1 : -1;
+      const dir = dirTo(f, o), mouth = f.pos.clone().addScaledVector(dir, f.radius * 0.9); mouth.y = f.mesh.topY * 0.5 * S;
+      if (t < 0.45) { // a deep breath in
+        f.mvPose = 'wind-up'; f.mvSq = 1 + Math.min(1, t / 0.45) * 0.18; f.mvRot = 0;
+        if (Math.random() < 0.3) sprite('sparkle', { at: mouth.clone().addScaledVector(dir, 0.8 * S), size: 0.9 * S, life: 0.35, z: 6, anim: (q) => ({ x: -dir.x * q * 0.8 * S, s: 1 - q, o: 1 - q }) });
+      } else if (t < 1.75) { // the fire stream
+        f.mvPose = 'attack'; f.mvSq = 0.94 + Math.sin(t * 40) * 0.03; f.mvRot = -0.08;
+        const tgt = o.pos.clone(); tgt.y = o.mesh.topY * 0.45 * S;
+        flameT -= dt;
+        if (flameT <= 0) {
+          flameT = 0.03;
+          const dx = tgt.x - mouth.x, dz = tgt.z - mouth.z, dy = tgt.y - mouth.y, wob = rand(-0.4, 0.4) * S;
+          sprite(Math.random() < 0.65 ? 'fireburst' : 'e-gold-sparks', { at: mouth.clone(), size: rand(1.4, 2.2) * S, life: 0.42, z: 7,
+            anim: (q) => ({ x: dx * q * 1.08, z: dz * q, y: dy * q + wob * Math.sin(q * Math.PI), s: 0.5 + q * 1.1, r: q * 2, o: fade(q, 0.25) }) });
+        }
+        if (Math.random() < 0.25) sfx('whoosh');
+        // scorching hits while the rival stands in the stream
+        if (n < TICKS && t >= 0.6 + n * 0.22) {
+          n++;
+          if (flatDist(f, o) < 9 * S) {
+            applyHit(f, o, f.dmg * (n === TICKS ? 0.8 : 0.33), { kb: n === TICKS ? 4 : 0.6, stun: 0.25, noParry: true, aoe: true, heavy: n === TICKS });
+            sprite('impact2', { at: tgt.clone(), size: 2 * S, life: 0.3, z: 9, anim: (q) => ({ s: ease.pop(q), o: fade(q, 0.5) }) });
+          }
+        }
+      } else if (!ended) {
+        ended = true; f.mvPose = 'idle'; f.mvSq = 1; f.mvRot = 0;
+        sprite('e-fire-dragon', { at: at(o, o.mesh.topY * 0.5), size: 6.5 * S, life: 0.8, z: 8, anim: (q) => ({ s: 0.4 + ease.out(q) * 0.8, y: q * 0.6 * S, o: fade(q, 0.5) }) });
+        match.shake = Math.max(match.shake, 0.3 * S); cheer(1.2);
+      } else if (t >= 2.0) { f.mvFace = 0; f.lockFacing = false; return true; }
+      return false;
+    }, t: () => t };
+  }
   /* ===================== Trace-to-cast (tap battles) =====================
      Pressing a ready special freezes time and shows that move's rune. A glowing guide traces it to
      show the way; you draw over it. Good tracing casts the move (neater = stronger); a miss or the
@@ -1856,6 +1978,7 @@
     const el = stageEl && stageEl.querySelector('#a-cue'); if (!el) return;
     if (!a) { el.className = 'a-cue'; el.innerHTML = ''; return; }
     el.className = 'a-cue show ' + a.color;
+    if (a.color === 'special') { el.innerHTML = `<img src="${colSrc('e-block-shield')}" alt=""><b>SPECIAL — BLOCK!</b>`; el.setAttribute('aria-label', 'Rival special coming: Block to take less damage'); return; }
     el.innerHTML = a.color === 'blue' ? `<img src="${colSrc('e-block-shield')}" alt=""><b>BLOCK</b>`
       : `<span class="cue-row"><img src="${colSrc('e-attack-warning')}" alt=""><img class="chev" src="${colSrc('e-dodge-chevron')}" alt=""></span><b>DODGE</b>`;
     const tele = stageEl.querySelector('#bt-tele'); if (tele) tele.src = btSrc(a.color === 'blue' ? 'ring_b1' : 'ring_r');
@@ -1917,11 +2040,11 @@
       if (s.id === 'grandsteamer' || s.id === 'goldenfry' || s.id === 'hotpot') { speedLines(0.9); return ultimate(f, o, s.id); }
       return MOVES[s.id](f, o);
     };
-    const SIG = { steampuff: tapSteamPuff, bunslam: tapBunSlam, crispydash: tapCrispyDash, pleatflurry: tapPleatFlurry };
+    const SIG = { steampuff: tapSteamPuff, bunslam: tapBunSlam, crispydash: tapCrispyDash, pleatflurry: tapPleatFlurry, goldenfry: tapFieryBreath };
     f.mv = SIG[s.id] ? SIG[s.id](f, o) : tapCloseIn(f, o, make);
     f.mvSlot = 'tap' + i;
     btSpecialFx(s.id, f, o);
-    banner(`<span class="mvname">${DG.ui.esc(DG.MOVES[s.id].name)}!</span>${f.perfectRune ? '<span class="mvsub">Perfect rune!</span>' : ''}`, 1.1); f.perfectRune = false;
+    banner(`<span class="mvname">${DG.ui.esc(DG.MOVES[s.id].name)}!</span>${f.perfectRune ? '<span class="mvsub">Perfect rune!</span>' : !f.isPlayer ? `<span class="mvsub">${DG.ui.esc(f.name)}'s special!</span>` : ''}`, 1.1); f.perfectRune = false;
     speedLines(0.25); sfx('special'); match.stats.specials++;
   }
   /** Specials first hop into range (fighters stand apart in tap mode), then run the move itself. */
@@ -1959,7 +2082,10 @@
     if (p.state === 'windup' || (p.state === 'attack' && !p.hitDone) || p.state === 'recover') setState(p, 'idle');
     if (kind === 'dodge' && p.special < TAP.dodgeCost) { if (p.msgT <= 0) { floatText(p, 'Too tired to dodge!', '#ffc75a'); p.msgT = 0.6; } sfx('bad'); return; }
     p.defCd = TAP.defCd;
-    if (kind === 'block') { p.blocking = true; p.blockT = TAP.blockHold; p.shieldT = TAP.blockHold + 0.15; sfx('block'); }
+    if (kind === 'block') {
+      p.blocking = true; p.blockT = TAP.blockHold; p.shieldT = TAP.blockHold + 0.15; sfx('block');
+      const r = F[1]; if (r.spWarn || (r.state === 'move' && r.mvMul)) { p.spGuard = true; floatText(p, 'Bracing!', '#9fc4ff'); } // holds until the rival's special is over
+    }
     else {
       p.special -= TAP.dodgeCost; // dodging is tiring
       setState(p, 'dodge'); p.dodgeTo = null; sfx('whoosh');
@@ -2018,7 +2144,11 @@
     e.blocking = false;
     btSlash(p, e, null, mult > 1);
     if (!DG.state.settings.tapHintDone) { DG.state.settings.tapHintDone = true; DG.save(); const h = stageEl.querySelector('#a-taphint'); if (h) h.classList.add('gone'); } // onboarding done after the first hit
-    if (res === 'hit') btBurst(e, mult > 1 ? 'impact1' : 'impact2', mult > 1 ? 3 : 2.2, 0.35, 1.0);
+    if (res === 'hit') {
+      btBurst(e, mult > 1 ? 'impact1' : 'impact2', mult > 1 ? 3 : 2.2, 0.35, 1.0);
+      const before = p.special; p.special = Math.min(100, p.special + TAP.hitCharge * (p.chargeMul || 1));
+      if (before < 50 && p.special >= 50) { floatText(p, 'Special ready! ✨', '#ffe066', true); sfx('special'); }
+    }
     else if (res === 'blocked') sprite('shield', { at: at(e, 1.2), size: 2 * match.S, life: 0.45, z: 7, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
   }
 
@@ -2028,6 +2158,7 @@
     a.resolved = true; tapCueEl(null);
     if (p.state === 'ko' || match.over) return;
     const right = (a.color === 'blue' && a.choice === 'block') || (a.color === 'red' && a.choice === 'dodge');
+    e.special = Math.min(100, (e.special || 0) + (right ? TAP.eDefCharge : TAP.eHitCharge) * (tapTier() === 0 ? 0.6 : 1));
     if (right && a.color === 'blue') {
       p.blocking = true; p.blockT = Math.max(p.blockT || 0, 0.25); parry(p, e); match.stats.blocks++;
       btBadge(p, 'blockbadge'); p.shieldT = Math.max(p.shieldT || 0, 0.55); p.shieldHit = 0.3;
@@ -2078,7 +2209,12 @@
       Object.keys(f.tapCd || {}).forEach((k) => (f.tapCd[k] = Math.max(0, f.tapCd[k] - dt)));
     });
     if (e.style === 'mixed') { e.ai.mixT -= dt; if (e.ai.mixT <= 0) { e.ai.mixT = 7; e.ai.cur = pick(['charger', 'blocker', 'dodger']); } }
-    if (!match.over && p.state !== 'ko') p.special = Math.min(100, p.special + p.charge * dt);
+    if (e.spWarn) { // the rival is powering up a special
+      if (e.state === 'stun' || e.state === 'ko' || match.over) { e.spWarn = null; tapCueEl(null); }
+      else if ((e.spWarn.t += dt) >= TAP.spWarn) { const i = e.spWarn.i; e.spWarn = null; tapCueEl(null); setState(e, 'idle'); tapStartSpecial(e, p, i, 1); match.stats.rivalSpecials = (match.stats.rivalSpecials || 0) + 1; }
+    }
+    if (p.spGuard) { if (!e.spWarn && !(e.state === 'move' && e.mvMul)) p.spGuard = false; else p.shieldT = Math.max(p.shieldT || 0, 0.3); }
+    // (tap battles: no passive charging — your hits fill the meter)
 
     // --- your input (one per press) ---
     const k = E('KeyJ') ? 'attack' : E('KeyK') ? 'block' : E('Space') ? 'dodge' : E('KeyL') ? 'sp0' : E('KeyI') ? 'sp1' : null;
@@ -2149,7 +2285,11 @@
           const side = new THREE.Vector3(-dirTo(e, p).z, 0, dirTo(e, p).x).multiplyScalar(e.ai.side * 1.2 * S);
           const want = p.pos.clone().addScaledVector(dirTo(p, e), ready ? atkRange * 0.95 : keep).add(ready ? new THREE.Vector3() : side);
           walk1 = [want, e.speed * S * (ready ? 1.5 : 0.7) * (t === 0 ? 0.8 : 1)];
-          if (ready && d <= atkRange + 0.3 * S) tapEnemyStart(e, p);
+          if (ready && !e.spWarn && e.special >= 50 && e.tapMoves && e.tapMoves.length && d <= atkRange + 2.5 * S && p.state !== 'ko') { // a full meter: unleash a special
+            e.spWarn = { t: 0, i: Math.floor(Math.random() * e.tapMoves.length) }; walk1 = null;
+            tapCueEl({ color: 'special' }); sfx('charge'); floatText(e, '⚡ Special incoming!', '#d9b8ff', true);
+          } else if (ready && !e.spWarn && d <= atkRange + 0.3 * S) tapEnemyStart(e, p);
+          if (e.spWarn) walk1 = null; // stands still while powering up
           break;
         }
         case 'windup':
@@ -2165,6 +2305,12 @@
           if (e.stT >= (e.tap.rec || TAP.recover)) { e.tap.rec = 0; setState(e, 'idle'); e.tap.next = match.ft + tapEnemyGap(e); }
           break;
         case 'stun': if (e.stT >= e.stunDur) { setState(e, 'idle'); e.tap.next = match.ft + tapEnemyGap(e) * 0.6; } break;
+        case 'move': // the rival's special plays out, then it takes a breather
+          if (!e.mv || e.mv.update(dt)) {
+            e.mv = null; e.mvMul = null; e.spin = false; e.lockFacing = false; e.hopY = 0; e.mvPose = e.mvRot = e.mvSq = null; e.mvFace = 0; e.meteor = false; e.onFire = false;
+            setState(e, 'recover'); e.tap.rec = TAP.recover + 0.4; e.goal = e.pos.clone();
+          }
+          break;
         case 'dodge': {
           if (!e.dodgeTo) e.dodgeTo = e.pos.clone().add(new THREE.Vector3(-dirTo(e, p).z, 0, dirTo(e, p).x).multiplyScalar((e.tapSide || 1) * 1.8 * S));
           walk1 = [e.dodgeTo, 12 * S];
@@ -2265,11 +2411,11 @@
     const si = opts.net ? Math.max(pDef.stageIdx, oDef.stageIdx) : pDef.stageIdx;
     const S = STAGE_SCALE[si] || 1.2, R = ARENA_R[si] || 10.5;
     // tap controls are the default for single-player; friend battles keep the classic controls and protocol
-    const mode = opts.net ? 'classic' : (DG.state.settings.arenaControls === 'classic' ? 'classic' : 'tap');
+    const mode = opts.net ? 'classic' : 'tap'; // solo battles are always tap battles
     const Rt = mode === 'tap' ? 4.7 * S : R; // tap battles use a cosier painted ring
     if (mode === 'tap') {
       DG.seedMoves();
-      Object.assign(pDef, { canSpecial: true, canMove2: false, canUlt: false, tapMoves: DG.state.moves.equipped.slice(0, 2) }); // snapshot of the loadout
+      Object.assign(pDef, { canSpecial: true, canMove2: false, canUlt: false, tapMoves: DG.state.moves.equipped.slice(0, 2).filter(Boolean) }); // snapshot of the loadout (empty slots skipped)
     }
     tapQ = null;
     match = { mode, ft: 0, R: Rt, net: !!opts.net, stats: { maxCombo: 0, perfect: 0, parries: 0, smashes: 0, blocks: 0, dodges: 0, specials: 0 }, hitstop: 0, slow: 0, speedT: 0, practice, opp, S, si, time: MATCH_TIME, phase: 'intro', phaseT: 0, over: false, endT: 0, shake: 0, cheer: 0.6, paused: false, winner: null };
@@ -2305,6 +2451,7 @@
           <button class="tp blk" data-tap="block" aria-label="Block (K) — answers blue attacks"><img src="${btSrc('btn_block')}" alt=""><kbd>K</kbd></button>
           <button class="tp dge" data-tap="dodge" aria-label="Dodge (Space) — answers red attacks"><img src="${btSrc('btn_dodge')}" alt=""><kbd>Space</kbd></button>
           ${tapMv.map((x, i) => `<button class="tp sp" data-tap="sp${i}" data-id="${x.id}" aria-label="Special ${i + 1}: ${DG.ui.esc(x.name)}">${btOrb(x.id)}<span class="bt-pips"><i></i><i></i><i></i></span><b>${DG.ui.esc(x.name)}</b><kbd>${i ? 'I' : 'L'}</kbd></button>`).join('')}
+          ${tapMv.length < 2 ? '<div class="tp sp sp-empty" aria-label="Empty special slot: buy more abilities in Special Attacks"><span class="sp-plus" aria-hidden="true">＋</span><b>Buy more</b></div>' : ''}
         </nav>` : ''}
         <div class="a-touch" id="a-touch" ${DG.ui.isTouch() && mode !== 'tap' ? '' : 'hidden'}>
           <div class="joy-zone" id="a-joyzone">
@@ -2343,7 +2490,9 @@
         f.radius = ((an[7][2] - an[7][0]) / 2) * unit * 0.8;
         f.mesh.topY = ((875 - an[3]) * unit) / S;
       });
-      F[0].special = 50; // start with enough energy for a couple of dodges
+      F[0].special = 0; // the special meter starts empty and fills from your hits
+      F[0].chargeMul = Math.max(0.8, 0.85 + (F[0].charge - 4) / 10); // Focus training (and snack / cozy bonuses) make each hit charge more
+      F[1].special = 0; F[1].tapMoves = (DG.TAP_STARTERS[F[1].shape] || []).slice(); F[1].tapCd = {}; F[1].spWarn = null; // rivals have their species' specials too
       if (!F[1].isPlayer) F[1].tint2d = DG.draw.mix('#' + new THREE.Color(F[1].hex).getHexString(), '#ffffff', 0.3);
       // feet at the art pack's anchors: you at (0.32, 0.50), the rival at (0.75, 0.51) of the plate
       F[0].pos.set(((0.32 - PLATE.U0) / PLATE.AU) * Rt, 0, ((0.50 - PLATE.V0) / PLATE.AV) * Rt);

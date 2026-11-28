@@ -969,6 +969,39 @@
     const im = new Image(); im.decoding = 'async'; im.src = (window.DG_ASSETS && window.DG_ASSETS[`img/rm_${n}.webp`]) || `img/rm_${n}.webp?v=1`; SKYV[n] = im;
   });
   const vOk = (n) => SKYV[n] && SKYV[n].complete && SKYV[n].naturalWidth;
+  /* Glass masks (where you can see outside) so falling rain stays inside the panes. */
+  const GLASS = {};
+  if (typeof Image !== 'undefined') ['window', 'door'].forEach((n) => {
+    const im = new Image(); im.decoding = 'async'; im.src = (window.DG_ASSETS && window.DG_ASSETS[`img/rm_${n}_glass.webp`]) || `img/rm_${n}_glass.webp?v=1`; GLASS[n] = im;
+  });
+  const RAINCV = {};
+  /** Moving rain behind the glass: slanted streaks falling, plus a few drops sliding down the pane. */
+  function rainOnGlass(ctx, n, alpha) {
+    const gm = GLASS[n]; if (!gm || !gm.complete || !gm.naturalWidth || typeof document === 'undefined') return;
+    const k = 0.5, w = Math.round(gm.naturalWidth * k), h = Math.round(gm.naturalHeight * k);
+    const cv = RAINCV[n] || (RAINCV[n] = document.createElement('canvas'));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const c = cv.getContext('2d'), t = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+    c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, w, h);
+    c.strokeStyle = 'rgba(235,245,255,0.85)'; c.lineCap = 'round';
+    const N = n === 'door' ? 26 : 40;
+    for (let i = 0; i < N; i++) {
+      const fx = (i * 0.618034) % 1, sp = 1.1 + (i % 4) * 0.25, len = (10 + (i % 3) * 5) * (w / 290);
+      const y = ((((i * 0.37) % 1) + t * sp) % 1.15) * h * 1.1 - len, x = fx * w * 1.15 - (y / h) * w * 0.12;
+      c.lineWidth = (i % 3 === 0 ? 1.6 : 1.1) * (w / 290);
+      c.globalAlpha = 0.55 + (i % 3) * 0.15;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x - len * 0.2, y + len); c.stroke();
+    }
+    c.globalAlpha = 1; c.fillStyle = 'rgba(240,248,255,0.75)'; // drops sliding down the glass
+    for (let i = 0; i < 6; i++) {
+      const x = ((i * 0.381966 + 0.1) % 1) * w, y = ((i * 0.27 + t * (0.08 + (i % 3) * 0.03)) % 1) * h, r = (2 + (i % 2)) * (w / 290);
+      c.beginPath(); c.ellipse(x, y, r * 0.8, r * 1.2, 0, 0, Math.PI * 2); c.fill();
+      c.globalAlpha = 0.35; c.fillRect(x - r * 0.3, y - r * 5, r * 0.6, r * 4); c.globalAlpha = 1;
+    }
+    c.globalCompositeOperation = 'destination-in'; c.drawImage(gm, 0, 0, w, h); c.globalCompositeOperation = 'source-over';
+    const p = ROOM.pos[n], o = SPR[n];
+    ctx.save(); ctx.globalAlpha = Math.min(1, alpha); ctx.drawImage(cv, p[0], p[1], o.w, o.h); ctx.restore();
+  }
   /** Draws the door or window for the current light: day art, with rain and night versions faded on top. */
   function skyVariant(ctx, n) {
     sprAt(ctx, n);
@@ -978,6 +1011,7 @@
     if (rain > 0.01 && vOk(n + '_rain')) { ctx.globalAlpha = Math.min(1, rain); ctx.drawImage(SKYV[n + '_rain'], p[0], p[1], o.w, o.h); }
     if (night > 0.01 && vOk(n + '_night')) { ctx.globalAlpha = Math.min(1, night); ctx.drawImage(SKYV[n + '_night'], p[0], p[1], o.w, o.h); }
     ctx.restore();
+    if (L.rain > 0.01) rainOnGlass(ctx, n, L.rain); // the rain keeps falling, day or night
   }
 
   /** A cream part (curtains, door frame) recoloured toward the wall colour; cached per colour. */
