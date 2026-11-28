@@ -18,6 +18,12 @@
     atkWindup: 0.1, atkLunge: 0.12, atkRecover: 0.22, // your basic attack
     blockHold: 0.45, dodgeHold: 0.42, defCd: 0.5,     // your block / dodge
     hitStun: 0.32,     // how long you're stunned when an attack lands
+    atkGap: 0.3,       // minimum time between your basic attacks
+    dodgeCost: 25,     // energy (the yellow bar) a dodge uses
+    dodgeBack: 2.6,    // how far a dodge retreats (× size)
+    spamWindow: 3.0,   // attacks inside this many seconds count as mashing…
+    stumble: 2.0,      // …and a blocked attack leaves you stumbling (can't move or act) this long
+    pummel: 3, pummelGap: 0.5, pummelDmg: 0.5, // while you stumble the rival gets free hits: count, spacing, damage × base
     tapRadius: 64,     // minimum tap target radius in CSS px (bigger on small screens)
     redDmg: 1.3, guardBreakDmg: 1.5,
   };
@@ -52,14 +58,6 @@
           </header>
         </div>
         ${hasThree ? '' : '<p class="note warn">The 3D arena needs the three.js library, which loads from the internet. Please connect once and reload the page.</p>'}
-        <div class="ar-card ar-me">
-          ${useViking ? '<img class="ar-me-pic" src="img/ar_viking.webp?v=1" alt="">' : '<canvas id="a-prev" class="ar-me-pic"></canvas>'}
-          <div class="ar-me-txt">
-            <h3>${DG.ui.esc(p.name)} <span>${DG.STAGES[si].name}</span></h3>
-            ${p.foodBonus ? `<p>${DG.FOODS[p.foodBonus.food].icon} Snack bonus ready: <b>${p.foodBonus.label}</b><br><small>Used up after your next real battle.</small></p>` : '<p>Tip: eat Tofu Bites or a Noodle Nest before a battle for a one-time boost.</p>'}
-            ${DG.cozy() ? '<p>🏠 Cozy bonus active: +10% special charge.</p>' : ''}
-          </div>
-        </div>
         <div class="ar-section">
           <img class="ar-ribbon" src="img/ar_rib_opp.webp?v=1" alt="Opponents">
           ${si < 1 ? `<p class="ar-note">🌱 Arena battles unlock when ${DG.ui.esc(p.name)} reaches the <b>Small</b> stage${nx ? ` — in <b>${DG.fmtDuration(nx.msLeft)}</b>` : ''}. You can still battle a friend!</p>` : ''}
@@ -88,7 +86,7 @@
             <button class="ar-btn host" id="a-host" ${hasThree ? '' : 'disabled'}>⚔️ Host a Battle</button>
             <button class="ar-btn join" id="a-join" ${hasThree ? '' : 'disabled'}>🔑 Join with a Code</button>
           </div>
-          <p class="ar-fine">Friend battles always use the classic controls.</p>
+          <p class="ar-fine">Same Wi‑Fi only · just for fun · classic controls.</p>
         </div>
         <div class="ar-section ar-setup">
           <div class="ar-seg" role="radiogroup" aria-label="Arena controls">
@@ -114,9 +112,11 @@
     const eq = (DG.state.moves && DG.state.moves.equipped || []).map((id) => DG.MOVES[id].name).join(' and ');
     return `<ul class="nice-list small">
       <li>👆 <b>${DG.ui.isTouch() ? 'Tap' : 'Click'} your rival</b> to attack (or press <kbd>J</kbd>).</li>
-      <li>🔵 A <b>blue</b> glow with a shield and <b>BLOCK</b> means: press <b>Block</b> (<kbd>K</kbd>) before it lands.</li>
-      <li>🔴 A <b>red</b> glow with arrows and <b>DODGE</b> means: press <b>Dodge</b> (<kbd>Space</kbd>). Red attacks break through a block!</li>
+      <li>🔵 When your rival turns <b>blue</b> (<b>BLOCK</b>), press <b>Block</b> (<kbd>K</kbd>): a shield pops up around you.</li>
+      <li>🔴 When it turns <b>red</b> (<b>DODGE</b>), press <b>Dodge</b> (<kbd>Space</kbd>) to hop back out of reach. Dodging uses a big chunk of your yellow energy, and red attacks break through a block!</li>
       <li>✨ Answer correctly and you get a moment to <b>counter</b> for a critical hit. Pressing too early or the wrong button won't stop the attack.</li>
+      <li>😵 Don't just mash! Rivals read button-mashing and <b>block</b> — a blocked hit leaves you <b>stumbling</b> for a second or two.</li>
+      <li>✍️ To cast a special, <b>trace its rune</b>: time stops, follow the glowing line from the dot. Neater tracing hits harder; a miss keeps your charge.</li>
       <li>🌟 Your two specials${eq ? ` (<b>${eq}</b>)` : ''} use half of the charge meter (<kbd>L</kbd> / <kbd>I</kbd>). Change them under <b>✨ Specials</b>.</li>
     </ul>`;
   }
@@ -646,7 +646,10 @@
       ai: { holdT: 0, comboDecided: false, atkCd: 1.0, blockT: 0, side: Math.random() < 0.5 ? 1 : -1, sideT: 2, reacted: false, counter: false, dart: 0, postDodge: 0, mixT: 0, cur: 'charger' },
     });
   }
-  function setState(f, s) { f.state = s; f.stT = 0; }
+  function setState(f, s) {
+    if (f.state === 'move' && s !== 'move' && (f.mvPose || f.meteor || f.onFire || f.mvRot || f.mvSq)) { f.mvPose = f.mvRot = f.mvSq = null; f.mvFace = 0; f.meteor = f.onFire = false; f.hopY = 0; f.lockFacing = false; }
+    f.state = s; f.stT = 0;
+  }
   function facingVec(f) { return new THREE.Vector3(Math.sin(f.facing), 0, Math.cos(f.facing)); }
   function flatDist(a, b) { return Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z); }
   function dirTo(a, b) { const v = new THREE.Vector3(b.pos.x - a.pos.x, 0, b.pos.z - a.pos.z); return v.lengthSq() > 1e-6 ? v.normalize() : facingVec(a); }
@@ -699,7 +702,7 @@
   /** Dodging at the very last moment: slow motion and a critical counter. */
   function perfectDodge(f) {
     f.perfectUsed = true; f.crit = true;
-    if (f.canSpecial) f.special = Math.min(100, f.special + 15);
+    if (f.canSpecial && !(match && match.mode === 'tap')) f.special = Math.min(100, f.special + 15);
     floatText(f, 'PERFECT DODGE!', '#9fe8ff', true); sfx('perfect');
     if (f.isPlayer) { match.slow = 0.6; speedLines(0.6); match.stats.perfect++; }
   }
@@ -1178,20 +1181,6 @@
         sprite('e-ice-burst', { at: at(o, H(o)), delay: 0.7, size: 6 * S, life: 0.85, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.65) }) });
         sprite('e-lightning-strike', { at: at(o, H(o) + 1), delay: 0.78, size: 4.6 * S, life: 0.35, z: 9, anim: (k) => ({ o: k < 0.55 ? 1 : 0 }) });
         break;
-      case 'steampuff':
-        sprite('e-steam-burst', { at: at(f, H(f)), delay: 0.26, size: 6.5 * S, life: 0.8, z: 6, anim: (k) => ({ s: 0.4 + ease.out(k) * 0.9, y: k * 0.8 * S, o: fade(k, 0.55) }) });
-        break;
-      case 'bunslam':
-        sprite('e-ground-shockwave', { at: at(o, 0.3), delay: 0.62, size: 7 * S, life: 0.7, z: 2, anim: (k) => ({ s: 0.3 + ease.out(k) * 1.1, o: fade(k, 0.4) }) });
-        sprite('e-dust-burst', { at: at(o, 0.6), delay: 0.62, size: 5 * S, life: 0.6, z: 7, anim: (k) => ({ s: 0.6 + k * 0.6, o: fade(k, 0.4) }) });
-        break;
-      case 'crispydash':
-        sprite('e-gold-sparks', { at: atO, delay: 0.42, size: 4.6 * S, life: 0.5, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
-        sprite('e-dodge-trail', { at: at0, delay: 0.18, size: 5 * S, life: 0.4, z: 4, flip: o.pos.x < f.pos.x, anim: (k) => ({ o: fade(k, 0.3) }) });
-        break;
-      case 'pleatflurry':
-        [0, 1, 2].forEach((i) => sprite('e-attack-slash', { at: atO, delay: 0.1 + i * 0.15, size: 4.4 * S, life: 0.3, z: 7, flip: i % 2 === 1, anim: (k) => ({ s: 0.7 + k * 0.5, r: (i % 2 ? 1 : -1) * (0.4 - k * 0.8), o: fade(k, 0.4) }) }));
-        break;
       case 'brothbubble':
         sprite('e-broth-splash', { at: at(f, H(f)), delay: 0.55, size: 6 * S, life: 0.7, z: 8, anim: (k) => ({ s: 0.5 + ease.out(k) * 0.9, o: fade(k, 0.5) }) });
         break;
@@ -1200,30 +1189,6 @@
         break;
     }
     switch (id) {
-      case 'steampuff':
-        sprite('halo', { at: at0, size: 3.2 * S, life: 0.35, z: 2, anim: (k) => ({ s: 0.5 + k, o: k }) });
-        for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU; sprite(i % 2 ? 'cloud1' : 'cloud2', { at: at(f, 0.6), delay: 0.28, size: 2.2 * S, life: 0.9, z: 4,
-          anim: (k) => ({ x: Math.sin(a) * 3.4 * ease.out(k) * S, z: Math.cos(a) * 1.6 * ease.out(k) * S, y: k * 1.2 * S, s: 0.4 + ease.out(k) * 0.9, r: a + k, o: fade(k, 0.5) }) }); }
-        sprite('goldring', { at: at(f, 0.1), delay: 0.28, size: 3 * S, life: 0.6, z: 1, anim: (k) => ({ s: 0.4 + ease.out(k) * 2.2, o: fade(k, 0.3) }) });
-        break;
-      case 'bunslam':
-        sprite('sparkle', { at: at0, size: 1.4 * S, life: 0.55, z: 6, anim: (k) => ({ y: 2.5 * S * Math.sin(Math.PI * k), r: k * 6, o: 1 - k * 0.5 }) });
-        sprite('impact1', { at: atO, delay: 0.62, size: 4.4 * S, life: 0.45, z: 7, anim: (k) => ({ s: ease.pop(k), r: k, o: fade(k, 0.5) }) });
-        sprite('goldflat', { at: at(o, 0.1), delay: 0.62, size: 5 * S, life: 0.7, z: 1, anim: (k) => ({ s: 0.3 + ease.out(k) * 1.6, o: fade(k, 0.3) }) });
-        sprite('goldburst', { at: at(o, 0.6), delay: 0.62, size: 3.2 * S, life: 0.5, z: 3, anim: (k) => ({ s: 0.6 + k * 0.6, o: fade(k, 0.3) }) });
-        setTimeoutFight(0.62, () => btPuffs(o, 8, 3.2));
-        break;
-      case 'crispydash':
-        for (let i = 0; i < 9; i++) sprite('fireburst', { at: (() => { let p = null; return () => (p = p || at(f, 0.6)); })(), delay: 0.18 + i * 0.045, size: 2.2 * S, life: 0.45, z: 3, anim: (k) => ({ s: 1 - k * 0.6, y: k * 0.6 * S, o: fade(k, 0.2) }) });
-        sprite('slash2', { at: atO, delay: 0.42, size: 4.6 * S, life: 0.35, z: 7, anim: (k) => ({ s: 0.7 + k * 0.6, r: -0.3 + k * 0.6, o: fade(k, 0.4) }) });
-        sprite('impact2', { at: atO, delay: 0.45, size: 3.2 * S, life: 0.4, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
-        break;
-      case 'pleatflurry':
-        ['slash1', 'slash4', 'slash2'].forEach((n, i) => {
-          sprite(n, { at: atO, delay: 0.12 + i * 0.15, size: 4 * S, life: 0.3, z: 7, flip: i % 2 === 1, anim: (k) => ({ s: 0.7 + k * 0.5, r: (i % 2 ? 1 : -1) * (0.4 - k * 0.8), o: fade(k, 0.4) }) });
-          sprite('impact2', { at: atO, delay: 0.14 + i * 0.15, size: 2.2 * S, life: 0.3, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
-        });
-        break;
       case 'brothbubble':
         sprite('ring_b1', { at: at0, size: 4.4 * S, life: 0.6, z: 6, anim: (k) => ({ s: 0.6 + ease.out(Math.min(1, k * 2)) * 0.45 + Math.sin(k * 20) * 0.02, r: k * 2, o: 0.9 }) });
         sprite('ring_b2', { at: at0, delay: 0.55, size: 4.6 * S, life: 0.5, z: 6, anim: (k) => ({ s: 1 + ease.out(k) * 1.4, r: k, o: fade(k, 0.2) }) });
@@ -1293,7 +1258,7 @@
     hud.querySelector('.me .en i').style.width = p.special + '%';
     hud.querySelector('.them .en i').style.width = (e.state === 'windup' ? Math.min(100, (e.stT / e.windup) * 100) : 0) + '%';
     const ready = [0, 1].some((i) => tapSpecialState(p, i).ready);
-    const r = hud.querySelector('#bt-ready1'); r.textContent = ready ? 'SPECIAL READY ✦' : 'Charging…'; r.classList.toggle('on', ready);
+    const r = hud.querySelector('#bt-ready1'); r.textContent = ready ? 'SPECIAL READY ✦' : p.special < TAP.dodgeCost ? 'Low energy' : 'Charging…'; r.classList.toggle('on', ready); r.classList.toggle('low', !ready && p.special < TAP.dodgeCost);
     hud.querySelector('#bt-time').textContent = Math.ceil(match.time);
   }
   /** A special's button: a glossy orb in the move's colour with its picture, and three charge pips. */
@@ -1319,7 +1284,7 @@
     viking: ['hat', 1.0, 0.6, [64, 215, 960, 809]], cap: ['hat', 0.95, 0.58, [64, 198, 960, 826]], tinyhat: ['hat', 0.78, 0.3, [64, 149, 960, 874]],
     chef: ['hat', 0.68, 0.36, [64, 171, 960, 852]], party: ['hat', 0.42, 0.22, [142, 64, 882, 960]], crown: ['hat', 0.6, 0.28, [64, 190, 960, 834]],
     beret: ['hat', 0.85, 0.42, [64, 203, 960, 821]], bow: ['hat', 0.55, 0.22, [64, 203, 960, 820]], flower: ['hat', 0.86, 0.36, [64, 276, 960, 748]],
-    headband: ['hat', 1.0, 0.48, [64, 216, 960, 808]], ninja: ['band', 1.04, 0.6, [64, 252, 960, 772]], headphones: ['band', 1.16, 0.5, [64, 145, 960, 879]],
+    headband: ['hat', 1.0, 0.48, [64, 216, 960, 808]], ninja: ['band', 1.04, 0.6, [64, 252, 960, 772]], headphones: ['band', 0.92, 0.08, [64, 145, 960, 879]],
     shades: ['eyes', 1.75, 0, [64, 338, 960, 686]], glasses: ['eyes', 1.8, 0, [64, 315, 960, 708]],
     mustache: ['stache', 1.3, 0, [64, 349, 960, 674]], bowtie: ['chest', 1.05, 0, [64, 256, 960, 767]],
   };
@@ -1376,7 +1341,7 @@
     if (f.state === 'windup' || f.state === 'charge') return 'wind-up';
     if (f.state === 'attack') return 'attack';
     if (f.state === 'recover') return f.stT < 0.14 ? 'attack' : 'idle';
-    if (f.state === 'move') return f.mv && f.mv.t() < 0.2 ? 'wind-up' : 'attack';
+    if (f.state === 'move') return f.mvPose || (f.mv && f.mv.t() < 0.2 ? 'wind-up' : 'attack');
     if (f.flash > 0.08) return 'hurt';
     return 'idle';
   }
@@ -1442,13 +1407,15 @@
       const bot = V.py + V.ph;
       if (bot < V.h) { ctx.save(); ctx.translate(0, bot); ctx.scale(1, -1); const hh = V.h - bot; ctx.drawImage(plate, 0, PLATE.H * (1 - hh / V.ph), PLATE.W, PLATE.H * (hh / V.ph), V.px, -hh, V.pw, hh); ctx.restore(); }
       ctx.drawImage(plate, V.px, V.py, V.pw, V.ph);
+      try { colCrowd(ctx, plate, V); } catch (err) { /* decoration only: never let it break the arena */ }
     }
     const e = F[1], a = e && e.tap && e.tap.atk, warn = a && !a.resolved && e.state === 'windup';
     // fighters, back to front
     const order = F.slice().sort((p, q) => p.pos.z - q.pos.z);
     order.forEach((f) => {
       const o = f === F[0] ? F[1] : F[0], p = pj(f.pos), D = fighterPx(f, p.ds);
-      if (Math.abs(o.pos.x - f.pos.x) > 0.15 * match.S) f.mirror2d = o.pos.x < f.pos.x; // face the rival
+      if (f.state === 'move' && f.mvFace) f.mirror2d = f.mvFace < 0; // a special steers which way you face
+      else if (Math.abs(o.pos.x - f.pos.x) > 0.15 * match.S) f.mirror2d = o.pos.x < f.pos.x; // face the rival
       const pose = poseOf(f);
       // soft contact shadow
       const lift = Math.max(0, f.hopY) * p.ppu;
@@ -1459,7 +1426,21 @@
       let sxk = 1, syk = 1, rot = 0, dx = 0;
       if (pose === 'idle') { const b = Math.sin(T * 4 + (f.isPlayer ? 0 : 1.7)); syk = 1 + b * 0.025; sxk = 1 - b * 0.015; }
       if (pose === 'wind-up') { dx = Math.sin(T * 60) * 1.5; syk = 0.97; }
-      if (pose === 'hurt') rot = (f.mirror2d ? 1 : -1) * 0.05;
+      if (pose === 'hurt') rot = f.stumbling ? Math.sin(T * 9) * 0.12 : (f.mirror2d ? 1 : -1) * 0.05;
+      if (f.state === 'move') { if (f.mvRot) rot = f.mvRot * (f.mirror2d ? -1 : 1); if (f.mvSq) { syk = f.mvSq; sxk = 1 + (1 - f.mvSq) * 0.6; } }
+      if (f.meteor) { // a blazing comet tail streaming up behind the falling bun
+        const mx = p.x, my = p.y - lift - D * 0.3, len = D * 2.2, fl = Math.sin(T * 40) * D * 0.03;
+        ctx.save();
+        const layer = (w, l, c0, c1, c2) => {
+          const g = ctx.createLinearGradient(mx, my - l, mx, my); g.addColorStop(0, c0); g.addColorStop(0.55, c1); g.addColorStop(1, c2);
+          ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(mx - w * 0.15 + fl, my - l); ctx.quadraticCurveTo(mx - w * 0.6, my - l * 0.35, mx - w, my);
+          ctx.arc(mx, my, w, Math.PI, 0, true); ctx.quadraticCurveTo(mx + w * 0.6, my - l * 0.35, mx + w * 0.15 - fl, my - l); ctx.closePath(); ctx.fill();
+        };
+        layer(D * 0.5, len, 'rgba(200,40,10,0)', 'rgba(230,70,20,0.75)', 'rgba(255,110,30,0.95)');
+        layer(D * 0.36, len * 0.8, 'rgba(255,120,30,0)', 'rgba(255,160,40,0.85)', 'rgba(255,200,80,1)');
+        layer(D * 0.2, len * 0.55, 'rgba(255,230,140,0)', 'rgba(255,240,170,0.9)', 'rgba(255,255,230,1)');
+        ctx.restore();
+      }
       if (f.state === 'dodge' && colOk(colImg('e-dodge-trail'))) { // speed trail behind the sidestep
         ctx.save(); ctx.globalAlpha = Math.max(0, 1 - f.stT / 0.4) * 0.85; ctx.translate(p.x, p.y - lift - D * 0.22); ctx.scale(f.mirror2d ? -1 : 1, 1);
         ctx.drawImage(colImg('e-dodge-trail'), -D * 0.95, -D * 0.25, D * 0.7, D * 0.5); ctx.restore();
@@ -1471,9 +1452,16 @@
         ag.addColorStop(0, `rgba(${c0},${0.7 * pul})`); ag.addColorStop(0.55, `rgba(${c0},${0.5 * pul})`); ag.addColorStop(1, `rgba(${c0},0)`);
         ctx.save(); ctx.fillStyle = ag; ctx.beginPath(); ctx.ellipse(cx0, cy0, rr, rr * 0.85, 0, 0, TAU); ctx.fill(); ctx.restore();
       }
-      const glow = f === e && warn ? (a.color === 'blue' ? `rgba(70,150,255,${0.75 + 0.25 * Math.sin(T * 20)})` : `rgba(255,60,50,${0.75 + 0.25 * Math.sin(T * 20)})`) : null;
-      drawDumpling2D(ctx, p.x + dx, p.y - lift, { species: f.shape, pose, size: D, mirror: f.mirror2d, tint: bodyTint(f), acc: f.accessory, glow, flash: f.flash, sx: sxk, sy: syk, rot,
+      const glow = f.meteor ? 'rgba(255,120,30,0.95)' : f.onFire ? `rgba(255,${90 + 40 * Math.sin(T * 30) | 0},20,0.95)` : f === e && warn ? (a.color === 'blue' ? `rgba(70,150,255,${0.75 + 0.25 * Math.sin(T * 20)})` : `rgba(255,60,50,${0.75 + 0.25 * Math.sin(T * 20)})`) : null;
+      const warnTint = f === e && warn ? (a.color === 'blue' ? '#5f9dff' : '#ff6a5a') : null; // the rival turns blue or red
+      drawDumpling2D(ctx, p.x + dx, p.y - lift, { species: f.shape, pose, size: D, mirror: f.mirror2d, tint: warnTint || bodyTint(f), acc: f.accessory, glow, flash: f.flash, sx: sxk, sy: syk, rot,
         alpha: f.state === 'ko' && f.stT > 2.4 ? Math.max(0.4, 1 - (f.stT - 2.4)) : 1 });
+      if (f.stumbling && f.state === 'stun') { // dazed: little birds flap in circles around the head
+        const hy = p.y - lift - D * ((875 - ANCH[f.shape].idle[3]) / 1024) - D * 0.02;
+        const birds = [];
+        for (let i = 0; i < 3; i++) { const ang = T * 4.2 + (i * TAU) / 3; birds.push({ ang, x: p.x + Math.cos(ang) * D * 0.24, y: hy + Math.sin(ang) * D * 0.06 }); }
+        birds.sort((a1, b1) => Math.sin(a1.ang) - Math.sin(b1.ang)).forEach((b1, i) => drawBird(ctx, b1.x, b1.y, D * 0.038 * (0.85 + 0.15 * Math.sin(b1.ang)), -Math.sin(b1.ang) < 0, T * 18 + i));
+      }
       // gold slash sweeping around your attack
       if ((f.state === 'attack' || (f.state === 'recover' && f.stT < 0.16)) && colOk(colImg('e-attack-slash'))) {
         const kk = f.state === 'attack' ? 0.35 + f.stT * 3 : 0.75 + f.stT * 2;
@@ -1481,10 +1469,15 @@
         ctx.translate(p.x, p.y - lift - D * 0.3); ctx.scale(f.mirror2d ? -1 : 1, 1); ctx.rotate(-0.35 + kk * 0.5);
         ctx.drawImage(colImg('e-attack-slash'), -D * 0.62, -D * 0.5, D * 1.24, D * 1.0); ctx.restore();
       }
-      // blue telegraph: a shield bubble around the rival
-      if (f === e && warn && a.color === 'blue' && colOk(colImg('e-shield-bubble'))) {
-        const kk = Math.min(1, e.stT / e.windup), s = D * (0.95 + 0.04 * Math.sin(T * 9)) * (0.85 + 0.15 * Math.min(1, kk * 3));
-        ctx.save(); ctx.globalAlpha = 0.85; ctx.drawImage(colImg('e-shield-bubble'), p.x - s / 2, p.y - lift - D * 0.36 - s / 2, s, s); ctx.restore();
+      // Block: a shield bubble pops up around YOU, with the shield held toward the rival
+      if (f === F[0] && (f.shieldT || 0) > 0 && colOk(colImg('e-shield-bubble'))) {
+        f.shieldT -= dt; f.shieldHit = Math.max(0, (f.shieldHit || 0) - dt);
+        const kk = Math.min(1, (TAP.blockHold + 0.15 - f.shieldT) / 0.12), fadeK = Math.min(1, f.shieldT / 0.15);
+        const s = D * 1.02 * (0.7 + 0.3 * ease.pop(kk)) * (1 + f.shieldHit * 0.25), cy0 = p.y - lift - D * 0.32;
+        ctx.save(); ctx.globalAlpha = 0.9 * fadeK; ctx.drawImage(colImg('e-shield-bubble'), p.x - s / 2, cy0 - s / 2, s, s);
+        const sh = colImg('e-block-shield');
+        if (colOk(sh)) { const ss = D * 0.42, sx0 = p.x + (f.mirror2d ? -1 : 1) * D * 0.34; ctx.drawImage(sh, sx0 - ss / 2, cy0 - ss / 2, ss, ss); }
+        ctx.restore();
       }
       if (f.bubble > 0 && colOk(colImg('e-shield-bubble'))) { // Broth Bubble
         const s = D * (1.0 + 0.04 * Math.sin(T * 9));
@@ -1492,6 +1485,48 @@
       }
     });
   }
+  /** A little cartoon bird (for the dazed effect). dir: true = flying right. */
+  function drawBird(ctx, x, y, r, dir, flap) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(dir ? 1 : -1, 1); ctx.lineJoin = 'round';
+    ctx.fillStyle = '#ffd84a'; ctx.strokeStyle = '#8a5a10'; ctx.lineWidth = Math.max(1, r * 0.18);
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 1.15, r, 0, 0, TAU); ctx.fill(); ctx.stroke(); // body
+    ctx.beginPath(); ctx.arc(r * 0.95, -r * 0.55, r * 0.62, 0, TAU); ctx.fill(); ctx.stroke(); // head
+    ctx.fillStyle = '#ff8a2a'; ctx.beginPath(); ctx.moveTo(r * 1.5, -r * 0.6); ctx.lineTo(r * 2.05, -r * 0.42); ctx.lineTo(r * 1.5, -r * 0.3); ctx.closePath(); ctx.fill(); // beak
+    ctx.fillStyle = '#3a2410'; ctx.beginPath(); ctx.arc(r * 1.1, -r * 0.68, r * 0.12, 0, TAU); ctx.fill(); // eye
+    const w = Math.sin(flap) * 0.9; // flapping wing
+    ctx.fillStyle = '#ffe98a'; ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.1); ctx.quadraticCurveTo(-r * 0.9, -r * (0.6 + w), -r * 1.4, -r * (0.2 + w * 1.1)); ctx.quadraticCurveTo(-r * 0.7, r * 0.2, -r * 0.2, -r * 0.1); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  /** The painted crowd bounces: thin vertical strips of the stands hop up and down in waves, more when they cheer. */
+  function colCrowd(ctx, plate, V) {
+    // The painted crowd stays sharp; the stands come alive with camera flashes, and confetti rains after big moments.
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cheerK = Math.min(1.5, match.cheer || 0), top = V.py + V.ph * 0.05, bot = V.py + V.ph * 0.2;
+    const n = 4 + Math.round(cheerK * 5);
+    for (let i = 0; i < n; i++) { // brief star-shaped flashes popping across the stands
+      const cyc = 1.3 + (i % 4) * 0.37, ph = ((((T + i * 0.53) % cyc) + cyc) % cyc) / cyc;
+      if (ph > 0.22) continue;
+      const seed = Math.floor((T + i * 0.53) / cyc) * 31 + i * 17;
+      const x = V.px + (((Math.sin(seed * 12.9898) * 43758.5453) % 1 + 1) % 1) * V.pw, y = top + (((Math.sin(seed * 78.233) * 12543.21) % 1 + 1) % 1) * (bot - top);
+      const k = Math.max(0, Math.sin((ph / 0.22) * Math.PI)); if (k <= 0.01) continue;
+      ctx.save(); ctx.globalAlpha = k; ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 14 * k + 2); g.addColorStop(0, 'rgba(255,255,240,0.95)'); g.addColorStop(1, 'rgba(255,240,200,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 14 * k + 2, 0, TAU); ctx.fill();
+      DG.draw.sparkle(ctx, x, y, 6 * k + 1, '#ffffff'); ctx.restore();
+    }
+    // confetti
+    if (!match.confetti) match.confetti = [];
+    const cf = match.confetti;
+    if (cheerK > 1 && cf.length < 70 && Math.random() < 0.5) for (let i = 0; i < 4; i++) cf.push({ x: V.px + Math.random() * V.pw, y: V.py + V.ph * 0.02, vx: rand(-20, 20), vy: rand(40, 90), r: Math.random() * TAU, vr: rand(-6, 6), c: pick(['#ff7a9a', '#ffd84a', '#7fd0ff', '#9fe08a', '#c49bff']), life: 3 });
+    const dtc = 1 / 60;
+    for (let i = cf.length - 1; i >= 0; i--) {
+      const q = cf[i]; q.x += (q.vx + Math.sin(T * 3 + i) * 25) * dtc; q.y += q.vy * dtc; q.r += q.vr * dtc; q.life -= dtc;
+      if (q.life <= 0 || q.y > V.py + V.ph * 0.6) { cf.splice(i, 1); continue; }
+      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.r); ctx.scale(1, Math.abs(Math.cos(q.r * 1.3)) * 0.8 + 0.2);
+      ctx.fillStyle = q.c; ctx.fillRect(-3.5, -2, 7, 4); ctx.restore();
+    }
+  }
+
   /** Portrait for the HUD: the player's species with their Closet colour and accessory. */
   function drawFace2D(cv, f) {
     const draw = () => {
@@ -1512,6 +1547,288 @@
     defs.forEach((d) => { POSES.forEach((p) => colImg(`f-${d.shape}-${p}`)); if (d.accessory && ACC[d.accessory]) colImg('a-' + d.accessory); });
   }
 
+  /* ===================== Signature special animations (tap battles) ===================== */
+  const smooth = (k) => k * k * (3 - 2 * k);
+  /** Steam Puff: zoom a full lap around the edge of the ring trailing steam, then rocket into the rival. */
+  function tapSteamPuff(f, o) {
+    const S = match.S, rr = match.R - f.radius * 1.05, start = f.pos.clone();
+    const a0 = Math.atan2(f.pos.x, f.pos.z), dir = f.pos.x < o.pos.x ? -1 : 1; // circle away from the rival first
+    let t = 0, hit = false, puffT = 0, edge = null, from = null;
+    f.lockFacing = true;
+    return { update(dt) {
+      t += dt; f.vel.set(0, 0, 0);
+      const ring = (a) => new THREE.Vector3(Math.sin(a) * rr, 0, Math.cos(a) * rr);
+      if (t < 0.22) { f.mvPose = 'wind-up'; f.mvSq = 0.9; f.mvRot = 0; } // crouch and puff up
+      else if (t < 1.5) { // the lap
+        f.mvPose = 'attack'; f.mvSq = 1;
+        const k = (t - 0.22) / 1.28, a = a0 + dir * smooth(k) * TAU;
+        const p0 = ring(a); if (!edge) edge = start.clone();
+        f.pos.copy(k < 0.12 ? edge.clone().lerp(p0, k / 0.12) : p0);
+        const ahead = ring(a + dir * 0.2); f.mvFace = ahead.x >= f.pos.x ? 1 : -1;
+        f.hopY = (0.35 + 0.15 * Math.sin(t * 18)) * S; f.mvRot = 0.18;
+        puffT -= dt;
+        if (puffT <= 0) { // steam trail
+          puffT = 0.05; const here = f.pos.clone();
+          sprite(Math.random() < 0.5 ? 'e-steam-burst' : 'cloud1', { at: new THREE.Vector3(here.x, 0.6 * S, here.z), size: rand(1.6, 2.4) * S, life: 0.7, z: 2,
+            anim: (q) => ({ y: q * 1.1 * S, s: 0.5 + q * 0.7, r: q, o: fade(q, 0.2) * 0.85 }) });
+        }
+      } else if (t < 1.78) { // whack!
+        if (!from) { from = f.pos.clone(); sfx('whoosh'); speedLines(0.35); }
+        const k = Math.min(1, (t - 1.5) / 0.2), back = new THREE.Vector3(from.x - o.pos.x, 0, from.z - o.pos.z); if (back.lengthSq() < 1e-6) back.set(-1, 0, 0); back.normalize();
+        const tgt = o.pos.clone().addScaledVector(back, f.radius + o.radius * 0.6);
+        f.pos.copy(from.clone().lerp(tgt, smooth(k))); f.mvFace = tgt.x >= from.x ? 1 : -1; f.mvRot = 0.35; f.hopY = 0.2 * S;
+        if (!hit && k >= 1) {
+          hit = true; f.hopY = 0;
+          applyHit(f, o, f.dmg * 1.1, { kb: 8, stun: 0.6, blockCost: 10, aoe: true, noParry: true, heavy: true });
+          sprite('e-steam-burst', { at: at(o, o.mesh.topY * 0.45), size: 7 * S, life: 0.8, z: 8, anim: (q) => ({ s: 0.4 + ease.out(q) * 0.9, y: q * 0.8 * S, o: fade(q, 0.55) }) });
+          sprite('e-hit-spark', { at: at(o, o.mesh.topY * 0.5), size: 3.4 * S, life: 0.4, z: 9, anim: (q) => ({ s: ease.pop(q), r: q, o: fade(q, 0.5) }) });
+          match.shake = Math.max(match.shake, 0.3); cheer(1.2);
+        }
+      } else { f.mvRot = 0; f.mvFace = 0; f.mvPose = 'idle'; f.hopY = 0; if (t >= 1.95) { f.lockFacing = false; return true; } }
+      return false;
+    }, t: () => t };
+  }
+  /** Bun Slam: shoot up off the top of the screen, line up over the rival (its shadow grows), then crash down like a meteor. */
+  function tapBunSlam(f, o) {
+    const S = match.S, top = 16 * S;
+    let t = 0, landed = false, launched = false, trailT = 0, target = null;
+    f.lockFacing = true;
+    return { update(dt) {
+      t += dt; f.vel.set(0, 0, 0);
+      if (t < 0.28) { f.mvPose = 'wind-up'; f.mvSq = 0.82 + 0.1 * Math.sin(t * 60); f.mvRot = 0; f.hopY = 0; } // deep crouch
+      else if (t < 0.72) { // blast off
+        if (!launched) {
+          launched = true; sfx('jump'); f.mvSq = 1;
+          sprite('e-dust-burst', { at: at(f, 0.3), size: 4 * S, life: 0.6, z: 3, anim: (q) => ({ s: 0.5 + q * 0.8, o: fade(q, 0.3) }) });
+          sprite('goldring', { at: at(f, 0.1), size: 3 * S, life: 0.5, z: 1, anim: (q) => ({ s: 0.4 + ease.out(q) * 1.6, o: fade(q, 0.3) }) });
+        }
+        const k = (t - 0.28) / 0.44; f.hopY = top * k * k; f.mvPose = 'dodge'; f.mvRot = -0.25; f.mvSq = 1.15;
+      } else if (t < 1.12) { // up out of sight, gliding over the rival
+        f.hopY = top;
+        target = o.pos.clone().addScaledVector(dirTo(o, f), 0.15 * S);
+        f.pos.lerp(target, Math.min(1, dt * 9));
+        if (Math.random() < 0.5) sprite('sparkle', { at: new THREE.Vector3(target.x, 0.05, target.z), size: 1.2 * S, life: 0.3, z: 1, anim: (q) => ({ s: 1 - q, o: 1 - q }) });
+      } else if (t < 1.36) { // meteor!
+        const k = (t - 1.12) / 0.24; f.hopY = top * (1 - k * k); f.mvPose = 'attack'; f.mvRot = 1.15; f.mvSq = 1.1; f.meteor = true;
+        f.mvFace = o.pos.x >= f.pos.x ? 1 : -1;
+        trailT -= dt;
+        if (trailT <= 0) {
+          trailT = 0.025;
+          sprite(Math.random() < 0.5 ? 'fireburst' : 'e-gold-sparks', { at: new THREE.Vector3(f.pos.x + rand(-0.3, 0.3) * S, f.hopY + 1.2 * S, f.pos.z), size: rand(2, 3) * S, life: 0.45, z: 5,
+            anim: (q) => ({ s: 1 - q * 0.5, y: q * 0.8 * S, o: fade(q, 0.2) }) });
+        }
+        if (k > 0.5 && Math.random() < 0.6) sfx('whoosh');
+      } else if (!landed) {
+        landed = true; f.hopY = 0; f.meteor = false; f.mvPose = 'block'; f.mvRot = 0; f.mvSq = 0.8;
+        // land just beside the rival so the two don't overlap
+        f.pos.copy(o.pos.clone().addScaledVector(dirTo(o, f), (f.radius + o.radius) * 0.75));
+        sfx('thud'); sfx('special'); match.shake = 0.6 * S; flashScreen(); cheer(1.5);
+        sprite('e-ground-shockwave', { at: at(o, 0.3), size: 9 * S, life: 0.8, z: 2, anim: (q) => ({ s: 0.3 + ease.out(q) * 1.2, o: fade(q, 0.4) }) });
+        sprite('e-dust-burst', { at: at(o, 0.6), size: 6 * S, life: 0.7, z: 7, anim: (q) => ({ s: 0.6 + q * 0.7, o: fade(q, 0.4) }) });
+        sprite('impact1', { at: at(o, 1.2), size: 5 * S, life: 0.45, z: 9, anim: (q) => ({ s: ease.pop(q), r: q, o: fade(q, 0.5) }) });
+        btPuffs(o, 8, 3.2);
+        if (flatDist(f, o) < (f.radius + o.radius) * 1.6) applyHit(f, o, f.dmg * 1.4, { kb: 6, stun: 0.7, aoe: true, noParry: true, heavy: true });
+      } else {
+        f.mvSq = 0.8 + Math.min(0.2, (t - 1.36) * 1.2); f.mvPose = t < 1.55 ? 'block' : 'idle';
+        if (t >= 1.75) { f.mvRot = 0; f.mvSq = 1; f.mvFace = 0; f.lockFacing = false; return true; }
+      }
+      return false;
+    }, t: () => t };
+  }
+
+  /** Crispy Dash: race laps of the ring, getting faster and hotter until you burst into flames, then hurtle into the rival. */
+  function tapCrispyDash(f, o) {
+    const S = match.S, rr = match.R - f.radius * 1.05, start = f.pos.clone();
+    const a0 = Math.atan2(f.pos.x, f.pos.z), dir = f.pos.x < o.pos.x ? -1 : 1, LAP = 1.7;
+    let t = 0, hit = false, trailT = 0, from = null, lit = false;
+    f.lockFacing = true;
+    const ring = (a) => new THREE.Vector3(Math.sin(a) * rr, 0, Math.cos(a) * rr);
+    return { update(dt) {
+      t += dt; f.vel.set(0, 0, 0);
+      if (t < 0.2) { f.mvPose = 'wind-up'; f.mvSq = 0.88; }
+      else if (t < 0.2 + LAP) { // the run: ~1.4 laps, speeding up (k²)
+        const k = (t - 0.2) / LAP, a = a0 + dir * k * k * TAU * 1.4, p0 = ring(a);
+        f.mvPose = 'attack'; f.mvSq = 1; f.pos.copy(k < 0.1 ? start.clone().lerp(p0, k / 0.1) : p0);
+        f.mvFace = ring(a + dir * 0.2).x >= f.pos.x ? 1 : -1; f.mvRot = 0.12 + k * 0.2;
+        f.hopY = Math.abs(Math.sin(t * 22)) * 0.25 * S; // little running bounces
+        if (!lit && k > 0.55) { lit = true; f.onFire = true; sfx('special'); floatText(f, '🔥', '#ff9a3a'); }
+        trailT -= dt;
+        if (trailT <= 0) {
+          trailT = lit ? 0.03 : 0.06; const here = f.pos.clone();
+          const name = lit ? (Math.random() < 0.6 ? 'fireburst' : 'e-gold-sparks') : (k > 0.3 ? 'cloud1' : 'e-dust-burst');
+          sprite(name, { at: new THREE.Vector3(here.x, (lit ? 0.7 : 0.3) * S, here.z), size: (lit ? rand(1.8, 2.6) : rand(1, 1.6)) * S, life: lit ? 0.5 : 0.45, z: 2,
+            anim: (q) => ({ y: q * (lit ? 0.9 : 0.4) * S, s: lit ? 1 - q * 0.5 : 0.6 + q * 0.6, o: fade(q, 0.2) * (lit ? 1 : 0.6) }) });
+        }
+      } else if (t < 0.2 + LAP + 0.22) { // hurtle!
+        if (!from) { from = f.pos.clone(); sfx('whoosh'); speedLines(0.4); }
+        const k = Math.min(1, (t - 0.2 - LAP) / 0.18), back = new THREE.Vector3(from.x - o.pos.x, 0, from.z - o.pos.z);
+        if (back.lengthSq() < 1e-6) back.set(-1, 0, 0); back.normalize();
+        const tgt = o.pos.clone().addScaledVector(back, f.radius + o.radius * 0.6);
+        f.pos.copy(from.clone().lerp(tgt, k * k)); f.mvFace = tgt.x >= from.x ? 1 : -1; f.mvRot = 0.4; f.hopY = 0.15 * S;
+        if (Math.random() < 0.8) sprite('fireburst', { at: at(f, 0.7), size: 2.4 * S, life: 0.4, z: 3, anim: (q) => ({ s: 1 - q * 0.5, o: fade(q, 0.2) }) });
+        if (!hit && k >= 1) {
+          hit = true; f.hopY = 0;
+          applyHit(f, o, f.dmg * 1.6, { kb: 9, stun: 0.6, blockCost: 12, aoe: true, noParry: true, heavy: true });
+          sprite('e-fire-dragon', { at: at(o, o.mesh.topY * 0.5), size: 6 * S, life: 0.7, z: 8, anim: (q) => ({ s: 0.5 + ease.out(q) * 0.7, o: fade(q, 0.5) }) });
+          sprite('impact2', { at: at(o, o.mesh.topY * 0.5), size: 4 * S, life: 0.4, z: 9, anim: (q) => ({ s: ease.pop(q), o: fade(q, 0.5) }) });
+          for (let i = 0; i < 6; i++) sprite('fireburst', { at: at(o, 0.8), size: 2.2 * S, life: 0.6, z: 7, anim: ((a) => (q) => ({ x: Math.cos(a) * 2.4 * q * S, y: (Math.sin(a) * 1.6 * q + q * 0.6) * S, s: 1 - q * 0.5, o: fade(q, 0.3) }))(i / 6 * TAU) });
+          match.shake = Math.max(match.shake, 0.4 * S); flashScreen(); cheer(1.3);
+        }
+      } else { f.onFire = false; f.mvRot = 0; f.mvFace = 0; f.mvPose = 'idle'; f.hopY = 0; if (t >= 0.2 + LAP + 0.42) { f.lockFacing = false; return true; } }
+      return false;
+    }, t: () => t };
+  }
+  /** Pleat Flurry: spin like a top and ricochet off the rival again and again — lots of little hits. */
+  function tapPleatFlurry(f, o) {
+    const S = match.S, HITS = 8, GAP = 0.17, start = f.pos.clone();
+    let t = 0, n = 0, side = null;
+    f.lockFacing = true;
+    return { update(dt) {
+      t += dt; f.vel.set(0, 0, 0);
+      if (!side) { side = new THREE.Vector3(start.x - o.pos.x, 0, start.z - o.pos.z); if (side.lengthSq() < 1e-6) side.set(-1, 0, 0); side.normalize(); }
+      const touch = f.radius + o.radius * 0.7;
+      if (t < 0.25) { // spin up while closing in
+        const k = t / 0.25; f.mvPose = 'dodge'; f.mvRot = k * k * 8;
+        f.pos.copy(start.clone().lerp(o.pos.clone().addScaledVector(side, touch + 0.6 * S), k));
+      } else if (n < HITS || t < 0.25 + HITS * GAP + 0.05) { // ricochet: bump in, bounce out, from alternating sides
+        const tt = t - 0.25, ph = (tt % GAP) / GAP, i = Math.floor(tt / GAP);
+        const s2 = side.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), (i % 2 ? 0.7 : -0.7));
+        f.mvPose = 'dodge'; f.mvRot = 8 + tt * 34;
+        f.pos.copy(o.pos.clone().addScaledVector(s2, touch + Math.sin(ph * Math.PI) * 0.9 * S));
+        f.hopY = Math.sin(ph * Math.PI) * 0.25 * S;
+        if (n < HITS && tt >= n * GAP) {
+          n++; sfx('hit');
+          applyHit(f, o, f.dmg * 0.21, { kb: 0.4, stun: 0.2, blockCost: 3, aoe: true, noParry: true });
+          const nm = ['slash1', 'slash4', 'slash2', 'e-attack-slash'][n % 4];
+          sprite(nm, { at: at(o, o.mesh.topY * rand(0.35, 0.65)), size: 3.2 * S, life: 0.25, z: 8, flip: n % 2 === 1, anim: (q) => ({ s: 0.7 + q * 0.5, r: (n % 2 ? 1 : -1) * (0.5 - q), o: fade(q, 0.4) }) });
+          sprite('impact2', { at: at(o, o.mesh.topY * 0.5), size: 1.8 * S, life: 0.25, z: 9, anim: (q) => ({ s: ease.pop(q), o: fade(q, 0.5) }) });
+          match.shake = Math.max(match.shake, 0.12 * S);
+          if (n === HITS) { cheer(1.2); floatText(o, HITS + ' hits!', '#bfe3ff', true); }
+        }
+      } else { // spin down and hop back
+        const k = Math.min(1, (t - 0.3 - HITS * GAP) / 0.3); f.mvRot = (1 - k) * 2; f.mvPose = 'idle'; f.hopY = Math.sin(k * Math.PI) * 0.5 * S;
+        if (k >= 1) { f.mvRot = 0; f.hopY = 0; f.lockFacing = false; return true; }
+      }
+      return false;
+    }, t: () => t };
+  }
+  /* ===================== Trace-to-cast (tap battles) =====================
+     Pressing a ready special freezes time and shows that move's rune. A glowing guide traces it to
+     show the way; you draw over it. Good tracing casts the move (neater = stronger); a miss or the
+     timer running out leaves your charge untouched. */
+  const RUNES = { // points in a unit box (0..1), drawn in order
+    steampuff: { name: 'Swirl', pts: [[0.72, 0.18], [0.35, 0.16], [0.24, 0.36], [0.5, 0.5], [0.76, 0.64], [0.66, 0.85], [0.28, 0.84]] }, // S
+    bunslam: { name: 'Slam', pts: [[0.15, 0.18], [0.5, 0.86], [0.85, 0.18]] }, // V
+    crispydash: { name: 'Bolt', pts: [[0.18, 0.2], [0.82, 0.2], [0.18, 0.8], [0.82, 0.8]] }, // Z
+    pleatflurry: { name: 'Pleats', pts: [[0.08, 0.2], [0.29, 0.82], [0.5, 0.35], [0.71, 0.82], [0.92, 0.2]] }, // W
+    brothbubble: { name: 'Bubble', circle: true },
+    ladlesplash: { name: 'Wave', pts: [[0.06, 0.5], [0.2, 0.28], [0.36, 0.5], [0.52, 0.72], [0.68, 0.5], [0.82, 0.28], [0.94, 0.45]] },
+    grandsteamer: { name: 'Tornado', spiral: true },
+    goldenfry: { name: 'Flame', pts: [[0.5, 0.1], [0.86, 0.86], [0.14, 0.86], [0.5, 0.1]] }, // triangle
+    hotpot: { name: 'Frost', pts: [[0.18, 0.18], [0.82, 0.18], [0.82, 0.82], [0.18, 0.82], [0.18, 0.18]] }, // square
+  };
+  const TRACE = { time: 6, need: 0.78, prec: 0.62 }; // seconds to trace; coverage and precision needed
+  function runePoints(id) {
+    const r = RUNES[id] || RUNES.steampuff;
+    let pts;
+    if (r.circle) pts = Array.from({ length: 49 }, (_, i) => { const a = -Math.PI / 2 + (i / 48) * TAU; return [0.5 + Math.cos(a) * 0.38, 0.5 + Math.sin(a) * 0.38]; });
+    else if (r.spiral) pts = Array.from({ length: 70 }, (_, i) => { const k = i / 69, a = k * TAU * 2.1, rr = 0.06 + k * 0.36; return [0.5 + Math.cos(a) * rr, 0.5 + Math.sin(a) * rr]; });
+    else pts = r.pts;
+    // resample evenly so scoring treats every part of the rune the same
+    const segs = []; let L = 0;
+    for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(d); L += d; }
+    const N = 72, out = [];
+    for (let n = 0; n <= N; n++) {
+      let want = (n / N) * L, i = 0;
+      while (i < segs.length - 1 && want > segs[i]) { want -= segs[i]; i++; }
+      const k = segs[i] ? Math.min(1, want / segs[i]) : 0;
+      out.push([pts[i][0] + (pts[i + 1][0] - pts[i][0]) * k, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * k]);
+    }
+    return out;
+  }
+  function traceOpen(i) {
+    const p = F[0], s = tapSpecialState(p, i);
+    const ov = stageEl.querySelector('#bt-trace'); if (!ov || match.tracing) return;
+    tapClearInputs();
+    const tr = match.tracing = { i, id: s.id, t0: performance.now(), ink: [], down: false, done: false, cov: 0, best: 0 };
+    ov.hidden = false;
+    ov.querySelector('.tr-name').textContent = DG.MOVES[s.id].name;
+    ov.querySelector('.tr-rune').textContent = (RUNES[s.id] || {}).name || '';
+    sfx('charge'); speedLines(0.4);
+    const cv = ov.querySelector('canvas');
+    const box = () => { const w = cv.clientWidth, h = cv.clientHeight, sz = Math.min(w * 0.78, h * 0.5); return { x: (w - sz) / 2, y: h * 0.48 - sz / 2, s: sz, w, h }; };
+    tr.box = box;
+    const pt = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    cv.onpointerdown = (e) => { e.preventDefault(); e.stopPropagation(); if (tr.done) return; try { cv.setPointerCapture(e.pointerId); } catch (err) {} tr.down = true; tr.ink.push([pt(e)]); };
+    cv.onpointermove = (e) => { if (!tr.down || tr.done) return; e.preventDefault(); tr.ink[tr.ink.length - 1].push(pt(e)); traceScore(tr); if (tr.cov >= 0.97 && tr.prec >= TRACE.prec) traceFinish(true); };
+    cv.onpointerup = cv.onpointercancel = (e) => { if (!tr.down) return; tr.down = false; traceScore(tr); if (tr.cov >= TRACE.need && tr.prec >= TRACE.prec) traceFinish(true); };
+    ov.querySelector('.tr-x').onclick = (e) => { e.stopPropagation(); traceFinish(false, 'cancel'); };
+    requestAnimationFrame(traceLoop);
+  }
+  function traceScore(tr) {
+    const b = tr.box(), rune = runePoints(tr.id).map(([u, v]) => [b.x + u * b.s, b.y + v * b.s]), tol = b.s * 0.11;
+    const ink = tr.ink.flat(); if (ink.length < 4) { tr.cov = 0; tr.prec = 0; return; }
+    tr.hit = rune.map(([x, y]) => ink.some(([a, c]) => (a - x) ** 2 + (c - y) ** 2 < tol * tol));
+    tr.cov = tr.hit.filter(Boolean).length / rune.length;
+    const near = ink.filter(([a, c]) => rune.some(([x, y]) => (a - x) ** 2 + (c - y) ** 2 < tol * tol * 2.6)).length;
+    tr.prec = near / ink.length;
+  }
+  function traceLoop() {
+    const tr = match && match.tracing; if (!tr || tr.done) return;
+    const now = performance.now(); if (match.paused) tr.t0 += now - (tr.lastT || now); tr.lastT = now; // the clock waits while paused
+    const ov = stageEl.querySelector('#bt-trace'), cv = ov.querySelector('canvas'), b = tr.box();
+    const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(b.w * dpr) || cv.height !== Math.round(b.h * dpr)) { cv.width = Math.round(b.w * dpr); cv.height = Math.round(b.h * dpr); }
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, b.w, b.h);
+    const el = (performance.now() - tr.t0) / 1000, left = Math.max(0, TRACE.time - el);
+    const rune = runePoints(tr.id).map(([u, v]) => [b.x + u * b.s, b.y + v * b.s]);
+    const col = (ORB[tr.id] || ['#ffcc33'])[0];
+    // magic circle behind the rune
+    ctx.save(); ctx.translate(b.x + b.s / 2, b.y + b.s / 2); ctx.rotate(el * 0.4);
+    ctx.strokeStyle = 'rgba(255,230,160,0.35)'; ctx.lineWidth = 2; ctx.setLineDash([6, 10]);
+    ctx.beginPath(); ctx.arc(0, 0, b.s * 0.56, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+    // the rune: a soft glow, then gold where you've traced
+    const path = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); };
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.shadowColor = col; ctx.shadowBlur = 24; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = b.s * 0.075; path(rune); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 3; ctx.setLineDash([2, 9]); path(rune); ctx.stroke(); ctx.setLineDash([]);
+    if (tr.hit) { ctx.strokeStyle = '#ffd84a'; ctx.shadowColor = '#ffb020'; ctx.shadowBlur = 16; ctx.lineWidth = b.s * 0.05;
+      for (let i = 1; i < rune.length; i++) if (tr.hit[i] && tr.hit[i - 1]) { ctx.beginPath(); ctx.moveTo(rune[i - 1][0], rune[i - 1][1]); ctx.lineTo(rune[i][0], rune[i][1]); ctx.stroke(); }
+      ctx.shadowBlur = 0; }
+    // start marker, and a guiding spark that runs along the rune to show the way (until you start drawing)
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(rune[0][0], rune[0][1], 9 + Math.sin(el * 8) * 2, 0, TAU); ctx.fill();
+    if (!tr.ink.length) {
+      const k = (el * 0.55) % 1, gp = rune[Math.min(rune.length - 1, Math.floor(k * rune.length))];
+      DG.draw.sparkle(ctx, gp[0], gp[1], 16, '#fff6c0');
+      ctx.font = '34px serif'; ctx.textAlign = 'center'; ctx.fillText('👆', gp[0] + 14, gp[1] + 40);
+    }
+    // your ink
+    ctx.strokeStyle = '#fff'; ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.lineWidth = 7;
+    tr.ink.forEach((st) => { if (st.length > 1) { path(st); ctx.stroke(); } }); ctx.shadowBlur = 0;
+    // timer ring
+    const ring = ov.querySelector('.tr-time'); if (ring) ring.style.setProperty('--k', (left / TRACE.time).toFixed(3));
+    ov.querySelector('.tr-pct').textContent = Math.round(tr.cov * 100) + '%';
+    if (left <= 0) { traceScore(tr); return traceFinish(tr.cov >= TRACE.need && tr.prec >= TRACE.prec); }
+    requestAnimationFrame(traceLoop);
+  }
+  function traceFinish(ok, why) {
+    const tr = match && match.tracing; if (!tr || tr.done) return;
+    tr.done = true;
+    const ov = stageEl.querySelector('#bt-trace'); ov.hidden = true;
+    const ink = ov.querySelector('canvas'); ink.onpointerdown = ink.onpointermove = ink.onpointerup = null;
+    match.tracing = null; tapClearInputs(); last = performance.now();
+    const p = F[0], o = F[1];
+    if (ok) {
+      const acc = Math.min(1, (tr.cov + tr.prec) / 2), perfect = acc > 0.9;
+      p.perfectRune = perfect;
+      tapStartSpecial(p, o, tr.i, 0.9 + 0.35 * acc);
+      if (perfect) { match.stats.perfectRunes = (match.stats.perfectRunes || 0) + 1; flashScreen(); }
+    } else {
+      floatText(p, why === 'cancel' ? 'Cancelled' : 'The rune fizzled…', '#ffe08a'); sfx('bad');
+    }
+  }
+
   /* ===================== Tap combat (single-player default) =====================
      Fighters stand facing each other. Tap the rival (or press J) to attack; Block / Dodge answer the
      opponent's telegraphed attacks: BLUE (shield, "BLOCK") = Block, RED (chevrons, "DODGE") = Dodge.
@@ -1521,7 +1838,7 @@
   function tapTier() { return match && match.opp ? match.opp.tier : 0; }
   function tapWindup(e) { const t = tapTier(); return TAP.windup * (t <= 0 ? 1.5 : t === 1 ? 1.25 : t >= 6 ? 0.92 : 1); }
   function tapQueue(kind) {
-    if (!match || match.mode !== 'tap' || match.paused || match.over || match.phase !== 'fight') return;
+    if (!match || match.mode !== 'tap' || match.paused || match.tracing || match.over || match.phase !== 'fight') return;
     tapQ = kind; // one input per press; a newer press replaces an older unhandled one
   }
   function tapClearInputs() { tapQ = null; tapMoveTo = null; Object.keys(edges).forEach((k) => (edges[k] = false)); Object.keys(keys).forEach((k) => (keys[k] = false)); }
@@ -1582,26 +1899,28 @@
     const cd = f.tapCd[id] || 0, busy = f.state === 'move' || f.state === 'stun' || f.state === 'ko';
     return { id, mv, cd, ready: !!mv && f.special >= mv.cost && cd <= 0 && !busy && !match.over };
   }
-  function tapStartSpecial(f, o, i) {
+  function tapStartSpecial(f, o, i, traced) {
     const s = tapSpecialState(f, i);
     if (!s.mv) return;
     if (!s.ready) {
       if (f.msgT <= 0) { floatText(f, s.cd > 0 ? 'Cooling down…' : f.special < s.mv.cost ? 'Still charging…' : 'Not now', '#ffe08a'); f.msgT = 0.5; }
       return;
     }
+    if (f.isPlayer && !traced && colView) { traceOpen(i); return; } // trace the move's rune first (time stops)
     f.special -= s.mv.cost; f.tapCd[s.id] = s.mv.cd; // spent exactly once, here
     f.blocking = false; f.hitDone = true;
     setState(f, 'move');
-    f.mvMul = s.mv.power / (MOVE_BASE[s.id] || 1);
+    f.mvMul = (s.mv.power / (MOVE_BASE[s.id] || 1)) * (traced || 1);
     const make = () => {
       if (s.id === 'brothbubble') return tapBubble(f, o, s.mv);
-      if (s.id === 'grandsteamer' || s.id === 'goldenfry' || s.id === 'hotpot') { cutIn(f, DG.MOVES[s.id].name); speedLines(0.9); return ultimate(f, o, s.id); }
+      if (s.id === 'grandsteamer' || s.id === 'goldenfry' || s.id === 'hotpot') { speedLines(0.9); return ultimate(f, o, s.id); }
       return MOVES[s.id](f, o);
     };
-    f.mv = tapCloseIn(f, o, make);
+    const SIG = { steampuff: tapSteamPuff, bunslam: tapBunSlam, crispydash: tapCrispyDash, pleatflurry: tapPleatFlurry };
+    f.mv = SIG[s.id] ? SIG[s.id](f, o) : tapCloseIn(f, o, make);
     f.mvSlot = 'tap' + i;
     btSpecialFx(s.id, f, o);
-    floatText(f, DG.MOVES[s.id].name + '!', '#ffe08a', true);
+    banner(`<span class="mvname">${DG.ui.esc(DG.MOVES[s.id].name)}!</span>${f.perfectRune ? '<span class="mvsub">Perfect rune!</span>' : ''}`, 1.1); f.perfectRune = false;
     speedLines(0.25); sfx('special'); match.stats.specials++;
   }
   /** Specials first hop into range (fighters stand apart in tap mode), then run the move itself. */
@@ -1637,23 +1956,35 @@
     if (p.defCd > 0) return; // still busy with the last block/dodge
     // answering a warning cancels your own basic attack straight away (before its hit lands)
     if (p.state === 'windup' || (p.state === 'attack' && !p.hitDone) || p.state === 'recover') setState(p, 'idle');
+    if (kind === 'dodge' && p.special < TAP.dodgeCost) { if (p.msgT <= 0) { floatText(p, 'Too tired to dodge!', '#ffc75a'); p.msgT = 0.6; } sfx('bad'); return; }
     p.defCd = TAP.defCd;
-    if (kind === 'block') { p.blocking = true; p.blockT = TAP.blockHold; sfx('block'); }
-    else { setState(p, 'dodge'); p.dodgeSide = p.dodgeSide === 1 ? -1 : 1; sfx('whoosh'); puffs(p.pos, 4, 0xfff1d6, 1.2 * match.S, 0.15); }
+    if (kind === 'block') { p.blocking = true; p.blockT = TAP.blockHold; p.shieldT = TAP.blockHold + 0.15; sfx('block'); }
+    else {
+      p.special -= TAP.dodgeCost; // dodging is tiring
+      setState(p, 'dodge'); p.dodgeTo = null; sfx('whoosh');
+      sprite('e-dust-burst', { at: at(p, 0.3), size: 2.6 * match.S, life: 0.45, z: 2, anim: (k) => ({ s: 0.6 + k * 0.6, o: fade(k, 0.3) }) });
+    }
     const a = F[1].tap && F[1].tap.atk;
     if (a && !a.resolved && !a.choice && F[1].state === 'windup') a.choice = kind; // first answer during the wind-up counts
   }
   function tapAttack(p) {
-    if (p.state !== 'idle' || p.blocking) return;
+    if (p.state !== 'idle' || p.blocking || match.ft < (p.atkReady || 0)) return;
+    p.atkReady = match.ft + TAP.atkWindup + TAP.atkRecover + TAP.atkGap;
     setState(p, 'windup'); p.hitDone = false; p.windup = TAP.atkWindup;
   }
 
   /** The enemy decides, at the moment your basic attack lands, whether it blocks or sidesteps. */
-  function tapEnemyReact(e) {
-    if (e.state !== 'idle') return null;
+  function tapEnemyReact(e, spam) {
+    if (e.state === 'stun' && spam < 3) return null; // a mashed rival shakes off the flinch and blocks
+    if (e.state !== 'idle' && e.state !== 'recover' && e.state !== 'stun') return null;
     const st = e.style === 'mixed' ? e.ai.cur : e.style, t = tapTier(), r = Math.random();
-    const pBlock = st === 'blocker' ? 0.25 + t * 0.07 : t >= 2 ? 0.06 + t * 0.02 : 0;
-    const pDodge = st === 'dodger' ? 0.2 + t * 0.06 : 0;
+    // every rival blocks now and then; mashing the attack makes them read it and block much more
+    const read = Math.max(0, spam - 2) * (0.24 + t * 0.02);
+    let pBlock = (st === 'blocker' ? 0.28 + t * 0.07 : 0.1 + t * 0.03) + read;
+    if (e.state === 'recover') pBlock = read * 0.6; // a real opening after its own attack: only heavy mashing gets read
+    if (e.state === 'stun') pBlock = read * 0.9;
+    pBlock = Math.min(0.9, pBlock);
+    const pDodge = e.state === 'recover' ? 0 : st === 'dodger' ? 0.2 + t * 0.06 : 0;
     if (r < pBlock) return 'block';
     if (r < pBlock + pDodge) return 'dodge';
     return null;
@@ -1661,16 +1992,28 @@
   function tapPlayerImpact(p, e) {
     if (p.hitDone) return; p.hitDone = true; // one hit per attack
     slashFx(p, false);
+    p.atkLog = (p.atkLog || []).filter((t0) => match.ft - t0 < TAP.spamWindow); p.atkLog.push(match.ft);
     const counter = e.state === 'recover' || e.state === 'stun';
-    const react = counter ? null : tapEnemyReact(e);
+    const react = tapEnemyReact(e, p.atkLog.length);
+    if (react === 'block') { // blocked! the rival's guard bounces you off and you stumble
+      e.blocking = true; e.tapShieldT = 0.5; setState(e, 'idle');
+      sfx('block'); floatText(e, 'Blocked!', '#7fb2ff');
+      sprite('e-block-shield', { at: at(e, e.mesh.topY * 0.55), size: 2.6 * match.S, life: 0.6, z: 7, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
+      btBadge(e, 'blockbadge');
+      setState(p, 'stun'); p.stunDur = TAP.stumble; p.stumbling = true; p.atkLog = []; p.goal = p.pos.clone(); p.blocking = false;
+      p.kb.copy(dirTo(e, p)).multiplyScalar(5 * match.S); match.shake = Math.max(match.shake, 0.12);
+      floatText(p, 'Stumbled!', '#ffc75a', true);
+      tapCancelCue('stumble');
+      e.pummel = { n: TAP.pummel, next: match.ft + 0.35 }; // …and the rival piles in while you're dazed
+      return;
+    }
     if (react === 'dodge') {
       setState(e, 'dodge'); e.tapSide = Math.random() < 0.5 ? 1 : -1; floatText(e, 'Dodged!', '#6fd3b5'); sfx('whoosh');
       if (e.ai) e.ai.counter = true; return;
     }
     let mult = 1;
     if (counter && e.state === 'recover') { mult = 1.25; floatText(p, 'COUNTER!', '#ffe066'); }
-    if (react === 'block') { e.blocking = true; e.tapShieldT = 0.4; if (e.ai) e.ai.counter = true; }
-    const res = applyHit(p, e, p.dmg * mult, { kb: 1.4, stun: 0.25, noParry: true, aoe: true, blockCost: 0 });
+    const res = applyHit(p, e, p.dmg * mult, { kb: 1.4, stun: 0.18, noParry: true, aoe: true, blockCost: 0 });
     e.blocking = false;
     btSlash(p, e, null, mult > 1);
     if (!DG.state.settings.tapHintDone) { DG.state.settings.tapHintDone = true; DG.save(); const h = stageEl.querySelector('#a-taphint'); if (h) h.classList.add('gone'); } // onboarding done after the first hit
@@ -1686,7 +2029,7 @@
     const right = (a.color === 'blue' && a.choice === 'block') || (a.color === 'red' && a.choice === 'dodge');
     if (right && a.color === 'blue') {
       p.blocking = true; p.blockT = Math.max(p.blockT || 0, 0.25); parry(p, e); match.stats.blocks++;
-      btBadge(p, 'blockbadge'); btRing(p, 'ring_b2', 3.4, 0.5); sprite('shield', { at: at(p, 1.2), size: 2.4 * match.S, life: 0.5, z: 7, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.6) }) });
+      btBadge(p, 'blockbadge'); p.shieldT = Math.max(p.shieldT || 0, 0.55); p.shieldHit = 0.3;
       return;
     }
     if (right) {
@@ -1738,7 +2081,8 @@
 
     // --- your input (one per press) ---
     const k = E('KeyJ') ? 'attack' : E('KeyK') ? 'block' : E('Space') ? 'dodge' : E('KeyL') ? 'sp0' : E('KeyI') ? 'sp1' : null;
-    const inp = tapQ || k; tapQ = null;
+    let inp = tapQ || k; tapQ = null;
+    if (p.stumbling) { inp = null; tapMoveTo = null; } // dazed: no moving, attacking or defending
     if (tapMoveTo) { if (['idle', 'recover', 'dodge'].includes(p.state) && !p.blocking) { p.goal = tapMoveTo.clone(); if (p.state === 'recover') setState(p, 'idle'); } tapMoveTo = null; }
     if (inp && !match.over) {
       if (inp === 'attack') tapAttack(p);
@@ -1762,20 +2106,39 @@
       }
       case 'recover': if (p.stT >= TAP.atkRecover) { setState(p, 'idle'); p.goal = p.pos.clone(); } break;
       case 'dodge': {
-        if (!p.dodgeTo) { const side = new THREE.Vector3(-dirTo(p, e).z, 0, dirTo(p, e).x).multiplyScalar((p.dodgeSide || 1) * 2 * S); p.dodgeTo = p.pos.clone().add(side).addScaledVector(dirTo(p, e), -0.6 * S); }
-        walk0 = [p.dodgeTo, 12 * S];
-        if (p.stT >= TAP.dodgeHold) { setState(p, 'idle'); p.goal = p.pos.clone(); p.dodgeTo = null; }
+        if (!p.dodgeTo) { // retreat straight back from the rival (sliding along the ring edge if needed)
+          const back = p.pos.clone().addScaledVector(dirTo(p, e), -TAP.dodgeBack * S), lim = match.R - p.radius, d = Math.hypot(back.x, back.z);
+          if (d > lim) back.multiplyScalar(lim / d);
+          p.dodgeTo = back;
+        }
+        walk0 = [p.dodgeTo, 14 * S];
+        p.hopY = Math.sin(Math.min(1, p.stT / TAP.dodgeHold) * Math.PI) * 0.45 * S;
+        if (p.stT >= TAP.dodgeHold) { setState(p, 'idle'); p.goal = p.pos.clone(); p.dodgeTo = null; p.hopY = 0; }
         break;
       }
-      case 'stun': if (p.stT >= p.stunDur) { setState(p, 'idle'); p.goal = p.pos.clone(); } break;
-      case 'move': if (p.mv && p.mv.update(dt)) { p.mv = null; p.mvMul = null; p.spin = false; p.lockFacing = false; p.hopY = 0; setState(p, 'recover'); p.goal = p.pos.clone(); } break;
+      case 'stun': if (p.stT >= p.stunDur) { setState(p, 'idle'); p.goal = p.pos.clone(); p.stumbling = false; } break;
+      case 'move': if (p.mv && p.mv.update(dt)) { p.mv = null; p.mvMul = null; p.spin = false; p.lockFacing = false; p.hopY = 0; p.mvPose = p.mvRot = p.mvSq = null; p.mvFace = 0; p.meteor = false; p.onFire = false; setState(p, 'recover'); p.goal = p.pos.clone(); } break;
     }
     if (p.state !== 'dodge') p.dodgeTo = null;
     // --- the opponent ---  (closes in before it winds up; lunges at impact)
     const t = tapTier(), st = e.style === 'mixed' ? e.ai.cur : e.style;
     const atkRange = e.radius + p.radius + (st === 'dodger' ? 1.0 : 0.6) * S, hitRange = e.radius + p.radius + 1.9 * S;
     let walk1 = null;
-    if (e.state !== 'ko' && !match.over) {
+    if (e.pummel && e.state !== 'ko' && !match.over) { // free hits on a stumbling player
+      const pm = e.pummel;
+      if (!p.stumbling || p.state === 'ko' || pm.n <= 0) { e.pummel = null; if (e.state !== 'stun') setState(e, 'idle'); e.tap.next = match.ft + tapEnemyGap(e); }
+      else {
+        walk1 = [p.pos.clone().addScaledVector(dirTo(p, e), atkRange * 0.85), e.speed * S * 1.8];
+        if (e.state === 'recover' && e.stT > 0.18) setState(e, 'idle');
+        if (e.state !== 'idle' && e.state !== 'recover') setState(e, 'idle');
+        if (match.ft >= pm.next && flatDist(e, p) <= atkRange + 0.5 * S) {
+          pm.n--; pm.next = match.ft + TAP.pummelGap; setState(e, 'recover');
+          const rem = Math.max(0.15, p.stunDur - p.stT); // the hits don't shorten or lengthen the daze
+          applyHit(e, p, e.dmg * TAP.pummelDmg, { kb: 1.2, stun: rem, noParry: true, aoe: true });
+          p.stumbling = true; btSlash(e, p, null, pm.n === 0); cheer(0.6);
+        }
+      }
+    } else if (e.state !== 'ko' && !match.over) {
       switch (e.state) {
         case 'idle': {
           const d = flatDist(e, p), keep = st === 'dodger' ? atkRange + 2.2 * S : st === 'blocker' ? atkRange + 0.6 * S : atkRange + 1.0 * S;
@@ -1932,6 +2295,11 @@
         <img class="bt-tele" id="bt-tele" alt="">
         <div class="a-cue" id="a-cue" role="status" aria-live="assertive"></div>
         <div class="a-taphint ${DG.state.settings.tapHintDone ? 'gone' : ''}" id="a-taphint"><img src="${btSrc('taphint')}" alt="${DG.ui.isTouch() ? 'Tap' : 'Click'} the opponent to attack!"><small>${DG.ui.isTouch() ? 'Tap the floor to move' : 'Click the floor to move'}</small></div>
+        <div class="bt-trace" id="bt-trace" hidden role="dialog" aria-label="Trace the symbol to cast your special">
+          <div class="tr-head"><b class="tr-name"></b><span>Trace the <em class="tr-rune"></em> rune!</span></div>
+          <canvas aria-hidden="true"></canvas>
+          <div class="tr-foot"><span class="tr-time"><b class="tr-pct">0%</b></span><span class="tr-tip">Start at the glowing dot and follow the line</span><button class="tr-x" aria-label="Cancel">✕</button></div>
+        </div>
         <nav class="tap-pad" id="tap-pad" aria-label="Battle actions">
           <button class="tp blk" data-tap="block" aria-label="Block (K) — answers blue attacks"><img src="${btSrc('btn_block')}" alt=""><kbd>K</kbd></button>
           <button class="tp dge" data-tap="dodge" aria-label="Dodge (Space) — answers red attacks"><img src="${btSrc('btn_dodge')}" alt=""><kbd>Space</kbd></button>
@@ -1974,6 +2342,7 @@
         f.radius = ((an[7][2] - an[7][0]) / 2) * unit * 0.8;
         f.mesh.topY = ((875 - an[3]) * unit) / S;
       });
+      F[0].special = 50; // start with enough energy for a couple of dodges
       if (!F[1].isPlayer) F[1].tint2d = DG.draw.mix('#' + new THREE.Color(F[1].hex).getHexString(), '#ffffff', 0.3);
       // feet at the art pack's anchors: you at (0.32, 0.50), the rival at (0.75, 0.51) of the plate
       F[0].pos.set(((0.32 - PLATE.U0) / PLATE.AU) * Rt, 0, ((0.50 - PLATE.V0) / PLATE.AV) * Rt);
@@ -1999,7 +2368,7 @@
     if (match.mode === 'tap') {
       // tap the rival to attack; buttons and HUD never count as attack taps
       stageEl.addEventListener('pointerdown', (e) => {
-        if (e.target.closest('button, .tap-pad, .a-hud, .a-pause, .a-rotate, .modal-wrap')) return;
+        if (e.target.closest('button, .tap-pad, .a-hud, .a-pause, .a-rotate, .modal-wrap, .bt-trace')) return;
         DG.audio.unlock();
         if (!match || match.phase !== 'fight') return;
         e.preventDefault();
@@ -2122,7 +2491,7 @@
   function endMatch(result, how) {
     if (match.over) return;
     match.over = true; match.result = result; match.how = how; match.endT = 0;
-    if (match.mode === 'tap') { tapCancelCue('end'); tapClearInputs(); }
+    if (match.mode === 'tap') { tapCancelCue('end'); tapClearInputs(); if (match.tracing) traceFinish(false, 'cancel'); }
     match.winner = result === 'win' ? F[0] : result === 'lose' ? F[1] : null;
     const loser = result === 'win' ? F[1] : result === 'lose' ? F[0] : null;
     if (loser && loser.state !== 'ko') { setState(loser, 'ko'); loser.mv = null; loser.hopY = 0; }
@@ -2440,12 +2809,12 @@
         }
       }
       F[1].hopY = Math.abs(Math.sin(match.phaseT * 6)) * 0.6 * match.S;
-      if (match.phaseT >= match.introLen) { match.phase = 'count'; match.phaseT = 0; F[1].hopY = 0; banner('3', 0.8); sfx('click'); match.cnt = 3; }
+      if (match.phaseT >= match.introLen) { match.phase = 'count'; match.phaseT = 0; F[1].hopY = 0; banner(match.mode === 'tap' ? '<span class="cnum">3</span>' : '3', 0.8); sfx('click'); match.cnt = 3; }
     } else if (match.phase === 'count') {
       const c = 3 - Math.floor(match.phaseT / 0.7);
-      if (c !== match.cnt && c > 0) { match.cnt = c; banner(String(c), 0.6); sfx('click'); }
+      if (c !== match.cnt && c > 0) { match.cnt = c; banner(match.mode === 'tap' ? `<span class="cnum">${c}</span>` : String(c), match.mode === 'tap' ? 0.69 : 0.6); sfx('click'); }
       if (match.phaseT >= 2.1) {
-        match.phase = 'fight'; banner('Steam! 🔥', 0.8); sfx('good'); Object.keys(edges).forEach((k) => (edges[k] = false));
+        match.phase = 'fight'; banner(match.mode === 'tap' ? '<span class="cnum go">FIGHT!</span>' : 'Steam! 🔥', 0.8); sfx('good'); Object.keys(edges).forEach((k) => (edges[k] = false));
         if (match.mode === 'tap') { tapQ = null; F[1].tap.next = match.ft + (tapTier() === 0 ? 2.2 : 1.4); }
       }
     } else if (match.phase === 'fight') {
@@ -2545,7 +2914,9 @@
   function loop(now) {
     if (!match || !stageEl || !stageEl.isConnected) return;
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (!match.paused) {
+    if (match.tracing && !match.paused) { // time stops while you trace a rune
+      try { render(0, 0); } catch (e) { console.error(e); }
+    } else if (!match.paused) {
       let gdt = dt;
       if (match.hitstop > 0) { match.hitstop -= dt; gdt = 0; } // impact freeze
       else if (match.slow > 0) { match.slow -= dt; gdt = dt * 0.35; } // slow motion
@@ -2614,6 +2985,7 @@
     // test hooks
     _debug: () => ({ match, F }),
     _tap: { draw: (c, x, y, o) => drawDumpling2D(c, x, y, o), img: (n) => colImg(n), hits: (x, y) => tapHitsRival(x, y), box: () => fighterBox(F[1]), pj: (v) => pj(v), pose: (f) => poseOf(f) },
+    _special: (i, traced) => tapStartSpecial(F[0], F[1], i, traced || 1),
     _forceEnd: (r) => { if (match) { endMatch(r, 'ko'); match.endT = 99; } },
   };
   DG.ui.register('arena', DG.Arena);

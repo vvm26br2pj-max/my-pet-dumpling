@@ -64,16 +64,16 @@
   /** Header trim, bow and border take their color from the accessory your dumpling wears. */
   function tintHud(p) {
     const hud = root; if (!hud) return;
-    const a = p.accessory && DG.ACCESSORIES[p.accessory];
-    const c = (a && a.tint) || '#c9a8f5';
+    // the panel's border matches your dumpling's own colour (from the Closet)
+    const lc = DG.lookColors(p.type, p.look), c = DG.draw.mix(lc.base, lc.line, 0.6);
     if (hud._tint === c) return; hud._tint = c;
     const S = DG.draw.shade, M = DG.draw.mix;
     hud.style.setProperty('--trim', c);
     hud.style.setProperty('--trim-dark', S(c, 0.78));
     hud.style.setProperty('--trim-deep', S(c, 0.6));
     hud.style.setProperty('--trim-light', M(c, '#ffffff', 0.45));
-    hud.style.setProperty('--hud-border', M(c, '#ffffff', 0.62));
-    hud.style.setProperty('--hud-shadow', M(c, '#f3c9a6', 0.45));
+    hud.style.setProperty('--hud-border', c);
+    hud.style.setProperty('--hud-shadow', S(c, 0.85));
   }
   /** The button bar takes its colours from the house wallpaper. */
   function tintDock() {
