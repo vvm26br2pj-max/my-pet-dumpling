@@ -9,6 +9,22 @@
   const ARENA_R = { 0: 8.5, 1: 9, 2: 9, 3: 10.5, 4: 14 };
   const GIANT = 4;
   const MATCH_TIME = 90;
+  /* Tap combat (single-player default). All times are in fight-seconds (they pause and slow with the match). */
+  const TAP = {
+    windup: 0.65,      // enemy wind-up before impact (lower tiers get longer: see tapWindup)
+    recover: 0.45,     // enemy recovery after an attack
+    counter: 0.6,      // extra opening after you correctly dodge a red attack
+    gapMin: 1.0, gapMax: 1.9, // pause between enemy attacks
+    atkWindup: 0.1, atkLunge: 0.12, atkRecover: 0.22, // your basic attack
+    blockHold: 0.45, dodgeHold: 0.42, defCd: 0.5,     // your block / dodge
+    hitStun: 0.32,     // how long you're stunned when an attack lands
+    tapRadius: 64,     // minimum tap target radius in CSS px (bigger on small screens)
+    redDmg: 1.3, guardBreakDmg: 1.5,
+  };
+  /* Damage the existing special-move code already deals (as a multiple of base damage); tap mode rescales it to TAP_MOVES[id].power. */
+  const MOVE_BASE = { steampuff: 1.1, crispydash: 1.6, bunslam: 1.4, pleatflurry: 1.65, ladlesplash: 1.3, brothbubble: 1, grandsteamer: 2.6, goldenfry: 2.6, hotpot: 2.6 };
+  let tapMoveTo = null; // where you last tapped on the floor
+  let tapQ = null; // the one queued tap-mode input: 'attack' | 'block' | 'dodge' | 'sp0' | 'sp1'
 
   let root, stageEl, renderer, scene, camera, raf = 0, last = 0, T = 0;
   let F = [], fx = [], projs = [], floats = [], crowd = [], petals = [], match = null;
@@ -20,10 +36,11 @@
     const p = DG.pet(), si = DG.stageIndex(), st = DG.state;
     const hasThree = !!window.THREE;
     const nx = DG.nextStage();
-    const OPP_IMG = { chili: 'img/ar_opp_chili.webp?v=1', shumai: 'img/ar_opp_shumai.webp?v=1', hargow: 'img/ar_opp_hargow.webp?v=1', pierogi: 'img/ar_opp_pierogi.webp?v=1', momo: 'img/ar_opp_momo.webp?v=1', mandu: 'img/ar_opp_mandu.webp?v=1', champion: 'img/ar_opp_champion.webp?v=1' };
+    const OPP_IMG = Object.fromEntries(DG.OPPONENTS.map((o) => [o.id, assetSrc(`img/col/o-${o.id}.webp`, 1)])); // the Coliseum rival portraits
     const STYLE_IMG = { charger: 'img/ar_style_charger.webp?v=1', blocker: 'img/ar_style_blocker.webp?v=1', dodger: 'img/ar_style_dodger.webp?v=1', mixed: 'img/ar_style_champion.webp?v=1' };
     const STYLE_TINT = { charger: '#ffe2cf', blocker: '#fff0c4', dodger: '#e3ecff', mixed: '#fff0b8' };
     const useViking = p.accessory === 'viking';
+    const tapOn = st.settings.arenaControls !== 'classic';
     root.innerHTML = `
       <div class="ar">
         <div class="ar-hero">
@@ -71,16 +88,69 @@
             <button class="ar-btn host" id="a-host" ${hasThree ? '' : 'disabled'}>⚔️ Host a Battle</button>
             <button class="ar-btn join" id="a-join" ${hasThree ? '' : 'disabled'}>🔑 Join with a Code</button>
           </div>
-          <button class="ar-controls" id="a-controls">🎮 Controls</button>
+          <p class="ar-fine">Friend battles always use the classic controls.</p>
+        </div>
+        <div class="ar-section ar-setup">
+          <div class="ar-seg" role="radiogroup" aria-label="Arena controls">
+            <span>Controls</span>
+            <button role="radio" data-ctl="tap" aria-checked="${tapOn}" class="${tapOn ? 'on' : ''}">👆 Tap</button>
+            <button role="radio" data-ctl="classic" aria-checked="${!tapOn}" class="${tapOn ? '' : 'on'}">🕹️ Classic</button>
+          </div>
+          <div class="ar-setup-btns"><button class="ar-controls" id="a-specials">✨ Specials</button><button class="ar-controls" id="a-controls">🎮 How to play</button></div>
         </div>
       </div>`;
     root.querySelector('#a-home').onclick = () => { DG.audio.play('click'); DG.ui.show('home'); };
-    root.querySelector('#a-controls').onclick = () => { DG.audio.play('click'); DG.ui.modal({ title: '🎮 Controls', html: controlsHtml(), buttons: [{ label: 'Got it', cls: 'primary' }] }); };
+    root.querySelector('#a-controls').onclick = () => { DG.audio.play('click'); DG.ui.modal({ title: tapOn ? '👆 Tap controls' : '🕹️ Classic controls', html: tapOn ? tapHelpHtml() : controlsHtml(), buttons: [{ label: 'Got it', cls: 'primary' }] }); };
+    root.querySelector('#a-specials').onclick = () => { DG.audio.play('click'); specialsMenu(); };
+    root.querySelectorAll('[data-ctl]').forEach((b) => (b.onclick = () => { DG.audio.play('click'); st.settings.arenaControls = b.dataset.ctl; DG.save(); lobby(); }));
     const pv = root.querySelector('#a-prev');
     root._stop = pv ? DG.ui.previewLoop(pv, (t) => ({ type: p.type, look: p.look, stage: si, size: 90, accessory: p.accessory, trait: p.trait, mood: 'joy', hop: Math.max(0, Math.sin(t * 4)) * 8 }), 140, 120) : null;
     root.querySelectorAll('[data-fight]').forEach((b) => (b.onclick = () => { DG.audio.unlock(); startMatch({ opp: +b.dataset.fight }); }));
     root.querySelector('#a-host').onclick = () => { DG.audio.unlock(); hostGame(); };
     root.querySelector('#a-join').onclick = () => { DG.audio.unlock(); joinGame(); };
+  }
+
+  function tapHelpHtml() {
+    const eq = (DG.state.moves && DG.state.moves.equipped || []).map((id) => DG.MOVES[id].name).join(' and ');
+    return `<ul class="nice-list small">
+      <li>👆 <b>${DG.ui.isTouch() ? 'Tap' : 'Click'} your rival</b> to attack (or press <kbd>J</kbd>).</li>
+      <li>🔵 A <b>blue</b> glow with a shield and <b>BLOCK</b> means: press <b>Block</b> (<kbd>K</kbd>) before it lands.</li>
+      <li>🔴 A <b>red</b> glow with arrows and <b>DODGE</b> means: press <b>Dodge</b> (<kbd>Space</kbd>). Red attacks break through a block!</li>
+      <li>✨ Answer correctly and you get a moment to <b>counter</b> for a critical hit. Pressing too early or the wrong button won't stop the attack.</li>
+      <li>🌟 Your two specials${eq ? ` (<b>${eq}</b>)` : ''} use half of the charge meter (<kbd>L</kbd> / <kbd>I</kbd>). Change them under <b>✨ Specials</b>.</li>
+    </ul>`;
+  }
+  /** Buy and equip the two tap-combat specials. */
+  function specialsMenu() {
+    DG.seedMoves();
+    const draw = (el) => {
+      const st = DG.state, m = st.moves;
+      el.querySelector('.sp-coins').innerHTML = `🪙 <b>${st.coins}</b>`;
+      el.querySelector('.sp-list').innerHTML = Object.entries(DG.TAP_MOVES).map(([id, mv]) => {
+        const owned = m.owned.includes(id), can = DG.canUseMove(id), slot = m.equipped.indexOf(id);
+        let act;
+        if (!can.ok) act = `<span class="sp-lock">🔒 ${can.why}</span>`;
+        else if (!owned) act = `<button class="btn small primary" data-buy="${id}" ${st.coins < mv.price ? 'disabled' : ''}>Buy · 🪙${mv.price}</button>`;
+        else act = `<button class="btn small ${slot === 0 ? 'primary' : ''}" data-eq="0" data-id="${id}">${slot === 0 ? '✓ Slot 1' : 'Slot 1'}</button><button class="btn small ${slot === 1 ? 'primary' : ''}" data-eq="1" data-id="${id}">${slot === 1 ? '✓ Slot 2' : 'Slot 2'}</button>`;
+        return `<div class="sp-row ${slot >= 0 ? 'eq' : ''}"><span class="sp-ico">${mv.icon}</span><div class="sp-txt"><b>${DG.MOVES[id].name}</b><small>${DG.MOVES[id].desc.replace('ULTIMATE: ', '')}</small><small class="sp-num">⚡${mv.cost} charge · ${mv.cd}s cooldown · ${Math.round(mv.power * 100)}% power</small></div><div class="sp-act">${act}</div></div>`;
+      }).join('');
+      el.querySelectorAll('[data-buy]').forEach((b) => (b.onclick = () => {
+        const r = DG.buyMove(b.dataset.buy);
+        if (r.ok) { DG.audio.play('coin'); DG.ui.toast(`✨ Learned ${DG.MOVES[b.dataset.buy].name}!`); } else { DG.audio.play('bad'); DG.ui.toast(r.why); }
+        draw(el);
+      }));
+      el.querySelectorAll('[data-eq]').forEach((b) => (b.onclick = () => {
+        const r = DG.equipMove(+b.dataset.eq, b.dataset.id);
+        DG.audio.play(r.ok ? 'pop' : 'bad'); if (!r.ok) DG.ui.toast(r.why);
+        draw(el);
+      }));
+    };
+    DG.ui.modal({
+      title: '✨ Specials', wide: true,
+      html: `<p class="fine">Equip two different specials for tap battles. Each uses charge from your meter. <span class="sp-coins"></span></p><div class="sp-list"></div>`,
+      buttons: [{ label: 'Done', cls: 'primary', onClick: () => lobby() }],
+      onOpen(el) { draw(el); },
+    });
   }
 
   function controlsHtml() {
@@ -591,6 +661,8 @@
     }
     let crit = false;
     if (att.crit) { crit = true; att.crit = false; dmg *= 1.5; }
+    if (match.mode === 'tap' && att.mvMul) dmg *= att.mvMul; // tap specials use their catalog power
+    if (match.mode === 'tap' && crit && def.invuln <= 0) btBadge(def, 'crit');
     let d = dmg, kb = (o.kb || 3) * S, result = 'hit';
     const faceDot = facingVec(def).dot(dirTo(def, att));
     if (def.bubble > 0) { d *= 0.2; kb *= 0.2; floatText(def, 'Bubble!', '#7fd0ff'); sfx('pop'); result = 'bubble'; }
@@ -602,7 +674,9 @@
       if (o.crush) { floatText(def, 'GUARD CRUSH!', '#ff9f40', true); burst3d(def.pos, 3.2, 0xffc080); match.hitstop = 0.1; guardBreak(def); }
       else if (def.sta <= 0) guardBreak(def);
     } else {
-      if (def.state !== 'move') { setState(def, 'stun'); def.stunDur = o.stun || 0.3; }
+      // in tap mode a winding-up enemy shrugs off plain hits (only specials and critical counters stagger it)
+      const armored = match.mode === 'tap' && def.state === 'windup' && !att.mvMul && !crit;
+      if (def.state !== 'move' && !armored) { setState(def, 'stun'); def.stunDur = o.stun || 0.3; }
       def.flash = 0.18; sfx(crit || o.heavy ? 'crit' : 'hit'); sparks(def.pos); cheer(o.heavy || crit ? 1 : 0.5);
       const big = o.heavy || crit;
       burst3d(def.pos, big ? 3.6 : 2.1, crit ? 0xffd0d0 : 0xffffff);
@@ -996,6 +1070,824 @@
     m.mats.forEach((mt) => { if (mt.emissive && f.state !== 'move') mt.emissive.setHex(f.flash > 0 ? 0xaa3333 : f.state === 'charge' ? (Math.sin(T * 30) > 0 ? 0x664400 : 0x2a1500) : f.invuln > 0 ? 0x224444 : f.crit ? 0x2a2000 : 0x000000); });
   }
 
+  /* ===================== Battle art (tap battles) =====================
+     Painted stands behind a transparent 3D canvas, the painted floor and railings in 3D (so the
+     fighters' feet and shadows sit on them), and 2D sprite effects pinned to 3D positions. */
+  const BT_V = 1;
+  const assetSrc = (path, v) => (window.DG_ASSETS && window.DG_ASSETS[path]) || `${path}?v=${v}`;
+  const btSrc = (n) => (window.DG_ASSETS && window.DG_ASSETS[`img/bt_${n}.webp`]) || `img/bt_${n}.webp?v=${BT_V}`;
+  const BT_PRELOAD = ['floor', 'rail_l', 'rail_c', 'rail_r', 'ring_b1', 'ring_b2', 'ring_r', 'shield', 'bang', 'slash1', 'slash2', 'slash3', 'slash4',
+    'impact1', 'impact2', 'impact3', 'puff1', 'puff2', 'puff3', 'goldring', 'goldring2', 'goldflat', 'goldburst', 'halo', 'tornado1', 'tornado2',
+    'dragon', 'fireburst', 'ice1', 'ice2', 'bolt1', 'bolt2', 'cloud1', 'cloud2', 'cloud3', 'crit', 'blockbadge', 'dodgebadge', 'sparkle', 'ic_drop', 'ic_snow', 'ic_fire'];
+  const btImgs = {};
+  function btPreload() { BT_PRELOAD.forEach((n) => { if (!btImgs[n]) { const im = new Image(); im.src = btSrc(n); btImgs[n] = im; } }); }
+  function btTexture(n) {
+    const tex = new THREE.TextureLoader().load(btSrc(n));
+    tex.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
+    return tex;
+  }
+  /** The arena for tap battles: painted floor + railings, soft lights, no sky (the painted stands show through). */
+  function buildTapScene(R) {
+    scene = new THREE.Scene(); scene.background = null; scene.fog = null; crowd = []; petals = [];
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xd9a877, 0.75));
+    const dl = new THREE.DirectionalLight(0xfff0dc, 0.55); dl.position.set(-4, 12, 9); scene.add(dl);
+    // painted platform: a disc with the painted top, and a wooden side so it has thickness
+    const top = new THREE.Mesh(new THREE.CircleGeometry(R, 72), new THREE.MeshBasicMaterial({ map: btTexture('floor'), transparent: true }));
+    top.rotation.x = -Math.PI / 2; top.position.y = 0.005; top.scale.setScalar(1.13); scene.add(top);
+    const side = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.1, R * 1.06, R * 0.18, 72, 1, true), new THREE.MeshLambertMaterial({ color: 0xc98a4f, side: THREE.DoubleSide }));
+    side.position.y = -R * 0.09; scene.add(side);
+    // railings with lanterns along the back edge, facing the middle
+    const rail = (n, w, h, ang, rr) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: btTexture(n), transparent: true, alphaTest: 0.05, side: THREE.DoubleSide }));
+      m.position.set(Math.sin(ang) * rr, h / 2 - 0.05, -Math.cos(ang) * rr); m.lookAt(0, h / 2, 0); scene.add(m);
+    };
+    const rr = R * 1.08, hgt = R * 0.32;
+    rail('rail_c', hgt * 1.5, hgt * 1.1, 0, rr);
+    rail('rail_l', hgt * 2.45, hgt, -0.62, rr);
+    rail('rail_r', hgt * 2.3, hgt, 0.62, rr);
+  }
+
+  /* ---------- 2D sprite effects pinned to the 3D world ---------- */
+  let fx2 = [];
+  /** Spawns a sprite. o: { at: Vector3 | () => Vector3, size (world units), life, delay, z, anim(k, e) → {s, r, o, x, y} (x/y in world units), flip, cls } */
+  function sprite(name, o) {
+    if (!stageEl || !match || match.mode !== 'tap') return null;
+    const layer = stageEl.querySelector('#bt-fx'); if (!layer) return null;
+    const el = document.createElement('img'); el.src = name.startsWith('e-') ? colSrc(name) : btSrc(name); el.alt = ''; el.className = 'bt-sp' + (o.cls ? ' ' + o.cls : '');
+    el.style.zIndex = o.z || 1; el.style.opacity = 0;
+    layer.appendChild(el);
+    const e = Object.assign({ el, t: 0, life: 0.6, delay: 0, size: 2, anim: null }, o);
+    fx2.push(e); return e;
+  }
+  function fx2Update(dt) {
+    if (!fx2.length || !colView) return;
+    for (let i = fx2.length - 1; i >= 0; i--) {
+      const e = fx2[i];
+      if (e.delay > 0) { e.delay -= dt; continue; }
+      e.t += dt; const k = Math.min(1, e.t / e.life);
+      const base = typeof e.at === 'function' ? e.at() : e.at;
+      const a = e.anim ? e.anim(k, e) : { s: 1, o: 1 - k };
+      const p = new THREE.Vector3(base.x + (a.x || 0), base.y + (a.y || 0), base.z + (a.z || 0));
+      const q = pj(p), ppu = q.ppu, px = q.x, py = q.y, size = e.size * ppu * (a.s == null ? 1 : a.s);
+      e.el.style.width = size + 'px';
+      e.el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) rotate(${a.r || 0}rad) scaleX(${e.flip ? -1 : 1})`;
+      e.el.style.opacity = Math.max(0, Math.min(1, a.o == null ? 1 : a.o));
+      if (e.t >= e.life) { e.el.remove(); fx2.splice(i, 1); }
+    }
+  }
+  function fx2Clear() { fx2.forEach((e) => e.el.remove()); fx2 = []; }
+  const ease = { out: (k) => 1 - (1 - k) * (1 - k), pop: (k) => (k < 0.35 ? (k / 0.35) * 1.15 : 1.15 - 0.15 * Math.min(1, (k - 0.35) / 0.3)) };
+  const fade = (k, from) => (k < from ? 1 : 1 - (k - from) / (1 - from));
+  const mid = (f, y) => () => new THREE.Vector3(f.pos.x, (y == null ? 0.9 : y) * match.S + f.hopY, f.pos.z);
+  const at = (f, y) => new THREE.Vector3(f.pos.x, (y == null ? 0.9 : y) * match.S, f.pos.z);
+  function btBurst(f, name, size, life, y) { sprite(name, { at: at(f, y), size: size * match.S, life: life || 0.45, z: 5, anim: (k) => ({ s: ease.pop(k), r: k * 0.4, o: fade(k, 0.5) }) }); }
+  function btRing(f, name, size, life, flat) { sprite(name, { at: at(f, flat ? 0.1 : 0.9), size: size * match.S, life: life || 0.6, z: 2, anim: (k) => ({ s: 0.3 + ease.out(k) * 1.2, o: fade(k, 0.3) }) }); }
+  function btPuffs(f, n, spread) {
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * TAU + rand(-0.3, 0.3), name = pick(['puff1', 'puff2', 'puff3']);
+      sprite(name, { at: at(f, 0.3), size: rand(1.2, 1.8) * match.S, life: rand(0.5, 0.8), delay: i * 0.02, z: 3,
+        anim: (k) => ({ x: Math.sin(ang) * spread * ease.out(k) * match.S, z: Math.cos(ang) * spread * 0.5 * ease.out(k) * match.S, y: k * 0.6 * match.S, s: 0.6 + k * 0.6, o: fade(k, 0.4) }) });
+    }
+  }
+  function btBadge(f, name) { sprite(name, { at: at(f, 3.0), size: 3.2 * match.S, life: 0.9, z: 8, anim: (k) => ({ s: ease.pop(Math.min(1, k * 2)), y: k * 0.5 * match.S, o: fade(k, 0.6) }) }); }
+  /** Hit spark at the point of contact between the two fighters. */
+  function btSlash(att, def, name, big) {
+    const c = new THREE.Vector3((att.pos.x + def.pos.x * 2) / 3, (def.mesh.topY * 0.42) * match.S, (att.pos.z + def.pos.z * 2) / 3);
+    sprite('e-hit-spark', { at: c, size: (big ? 2.8 : 2.1) * match.S, life: 0.34, z: 7, anim: (k) => ({ s: ease.pop(k), r: k * 0.6, o: fade(k, 0.45) }) });
+  }
+  /** Big, layered sprite choreography for each special (called when the move starts; timings match the move's hit). */
+  function btSpecialFx(id, f, o) {
+    const S = match.S;
+    const at0 = mid(f), atO = mid(o);
+    // the painted coliseum effects, layered under the smaller sheet effects below
+    const H = (g) => (g.mesh.topY * 0.45);
+    switch (id) {
+      case 'grandsteamer':
+        sprite('e-purple-tornado', { at: at(f, H(f)), size: 4.5 * S, life: 0.75, z: 3, anim: (k) => ({ s: 0.4 + k * 0.7, r: Math.sin(k * 30) * 0.06, o: k < 0.2 ? k * 5 : 1 }) });
+        sprite('e-purple-tornado', { at: at(o, H(o) + 0.6), delay: 0.6, size: 7.5 * S, life: 0.9, z: 8, anim: (k) => ({ s: ease.pop(Math.min(1, k * 1.4)), r: Math.sin(k * 26) * 0.08, y: k * 0.6 * S, o: fade(k, 0.6) }) });
+        sprite('e-lightning-strike', { at: at(o, H(o)), delay: 0.75, size: 4 * S, life: 0.3, z: 9, anim: (k) => ({ o: k < 0.5 ? 1 : 0 }) });
+        break;
+      case 'goldenfry': {
+        const from = at(f, H(f) + 1.2), to = at(o, H(o));
+        sprite('e-fire-dragon', { at: from, delay: 0.1, size: 7 * S, life: 0.8, z: 8, flip: to.x < from.x,
+          anim: (k) => ({ x: (to.x - from.x) * ease.out(k), z: (to.z - from.z) * ease.out(k), y: Math.sin(k * Math.PI) * 1.4 * S - k * 1.2 * S, s: 0.55 + k * 0.6, r: (to.x < from.x ? 1 : -1) * (0.25 - k * 0.5), o: k < 0.12 ? k * 8 : fade(k, 0.8) }) });
+        sprite('e-gold-sparks', { at: to, delay: 0.72, size: 5 * S, life: 0.6, z: 9, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
+        break;
+      }
+      case 'hotpot':
+        sprite('e-ice-burst', { at: at(o, H(o)), delay: 0.7, size: 6 * S, life: 0.85, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.65) }) });
+        sprite('e-lightning-strike', { at: at(o, H(o) + 1), delay: 0.78, size: 4.6 * S, life: 0.35, z: 9, anim: (k) => ({ o: k < 0.55 ? 1 : 0 }) });
+        break;
+      case 'steampuff':
+        sprite('e-steam-burst', { at: at(f, H(f)), delay: 0.26, size: 6.5 * S, life: 0.8, z: 6, anim: (k) => ({ s: 0.4 + ease.out(k) * 0.9, y: k * 0.8 * S, o: fade(k, 0.55) }) });
+        break;
+      case 'bunslam':
+        sprite('e-ground-shockwave', { at: at(o, 0.3), delay: 0.62, size: 7 * S, life: 0.7, z: 2, anim: (k) => ({ s: 0.3 + ease.out(k) * 1.1, o: fade(k, 0.4) }) });
+        sprite('e-dust-burst', { at: at(o, 0.6), delay: 0.62, size: 5 * S, life: 0.6, z: 7, anim: (k) => ({ s: 0.6 + k * 0.6, o: fade(k, 0.4) }) });
+        break;
+      case 'crispydash':
+        sprite('e-gold-sparks', { at: atO, delay: 0.42, size: 4.6 * S, life: 0.5, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
+        sprite('e-dodge-trail', { at: at0, delay: 0.18, size: 5 * S, life: 0.4, z: 4, flip: o.pos.x < f.pos.x, anim: (k) => ({ o: fade(k, 0.3) }) });
+        break;
+      case 'pleatflurry':
+        [0, 1, 2].forEach((i) => sprite('e-attack-slash', { at: atO, delay: 0.1 + i * 0.15, size: 4.4 * S, life: 0.3, z: 7, flip: i % 2 === 1, anim: (k) => ({ s: 0.7 + k * 0.5, r: (i % 2 ? 1 : -1) * (0.4 - k * 0.8), o: fade(k, 0.4) }) }));
+        break;
+      case 'brothbubble':
+        sprite('e-broth-splash', { at: at(f, H(f)), delay: 0.55, size: 6 * S, life: 0.7, z: 8, anim: (k) => ({ s: 0.5 + ease.out(k) * 0.9, o: fade(k, 0.5) }) });
+        break;
+      case 'ladlesplash':
+        sprite('e-broth-splash', { at: atO, delay: 0.6, size: 5.2 * S, life: 0.6, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
+        break;
+    }
+    switch (id) {
+      case 'steampuff':
+        sprite('halo', { at: at0, size: 3.2 * S, life: 0.35, z: 2, anim: (k) => ({ s: 0.5 + k, o: k }) });
+        for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU; sprite(i % 2 ? 'cloud1' : 'cloud2', { at: at(f, 0.6), delay: 0.28, size: 2.2 * S, life: 0.9, z: 4,
+          anim: (k) => ({ x: Math.sin(a) * 3.4 * ease.out(k) * S, z: Math.cos(a) * 1.6 * ease.out(k) * S, y: k * 1.2 * S, s: 0.4 + ease.out(k) * 0.9, r: a + k, o: fade(k, 0.5) }) }); }
+        sprite('goldring', { at: at(f, 0.1), delay: 0.28, size: 3 * S, life: 0.6, z: 1, anim: (k) => ({ s: 0.4 + ease.out(k) * 2.2, o: fade(k, 0.3) }) });
+        break;
+      case 'bunslam':
+        sprite('sparkle', { at: at0, size: 1.4 * S, life: 0.55, z: 6, anim: (k) => ({ y: 2.5 * S * Math.sin(Math.PI * k), r: k * 6, o: 1 - k * 0.5 }) });
+        sprite('impact1', { at: atO, delay: 0.62, size: 4.4 * S, life: 0.45, z: 7, anim: (k) => ({ s: ease.pop(k), r: k, o: fade(k, 0.5) }) });
+        sprite('goldflat', { at: at(o, 0.1), delay: 0.62, size: 5 * S, life: 0.7, z: 1, anim: (k) => ({ s: 0.3 + ease.out(k) * 1.6, o: fade(k, 0.3) }) });
+        sprite('goldburst', { at: at(o, 0.6), delay: 0.62, size: 3.2 * S, life: 0.5, z: 3, anim: (k) => ({ s: 0.6 + k * 0.6, o: fade(k, 0.3) }) });
+        setTimeoutFight(0.62, () => btPuffs(o, 8, 3.2));
+        break;
+      case 'crispydash':
+        for (let i = 0; i < 9; i++) sprite('fireburst', { at: (() => { let p = null; return () => (p = p || at(f, 0.6)); })(), delay: 0.18 + i * 0.045, size: 2.2 * S, life: 0.45, z: 3, anim: (k) => ({ s: 1 - k * 0.6, y: k * 0.6 * S, o: fade(k, 0.2) }) });
+        sprite('slash2', { at: atO, delay: 0.42, size: 4.6 * S, life: 0.35, z: 7, anim: (k) => ({ s: 0.7 + k * 0.6, r: -0.3 + k * 0.6, o: fade(k, 0.4) }) });
+        sprite('impact2', { at: atO, delay: 0.45, size: 3.2 * S, life: 0.4, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
+        break;
+      case 'pleatflurry':
+        ['slash1', 'slash4', 'slash2'].forEach((n, i) => {
+          sprite(n, { at: atO, delay: 0.12 + i * 0.15, size: 4 * S, life: 0.3, z: 7, flip: i % 2 === 1, anim: (k) => ({ s: 0.7 + k * 0.5, r: (i % 2 ? 1 : -1) * (0.4 - k * 0.8), o: fade(k, 0.4) }) });
+          sprite('impact2', { at: atO, delay: 0.14 + i * 0.15, size: 2.2 * S, life: 0.3, z: 8, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
+        });
+        break;
+      case 'brothbubble':
+        sprite('ring_b1', { at: at0, size: 4.4 * S, life: 0.6, z: 6, anim: (k) => ({ s: 0.6 + ease.out(Math.min(1, k * 2)) * 0.45 + Math.sin(k * 20) * 0.02, r: k * 2, o: 0.9 }) });
+        sprite('ring_b2', { at: at0, delay: 0.55, size: 4.6 * S, life: 0.5, z: 6, anim: (k) => ({ s: 1 + ease.out(k) * 1.4, r: k, o: fade(k, 0.2) }) });
+        for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU; sprite('ic_drop', { at: at(f, 1.0), delay: 0.55, size: 0.9 * S, life: 0.6, z: 7,
+          anim: (k) => ({ x: Math.sin(a) * 3.2 * ease.out(k) * S, y: (Math.cos(a) * 1.6 * ease.out(k) - k * k * 1.2) * S, o: fade(k, 0.5) }) }); }
+        sprite('cloud2', { at: at0, delay: 0.55, size: 3.4 * S, life: 0.7, z: 5, anim: (k) => ({ s: 0.5 + k, y: k * S, o: fade(k, 0.2) * 0.8 }) });
+        break;
+      case 'ladlesplash': {
+        const from = at(f, 0.7), to = at(o, 0.7);
+        sprite('slash3', { at: from, delay: 0.2, size: 4.2 * S, life: 0.55, z: 6, flip: to.x < from.x,
+          anim: (k) => ({ x: (to.x - from.x) * k, z: (to.z - from.z) * k, s: 0.8 + k * 0.4, o: fade(k, 0.7) }) });
+        for (let i = 0; i < 6; i++) sprite('ic_drop', { at: to, delay: 0.62 + i * 0.02, size: 0.8 * S, life: 0.5, z: 7,
+          anim: (k) => ({ x: rand(-2, 2) * k * S, y: (2 * k - 2.5 * k * k) * S, o: fade(k, 0.5) }) });
+        sprite('ring_b2', { at: to, delay: 0.62, size: 3.4 * S, life: 0.45, z: 5, anim: (k) => ({ s: 0.5 + ease.out(k) * 1.2, o: fade(k, 0.3) }) });
+        break;
+      }
+      case 'grandsteamer':
+        [0, 1, 2].forEach((i) => { const a = (i / 3) * TAU; sprite(i === 1 ? 'tornado2' : 'tornado1', { at: at0, size: 3.6 * S, life: 1.3, z: 4,
+          anim: (k) => ({ x: Math.sin(a + k * 9) * 2 * S * (1 - k * 0.4), z: Math.cos(a + k * 9) * S, y: k * 0.8 * S, s: 0.6 + k * 0.8, o: k < 0.15 ? k / 0.15 : fade(k, 0.7) }) }); });
+        sprite('cloud3', { at: at0, size: 5 * S, life: 1.2, z: 2, anim: (k) => ({ s: 0.5 + k * 1.2, o: fade(k, 0.5) * 0.7 }) });
+        sprite('goldburst', { at: at(f, 0.5), delay: 0.65, size: 5 * S, life: 0.6, z: 6, anim: (k) => ({ s: 0.8 + k, o: fade(k, 0.4) }) });
+        sprite('tornado2', { at: atO, delay: 0.7, size: 6 * S, life: 0.7, z: 7, anim: (k) => ({ s: ease.pop(k), r: Math.sin(k * 20) * 0.1, o: fade(k, 0.6) }) });
+        sprite('impact3', { at: atO, delay: 0.72, size: 5 * S, life: 0.5, z: 8, anim: (k) => ({ s: ease.pop(k), r: k, o: fade(k, 0.5) }) });
+        sprite('halo', { at: at(o, 2.6), delay: 0.8, size: 3 * S, life: 0.8, z: 8, anim: (k) => ({ r: k * 4, o: fade(k, 0.5) }) });
+        break;
+      case 'goldenfry': {
+        const from = at(f, 1.4), to = at(o, 1.0);
+        sprite('dragon', { at: from, delay: 0.15, size: 7 * S, life: 0.7, z: 7, flip: to.x < from.x,
+          anim: (k) => ({ x: (to.x - from.x) * ease.out(k) * 1.1, z: (to.z - from.z) * ease.out(k), y: Math.sin(k * Math.PI) * 1.2 * S, s: 0.6 + k * 0.5, o: k < 0.1 ? k * 10 : fade(k, 0.75) }) });
+        sprite('fireburst', { at: atO, delay: 0.7, size: 6 * S, life: 0.6, z: 8, anim: (k) => ({ s: ease.pop(k), y: k * 0.5 * S, o: fade(k, 0.5) }) });
+        sprite('impact1', { at: atO, delay: 0.72, size: 4.6 * S, life: 0.45, z: 9, anim: (k) => ({ s: ease.pop(k), r: k, o: fade(k, 0.5) }) });
+        sprite('goldring', { at: at(o, 0.1), delay: 0.72, size: 4 * S, life: 0.7, z: 1, anim: (k) => ({ s: 0.4 + ease.out(k) * 2, o: fade(k, 0.3) }) });
+        break;
+      }
+      case 'hotpot':
+        sprite('ring_b2', { at: at0, size: 4 * S, life: 0.7, z: 3, anim: (k) => ({ s: 0.4 + k, r: k * 3, o: fade(k, 0.6) }) });
+        sprite('ice2', { at: at(o, 0.9), delay: 0.7, size: 5.6 * S, life: 0.8, z: 7, anim: (k) => ({ s: ease.pop(k), y: -0.3 * S * (1 - k), o: fade(k, 0.65) }) });
+        sprite('ice1', { at: at(o, 0.7), delay: 0.76, size: 4 * S, life: 0.7, z: 8, anim: (k) => ({ x: 1.4 * S, s: ease.pop(k), o: fade(k, 0.6) }) });
+        sprite('ice1', { at: at(o, 0.7), delay: 0.8, size: 3.6 * S, life: 0.7, z: 8, flip: true, anim: (k) => ({ x: -1.4 * S, s: ease.pop(k), o: fade(k, 0.6) }) });
+        ['bolt1', 'bolt2', 'bolt1'].forEach((n, i) => sprite(n, { at: atO, delay: 0.72 + i * 0.1, size: 4 * S, life: 0.25, z: 9, flip: i === 1, anim: (k) => ({ y: (1 - i * 0.5) * S, o: k < 0.5 ? 1 : 0 }) }));
+        break;
+    }
+  }
+  /** Run something after a number of fight-seconds (pauses and slows with the match). */
+  function setTimeoutFight(sec, fn) { sprite('sparkle', { at: new THREE.Vector3(0, -50, 0), size: 0.01, delay: sec, life: 0.01, anim: (k, e) => { if (!e.done) { e.done = true; fn(); } return { o: 0 }; } }); }
+
+  /* ---------- HUD for tap battles ---------- */
+  function btHudHtml(p, e, oppImg) {
+    return `<div class="bt-hud">
+      <div class="bt-card me"><canvas class="bt-face" id="bt-face"></canvas><div class="bt-info"><b class="bt-name">${DG.ui.esc(p.name)}</b>
+        <div class="bt-bar hp"><i></i><em></em></div><div class="bt-bar en"><i></i></div><div class="bt-ready" id="bt-ready1"></div></div></div>
+      <div class="bt-timer"><img src="${btSrc('timer')}" alt=""><b id="bt-time">90</b></div>
+      <div class="bt-card them"><div class="bt-info"><b class="bt-name">${DG.ui.esc(e.name)}</b>
+        <div class="bt-bar hp"><i></i><em></em></div><div class="bt-bar en"><i></i></div><div class="bt-ready style">${DG.STYLES[e.style].name}</div></div>${oppImg ? `<img class="bt-face" src="${oppImg}" alt="">` : '<span class="bt-face"></span>'}</div>
+    </div>`;
+  }
+  function btHudUpdate() {
+    const hud = stageEl.querySelector('.bt-hud'); if (!hud) return;
+    const [p, e] = F;
+    const side = (f, el) => {
+      const pct = Math.max(0, f.hp / f.maxHp) * 100;
+      el.querySelector('.hp i').style.width = pct + '%';
+      el.querySelector('.hp').classList.toggle('low', pct < 30);
+      el.querySelector('.hp em').textContent = `${Math.ceil(f.hp)} / ${f.maxHp}`;
+    };
+    side(p, hud.querySelector('.me')); side(e, hud.querySelector('.them'));
+    hud.querySelector('.me .en i').style.width = p.special + '%';
+    hud.querySelector('.them .en i').style.width = (e.state === 'windup' ? Math.min(100, (e.stT / e.windup) * 100) : 0) + '%';
+    const ready = [0, 1].some((i) => tapSpecialState(p, i).ready);
+    const r = hud.querySelector('#bt-ready1'); r.textContent = ready ? 'SPECIAL READY ✦' : 'Charging…'; r.classList.toggle('on', ready);
+    hud.querySelector('#bt-time').textContent = Math.ceil(match.time);
+  }
+  /** A special's button: a glossy orb in the move's colour with its picture, and three charge pips. */
+  const ORB = { steampuff: ['#b78cff', 'e-steam-burst'], bunslam: ['#ffb34a', 'e-ground-shockwave'], crispydash: ['#ff7a3a', 'e-gold-sparks'], pleatflurry: ['#5fb0ff', 'e-attack-slash'],
+    brothbubble: ['#4cc2ff', 'e-shield-bubble'], ladlesplash: ['#3fa0ff', 'e-broth-splash'], grandsteamer: ['#a54cf0', 'e-purple-tornado'], goldenfry: ['#ff5a2a', 'e-fire-dragon'], hotpot: ['#58c8ff', 'e-ice-burst'] };
+  function btOrb(id) { const o = ORB[id] || ['#ffb34a', 'sparkle']; return `<span class="bt-orb" style="--oc:${o[0]}"><img src="${o[1].startsWith('e-') ? colSrc(o[1]) : btSrc(o[1])}" alt=""></span>`; }
+
+  /* ===================== Coliseum 2D stage (solo tap battles) =====================
+     The painted portrait arena plate with hand-painted pose sprites layered over it. Combat still runs
+     in world units on the floor plane (x across, z into the screen); this layer only maps them to the
+     plate and draws. Pose canvases are 1024 logical px with the feet pivot at (512, 875), facing right. */
+  const colSrc = (n) => assetSrc(`img/col/${n}.webp`, 1);
+  const COL = {}; // image cache
+  function colImg(n) { let im = COL[n]; if (!im) { im = COL[n] = new Image(); im.decoding = 'async'; im.src = colSrc(n); } return im; }
+  const colOk = (im) => im && im.complete && im.naturalWidth > 0;
+  const POSES = ['idle', 'wind-up', 'attack', 'hurt', 'dodge', 'block', 'knocked-out', 'neutral-front'];
+  /* Per species and pose, measured from the art: [eyeX, eyeY, tilt, headTopY, mouthY, headWidth, eyeSpan, contentBox] in 1024 px. */
+  const ANCH = {"bao":{"idle":[515,539,-0.006,229,612,662,267,[122,227,890,865]],"wind-up":[582,402,-0.155,279,460,478,184,[175,224,887,868]],"attack":[690,605,0.088,280,685,525,202,[109,269,910,870]],"hurt":[505,399,0.093,257,492,455,175,[166,210,861,870]],"dodge":[374,680,-0.002,350,747,580,223,[132,310,881,868]],"block":[607,570,-0.001,232,638,611,235,[145,232,878,864]],"knocked-out":[543,742,-0.009,426,793,666,256,[96,426,931,864]],"neutral-front":[505,537,-0.007,252,608,661,260,[114,248,904,869]]},"gyoza":{"idle":[523,661,-0.003,409,714,632,243,[94,409,929,874]],"wind-up":[589,589,-0.222,381,830,460,177,[138,380,883,873]],"attack":[671,700,0.091,433,775,465,179,[103,427,922,873]],"hurt":[491,616,0.343,378,798,421,162,[143,378,880,874]],"dodge":[443,746,-0.007,474,803,559,215,[116,465,908,872]],"block":[513,679,0.001,419,844,494,190,[96,419,929,872]],"knocked-out":[517,774,0.001,548,853,523,201,[84,548,940,873]],"neutral-front":[517,675,-0.001,419,850,556,214,[95,419,930,873]]},"soup":{"idle":[581,585,-0.01,240,669,720,277,[148,238,871,867]],"wind-up":[625,480,-0.18,197,540,647,249,[138,197,879,870]],"attack":[689,629,0.044,257,720,658,253,[135,220,882,868]],"hurt":[428,567,-0.242,226,645,658,253,[142,198,884,866]],"dodge":[662,656,-0.115,339,714,647,249,[131,331,891,871]],"block":[541,597,-0.005,222,655,681,262,[152,222,873,867]],"knocked-out":[533,736,-0.008,407,787,699,269,[88,407,939,861]],"neutral-front":[526,598,-0.001,226,666,716,279,[155,226,872,866]]}};
+  /* Accessories: [kind, width × head width, drop, content box in their 1024 canvas].
+     kind 'hat' sits its bottom edge `drop` of the way from head top to eyes; 'band' centres there;
+     'eyes' / 'stache' / 'chest' are face and body anchors. */
+  const ACC = {
+    viking: ['hat', 1.0, 0.6, [64, 215, 960, 809]], cap: ['hat', 0.95, 0.58, [64, 198, 960, 826]], tinyhat: ['hat', 0.78, 0.3, [64, 149, 960, 874]],
+    chef: ['hat', 0.68, 0.36, [64, 171, 960, 852]], party: ['hat', 0.42, 0.22, [142, 64, 882, 960]], crown: ['hat', 0.6, 0.28, [64, 190, 960, 834]],
+    beret: ['hat', 0.85, 0.42, [64, 203, 960, 821]], bow: ['hat', 0.55, 0.22, [64, 203, 960, 820]], flower: ['hat', 0.86, 0.36, [64, 276, 960, 748]],
+    headband: ['hat', 1.0, 0.48, [64, 216, 960, 808]], ninja: ['band', 1.04, 0.6, [64, 252, 960, 772]], headphones: ['band', 1.16, 0.5, [64, 145, 960, 879]],
+    shades: ['eyes', 1.75, 0, [64, 338, 960, 686]], glasses: ['eyes', 1.8, 0, [64, 315, 960, 708]],
+    mustache: ['stache', 1.3, 0, [64, 349, 960, 674]], bowtie: ['chest', 1.05, 0, [64, 256, 960, 767]],
+  };
+  const DROP = { bao: 1, gyoza: 0.85, soup: 0.75 }; // the shumai's open top sits lower than a bao's knot
+  const STAGE_SIZE = [0.82, 0.88, 0.94, 1, 1.07];
+  /* Where the floor is on the plate: world (x, z) → plate (u, v). */
+  const PLATE = { U0: 0.5, AU: 0.45, V0: 0.47, AV: 0.16, W: 1080, H: 1920 };
+  let colView = null; // { px, py, pw, ph, w, h, dpr }
+  function colLayout(cv) {
+    const w = cv.clientWidth || window.innerWidth, h = cv.clientHeight || window.innerHeight, dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    // keep the full-width composition; on very tall phones allow a slight side crop so the ring stays big
+    const pw = Math.max(w, Math.min(h * (PLATE.W / PLATE.H) * 0.92, w * 1.12)), ph = pw * (PLATE.H / PLATE.W);
+    const py = Math.min(0, (h - ph) * 0.5) + Math.max(0, (h - ph) * 0.42);
+    colView = { px: (w - pw) / 2, py, pw, ph, w, h, dpr };
+    return colView;
+  }
+  const depth = (v) => 1 + (v - PLATE.V0) * 1.5;
+  /** World point → screen {x, y, ppu (px per world unit), ds (depth scale)} in CSS px. */
+  function pj(p) {
+    const V = colView, R = match.R, u = PLATE.U0 + (p.x / R) * PLATE.AU, v = PLATE.V0 + (p.z / R) * PLATE.AV, ds = depth(v);
+    const ppu = (V.pw * PLATE.AU / R) * ds;
+    return { x: V.px + u * V.pw, y: V.py + v * V.ph - (p.y || 0) * ppu, ppu, ds };
+  }
+  /** Screen point → floor point (world), or null if it's far off the ring. */
+  function unpj(sx, sy) {
+    const V = colView, R = match.R, u = (sx - V.px) / V.pw, v = (sy - V.py) / V.ph;
+    const x = ((u - PLATE.U0) / PLATE.AU) * R, z = ((v - PLATE.V0) / PLATE.AV) * R, d = Math.hypot(x, z);
+    if (d > R * 1.35) return null;
+    const lim = R * 0.98, k = d > lim ? lim / d : 1;
+    return new THREE.Vector3(x * k, 0, z * k);
+  }
+  /** How big a fighter's 1024-px pose canvas is drawn on screen. */
+  function fighterPx(f, ds) { return colView.pw * 0.4 * STAGE_SIZE[Math.min(4, f.stageIdx == null ? 3 : f.stageIdx)] * ds; }
+
+  /* Tinted copies (rival colours, Closet colours, white hit-flash) cached per image + colour. */
+  const TINT = {};
+  function tinted(name, color, mode) {
+    const im = colImg(name); if (!colOk(im)) return null;
+    const key = name + '|' + color + '|' + mode; if (TINT[key]) return TINT[key];
+    const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+    const x = c.getContext('2d');
+    x.drawImage(im, 0, 0);
+    if (mode === 'white') { x.globalCompositeOperation = 'source-atop'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height); }
+    else { x.globalCompositeOperation = 'multiply'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height); x.globalCompositeOperation = 'destination-in'; x.drawImage(im, 0, 0); }
+    return (TINT[key] = c);
+  }
+  /** The pose a fighter shows right now. */
+  function poseOf(f) {
+    if (f.state === 'ko') return 'knocked-out';
+    if (f.state === 'stun') return 'hurt';
+    if (f.state === 'dodge') return 'dodge';
+    if (f.blocking || f.tapShieldT > 0) return 'block';
+    if (f.state === 'windup' || f.state === 'charge') return 'wind-up';
+    if (f.state === 'attack') return 'attack';
+    if (f.state === 'recover') return f.stT < 0.14 ? 'attack' : 'idle';
+    if (f.state === 'move') return f.mv && f.mv.t() < 0.2 ? 'wind-up' : 'attack';
+    if (f.flash > 0.08) return 'hurt';
+    return 'idle';
+  }
+  /** Draws one dumpling (body, then accessory) with its feet at (x, y). o: { species, pose, size, mirror, tint, acc, glow, flash, alpha, sx, sy, rot } */
+  function drawDumpling2D(ctx, x, y, o) {
+    const body = colImg(`f-${o.species}-${o.pose}`); if (!colOk(body)) return;
+    const k = o.size / 1024;
+    ctx.save();
+    ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+    ctx.translate(x, y); if (o.rot) ctx.rotate(o.rot); ctx.scale((o.mirror ? -1 : 1) * (o.sx || 1), o.sy || 1); ctx.translate(-512 * k, -875 * k);
+    const src = o.tint ? (tinted(`f-${o.species}-${o.pose}`, o.tint, 'mul') || body) : body;
+    if (o.glow) { ctx.shadowColor = o.glow; ctx.shadowBlur = 34 * (o.size / 300); ctx.drawImage(src, 0, 0, 1024 * k, 1024 * k); ctx.drawImage(src, 0, 0, 1024 * k, 1024 * k); ctx.shadowBlur = 0; }
+    ctx.drawImage(src, 0, 0, 1024 * k, 1024 * k);
+    if (o.flash > 0) { const wc = tinted(`f-${o.species}-${o.pose}`, '#ffffff', 'white'); if (wc) { ctx.globalAlpha *= Math.min(1, o.flash * 5) * 0.7; ctx.drawImage(wc, 0, 0, 1024 * k, 1024 * k); ctx.globalAlpha = o.alpha == null ? 1 : o.alpha; } }
+    if (o.acc) drawAccessory2D(ctx, o.species, o.pose, o.acc, k);
+    ctx.restore();
+  }
+  function drawAccessory2D(ctx, species, pose, id, k) {
+    const a = ACC[id], an = ANCH[species] && ANCH[species][pose], im = colImg('a-' + id);
+    if (!a || !an || !colOk(im)) return;
+    const [ex, ey, tilt, top, mouthY, headW, span] = an, [kind, wf, drop, cb] = a;
+    const cw = cb[2] - cb[0], ch = cb[3] - cb[1];
+    let w, ax, ay, ox, oy; // draw width; anchor point on the head; anchor point in the accessory's own content
+    if (kind === 'hat') { w = headW * wf; ax = ex; ay = top + (ey - top) * drop * DROP[species]; ox = (cb[0] + cb[2]) / 2; oy = cb[3] - ch * 0.06; }
+    else if (kind === 'band') { w = headW * wf; ax = ex; ay = top + (ey - top) * drop; ox = (cb[0] + cb[2]) / 2; oy = (cb[1] + cb[3]) / 2; }
+    else if (kind === 'eyes') { w = span * wf; ax = ex; ay = ey; ox = (cb[0] + cb[2]) / 2; oy = (cb[1] + cb[3]) / 2; }
+    else if (kind === 'stache') { w = span * wf; ax = ex; ay = ey + (mouthY - ey) * 0.6; ox = (cb[0] + cb[2]) / 2; oy = (cb[1] + cb[3]) / 2; }
+    else { w = span * wf; ax = ex; ay = ey + (875 - ey) * 0.66; ox = (cb[0] + cb[2]) / 2; oy = (cb[1] + cb[3]) / 2; }
+    const s = w / cw;
+    ctx.save();
+    ctx.translate(ax * k, ay * k); ctx.rotate(tilt); ctx.scale(s * k, s * k); ctx.translate(-ox, -oy);
+    ctx.drawImage(im, 0, 0, 1024, 1024);
+    ctx.restore();
+  }
+  /** Colour used for a fighter's body: rivals use their colour; Closet colours tint the player (Classic stays natural). */
+  function bodyTint(f) {
+    if (!f.isPlayer) return f.tint2d || null;
+    const lk = f.look && f.look.color;
+    if (!lk || lk === 'classic') return null;
+    const c = DG.lookColors(f.shape, f.look); return c && c.base ? DG.draw.mix(c.base, '#ffffff', 0.25) : null;
+  }
+  /** Screen box of a fighter's drawn body (for tap targeting). */
+  function fighterBox(f) {
+    const p = pj(f.pos), D = fighterPx(f, p.ds), an = ANCH[f.shape] && ANCH[f.shape][poseOf(f)], b = an ? an[7] : [150, 250, 870, 875], k = D / 1024;
+    const mir = f.mirror2d;
+    const x0 = p.x + (mir ? 512 - b[2] : b[0] - 512) * k, x1 = p.x + (mir ? 512 - b[0] : b[2] - 512) * k;
+    const hy = f.hopY * p.ppu;
+    return { x0, x1, y0: p.y - hy + (b[1] - 875) * k, y1: p.y - hy + (b[3] - 875) * k, cx: (x0 + x1) / 2, cy: p.y - hy + ((b[1] + b[3]) / 2 - 875) * k };
+  }
+
+  function colRender(dt) {
+    const cv = stageEl && stageEl.querySelector('#bt-cv'); if (!cv) return;
+    const V = colLayout(cv), ctx = cv.getContext('2d');
+    ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
+    let sx = 0, sy = 0;
+    if (match.shake > 0) { sx = rand(-1, 1) * match.shake * 14; sy = rand(-1, 1) * match.shake * 14; match.shake = Math.max(0, match.shake - dt * 1.2); }
+    ctx.translate(sx, sy);
+    // the plate (mirrored strips fill any space above/below on very tall screens)
+    const plate = colImg('arena');
+    ctx.fillStyle = '#d9925a'; ctx.fillRect(-20, -20, V.w + 40, V.h + 40);
+    if (colOk(plate)) {
+      if (V.py > 0) { ctx.save(); ctx.translate(0, V.py); ctx.scale(1, -1); ctx.drawImage(plate, 0, 0, PLATE.W, PLATE.H * (V.py / V.ph) + 2, V.px, 0, V.pw, V.py + 2); ctx.restore(); }
+      const bot = V.py + V.ph;
+      if (bot < V.h) { ctx.save(); ctx.translate(0, bot); ctx.scale(1, -1); const hh = V.h - bot; ctx.drawImage(plate, 0, PLATE.H * (1 - hh / V.ph), PLATE.W, PLATE.H * (hh / V.ph), V.px, -hh, V.pw, hh); ctx.restore(); }
+      ctx.drawImage(plate, V.px, V.py, V.pw, V.ph);
+    }
+    const e = F[1], a = e && e.tap && e.tap.atk, warn = a && !a.resolved && e.state === 'windup';
+    // fighters, back to front
+    const order = F.slice().sort((p, q) => p.pos.z - q.pos.z);
+    order.forEach((f) => {
+      const o = f === F[0] ? F[1] : F[0], p = pj(f.pos), D = fighterPx(f, p.ds);
+      if (Math.abs(o.pos.x - f.pos.x) > 0.15 * match.S) f.mirror2d = o.pos.x < f.pos.x; // face the rival
+      const pose = poseOf(f);
+      // soft contact shadow
+      const lift = Math.max(0, f.hopY) * p.ppu;
+      ctx.save(); ctx.globalAlpha = Math.max(0.15, 0.32 - lift / 600);
+      const sg = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, D * 0.32); sg.addColorStop(0, 'rgba(90,40,15,0.8)'); sg.addColorStop(1, 'rgba(90,40,15,0)');
+      ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(p.x, p.y, D * 0.32, D * 0.07, 0, 0, TAU); ctx.fill(); ctx.restore();
+      // a little life: breathing, wind-up shiver, hit squash
+      let sxk = 1, syk = 1, rot = 0, dx = 0;
+      if (pose === 'idle') { const b = Math.sin(T * 4 + (f.isPlayer ? 0 : 1.7)); syk = 1 + b * 0.025; sxk = 1 - b * 0.015; }
+      if (pose === 'wind-up') { dx = Math.sin(T * 60) * 1.5; syk = 0.97; }
+      if (pose === 'hurt') rot = (f.mirror2d ? 1 : -1) * 0.05;
+      if (f.state === 'dodge' && colOk(colImg('e-dodge-trail'))) { // speed trail behind the sidestep
+        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - f.stT / 0.4) * 0.85; ctx.translate(p.x, p.y - lift - D * 0.22); ctx.scale(f.mirror2d ? -1 : 1, 1);
+        ctx.drawImage(colImg('e-dodge-trail'), -D * 0.95, -D * 0.25, D * 0.7, D * 0.5); ctx.restore();
+      }
+      if (f === e && warn) { // a coloured aura behind the rival while it winds up
+        const kk = Math.min(1, e.stT / e.windup), pul = 0.75 + 0.25 * Math.sin(T * 18), cx0 = p.x, cy0 = p.y - lift - D * 0.3, rr = D * (0.5 + 0.08 * kk);
+        const ag = ctx.createRadialGradient(cx0, cy0, rr * 0.25, cx0, cy0, rr);
+        const c0 = a.color === 'blue' ? '70,150,255' : '255,60,45';
+        ag.addColorStop(0, `rgba(${c0},${0.7 * pul})`); ag.addColorStop(0.55, `rgba(${c0},${0.5 * pul})`); ag.addColorStop(1, `rgba(${c0},0)`);
+        ctx.save(); ctx.fillStyle = ag; ctx.beginPath(); ctx.ellipse(cx0, cy0, rr, rr * 0.85, 0, 0, TAU); ctx.fill(); ctx.restore();
+      }
+      const glow = f === e && warn ? (a.color === 'blue' ? `rgba(70,150,255,${0.75 + 0.25 * Math.sin(T * 20)})` : `rgba(255,60,50,${0.75 + 0.25 * Math.sin(T * 20)})`) : null;
+      drawDumpling2D(ctx, p.x + dx, p.y - lift, { species: f.shape, pose, size: D, mirror: f.mirror2d, tint: bodyTint(f), acc: f.accessory, glow, flash: f.flash, sx: sxk, sy: syk, rot,
+        alpha: f.state === 'ko' && f.stT > 2.4 ? Math.max(0.4, 1 - (f.stT - 2.4)) : 1 });
+      // gold slash sweeping around your attack
+      if ((f.state === 'attack' || (f.state === 'recover' && f.stT < 0.16)) && colOk(colImg('e-attack-slash'))) {
+        const kk = f.state === 'attack' ? 0.35 + f.stT * 3 : 0.75 + f.stT * 2;
+        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - Math.max(0, kk - 0.6) * 2.2); ctx.globalCompositeOperation = 'lighter';
+        ctx.translate(p.x, p.y - lift - D * 0.3); ctx.scale(f.mirror2d ? -1 : 1, 1); ctx.rotate(-0.35 + kk * 0.5);
+        ctx.drawImage(colImg('e-attack-slash'), -D * 0.62, -D * 0.5, D * 1.24, D * 1.0); ctx.restore();
+      }
+      // blue telegraph: a shield bubble around the rival
+      if (f === e && warn && a.color === 'blue' && colOk(colImg('e-shield-bubble'))) {
+        const kk = Math.min(1, e.stT / e.windup), s = D * (0.95 + 0.04 * Math.sin(T * 9)) * (0.85 + 0.15 * Math.min(1, kk * 3));
+        ctx.save(); ctx.globalAlpha = 0.85; ctx.drawImage(colImg('e-shield-bubble'), p.x - s / 2, p.y - lift - D * 0.36 - s / 2, s, s); ctx.restore();
+      }
+      if (f.bubble > 0 && colOk(colImg('e-shield-bubble'))) { // Broth Bubble
+        const s = D * (1.0 + 0.04 * Math.sin(T * 9));
+        ctx.save(); ctx.globalAlpha = 0.75; ctx.drawImage(colImg('e-shield-bubble'), p.x - s / 2, p.y - lift - D * 0.36 - s / 2, s, s); ctx.restore();
+      }
+    });
+  }
+  /** Portrait for the HUD: the player's species with their Closet colour and accessory. */
+  function drawFace2D(cv, f) {
+    const draw = () => {
+      if (!cv.isConnected) return;
+      const im = colImg(`f-${f.shape}-neutral-front`), ai = f.accessory ? colImg('a-' + f.accessory) : null;
+      if (!colOk(im) || (ai && !colOk(ai))) { setTimeout(draw, 120); return; }
+      const dpr = Math.min(2.5, window.devicePixelRatio || 1), w = cv.clientWidth || 48, h = cv.clientHeight || 44;
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+      const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+      const an = ANCH[f.shape]['neutral-front'], b = an[7], top = f.accessory && ACC[f.accessory] && ACC[f.accessory][0] === 'hat' ? an[3] - 160 : b[1];
+      const k = Math.min(w / (b[2] - b[0]), h / (b[3] - top)) * 0.96;
+      drawDumpling2D(ctx, w / 2 + (512 - (b[0] + b[2]) / 2) * k, h - 1 + (875 - b[3]) * k, { species: f.shape, pose: 'neutral-front', size: 1024 * k, tint: bodyTint(f), acc: f.accessory });
+    };
+    draw();
+  }
+  function colPreload(defs) {
+    ['arena', 'e-attack-slash', 'e-shield-bubble', 'e-dodge-trail', 'e-hit-spark', 'e-block-shield', 'e-attack-warning', 'e-dodge-chevron'].forEach(colImg);
+    defs.forEach((d) => { POSES.forEach((p) => colImg(`f-${d.shape}-${p}`)); if (d.accessory && ACC[d.accessory]) colImg('a-' + d.accessory); });
+  }
+
+  /* ===================== Tap combat (single-player default) =====================
+     Fighters stand facing each other. Tap the rival (or press J) to attack; Block / Dodge answer the
+     opponent's telegraphed attacks: BLUE (shield, "BLOCK") = Block, RED (chevrons, "DODGE") = Dodge.
+     The answer is accepted any time during the wind-up and resolved at impact. Two equipped specials
+     spend the shared charge meter. Friend battles keep the classic controls. */
+  /** The opponent's difficulty tier (0 = Chili Wonton … 6 = Grand Bao Champion); practice sparring counts as tier 0. */
+  function tapTier() { return match && match.opp ? match.opp.tier : 0; }
+  function tapWindup(e) { const t = tapTier(); return TAP.windup * (t <= 0 ? 1.5 : t === 1 ? 1.25 : t >= 6 ? 0.92 : 1); }
+  function tapQueue(kind) {
+    if (!match || match.mode !== 'tap' || match.paused || match.over || match.phase !== 'fight') return;
+    tapQ = kind; // one input per press; a newer press replaces an older unhandled one
+  }
+  function tapClearInputs() { tapQ = null; tapMoveTo = null; Object.keys(edges).forEach((k) => (edges[k] = false)); Object.keys(keys).forEach((k) => (keys[k] = false)); }
+  /** Cancel the opponent's current telegraph (pause, KO, time-out, end) so no cue is ever left hanging. */
+  function tapCancelCue(reason) {
+    const e = F[1]; if (!e || !e.tap) return;
+    const a = e.tap.atk;
+    if (a && !a.resolved) { a.resolved = true; a.cancelled = reason || true; }
+    e.tap.atk = null;
+    if (e.state === 'windup') { setState(e, 'idle'); e.tap.next = match.ft + rand(TAP.gapMin, TAP.gapMax); }
+    tapCueEl(null);
+  }
+  function tapCueEl(a) {
+    const el = stageEl && stageEl.querySelector('#a-cue'); if (!el) return;
+    if (!a) { el.className = 'a-cue'; el.innerHTML = ''; return; }
+    el.className = 'a-cue show ' + a.color;
+    el.innerHTML = a.color === 'blue' ? `<img src="${colSrc('e-block-shield')}" alt=""><b>BLOCK</b>`
+      : `<span class="cue-row"><img src="${colSrc('e-attack-warning')}" alt=""><img class="chev" src="${colSrc('e-dodge-chevron')}" alt=""></span><b>DODGE</b>`;
+    const tele = stageEl.querySelector('#bt-tele'); if (tele) tele.src = btSrc(a.color === 'blue' ? 'ring_b1' : 'ring_r');
+    el.setAttribute('aria-label', a.color === 'blue' ? 'Blue attack coming: Block' : 'Red attack coming: Dodge');
+  }
+
+  /** Where on the arena floor (y = 0) a screen point lands, kept inside the ring; null if off the floor. */
+  function tapFloorPoint(clientX, clientY) {
+    if (colView) { const r = stageEl.querySelector('#bt-cv').getBoundingClientRect(); return unpj(clientX - r.left, clientY - r.top); }
+    const r = renderer.domElement.getBoundingClientRect();
+    const rc = new THREE.Raycaster(); rc.setFromCamera({ x: ((clientX - r.left) / r.width) * 2 - 1, y: -((clientY - r.top) / r.height) * 2 + 1 }, camera);
+    const hit = new THREE.Vector3();
+    if (!rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) return null;
+    const lim = match.R * 1.05, d = Math.hypot(hit.x, hit.z);
+    if (d > lim * 1.25) return null; // well outside the ring (the stands)
+    if (d > lim) hit.multiplyScalar(lim / d);
+    return hit;
+  }
+  /** Is this screen point on the rival? Uses a raycast plus a generous circle around the projected fighter. */
+  function tapHitsRival(clientX, clientY) {
+    if (colView) {
+      const r = stageEl.querySelector('#bt-cv').getBoundingClientRect(), x = clientX - r.left, y = clientY - r.top, b = fighterBox(F[1]);
+      const pad = Math.min(r.width, r.height) < 500 ? 22 : 12, rad = Math.max(TAP.tapRadius * (r.width < 500 ? 1.15 : 1), (b.y1 - b.y0) * 0.55);
+      return (x >= b.x0 - pad && x <= b.x1 + pad && y >= b.y0 - pad && y <= b.y1 + pad) || Math.hypot(x - b.cx, y - b.cy) <= rad;
+    }
+    const e = F[1]; if (!e || !renderer) return false;
+    const r = renderer.domElement.getBoundingClientRect();
+    const nx = ((clientX - r.left) / r.width) * 2 - 1, ny = -((clientY - r.top) / r.height) * 2 + 1;
+    const rc = new THREE.Raycaster(); rc.setFromCamera({ x: nx, y: ny }, camera);
+    if (rc.intersectObject(e.mesh.body, true).length) return true;
+    const c = new THREE.Vector3(e.pos.x, (e.mesh.topY * 0.5) * match.S, e.pos.z).project(camera);
+    const top = new THREE.Vector3(e.pos.x, e.mesh.topY * match.S, e.pos.z).project(camera);
+    const cx = r.left + (c.x * 0.5 + 0.5) * r.width, cy = r.top + (-c.y * 0.5 + 0.5) * r.height;
+    const ty = r.top + (-top.y * 0.5 + 0.5) * r.height;
+    const small = Math.min(r.width, r.height) < 500;
+    const rad = Math.max(TAP.tapRadius * (small ? 1.3 : 1), Math.abs(cy - ty) * 1.35);
+    return Math.hypot(clientX - cx, clientY - cy) <= rad;
+  }
+
+  function tapSpecialState(f, i) {
+    const id = f.tapMoves[i], mv = DG.TAP_MOVES[id];
+    const cd = f.tapCd[id] || 0, busy = f.state === 'move' || f.state === 'stun' || f.state === 'ko';
+    return { id, mv, cd, ready: !!mv && f.special >= mv.cost && cd <= 0 && !busy && !match.over };
+  }
+  function tapStartSpecial(f, o, i) {
+    const s = tapSpecialState(f, i);
+    if (!s.mv) return;
+    if (!s.ready) {
+      if (f.msgT <= 0) { floatText(f, s.cd > 0 ? 'Cooling down…' : f.special < s.mv.cost ? 'Still charging…' : 'Not now', '#ffe08a'); f.msgT = 0.5; }
+      return;
+    }
+    f.special -= s.mv.cost; f.tapCd[s.id] = s.mv.cd; // spent exactly once, here
+    f.blocking = false; f.hitDone = true;
+    setState(f, 'move');
+    f.mvMul = s.mv.power / (MOVE_BASE[s.id] || 1);
+    const make = () => {
+      if (s.id === 'brothbubble') return tapBubble(f, o, s.mv);
+      if (s.id === 'grandsteamer' || s.id === 'goldenfry' || s.id === 'hotpot') { cutIn(f, DG.MOVES[s.id].name); speedLines(0.9); return ultimate(f, o, s.id); }
+      return MOVES[s.id](f, o);
+    };
+    f.mv = tapCloseIn(f, o, make);
+    f.mvSlot = 'tap' + i;
+    btSpecialFx(s.id, f, o);
+    floatText(f, DG.MOVES[s.id].name + '!', '#ffe08a', true);
+    speedLines(0.25); sfx('special'); match.stats.specials++;
+  }
+  /** Specials first hop into range (fighters stand apart in tap mode), then run the move itself. */
+  function tapCloseIn(f, o, make) {
+    let inner = null, t = 0;
+    const want = f.radius + o.radius + 0.5 * match.S;
+    return { update(dt) {
+      t += dt;
+      if (!inner) {
+        const d = flatDist(f, o);
+        if (d > want && t < 0.25) { f.vel.copy(dirTo(f, o)).multiplyScalar(Math.min(26 * match.S, (d - want) / Math.max(dt, 0.016))); return false; }
+        f.vel.set(0, 0, 0); inner = make();
+      }
+      return inner.update(dt);
+    }, t: () => (inner ? inner.t() : 0) };
+  }
+  /** Broth Bubble in tap mode: a short protective bubble that pops outward for bonus damage. */
+  function tapBubble(f, o) {
+    let t = 0, popped = false;
+    f.bubble = 1.1; ring(f.pos, 0x9fe0ff, 2.5 * match.S, 0.5); sfx('pop');
+    return { update(dt) {
+      t += dt; f.vel.set(0, 0, 0);
+      if (!popped && t >= 0.55) {
+        popped = true; sfx('splash'); ring(f.pos, 0x9fe0ff, 4 * match.S, 0.5); puffs(f.pos, 14, 0xbfe9ff, 2.6 * match.S, 0.3);
+        applyHit(f, o, f.dmg, { kb: 4, stun: 0.45, aoe: true, noParry: true });
+      }
+      return t >= 0.75;
+    }, t: () => t };
+  }
+
+  function tapDefend(p, kind) {
+    if (p.state === 'ko' || p.state === 'stun' || p.state === 'move') return;
+    if (p.defCd > 0) return; // still busy with the last block/dodge
+    // answering a warning cancels your own basic attack straight away (before its hit lands)
+    if (p.state === 'windup' || (p.state === 'attack' && !p.hitDone) || p.state === 'recover') setState(p, 'idle');
+    p.defCd = TAP.defCd;
+    if (kind === 'block') { p.blocking = true; p.blockT = TAP.blockHold; sfx('block'); }
+    else { setState(p, 'dodge'); p.dodgeSide = p.dodgeSide === 1 ? -1 : 1; sfx('whoosh'); puffs(p.pos, 4, 0xfff1d6, 1.2 * match.S, 0.15); }
+    const a = F[1].tap && F[1].tap.atk;
+    if (a && !a.resolved && !a.choice && F[1].state === 'windup') a.choice = kind; // first answer during the wind-up counts
+  }
+  function tapAttack(p) {
+    if (p.state !== 'idle' || p.blocking) return;
+    setState(p, 'windup'); p.hitDone = false; p.windup = TAP.atkWindup;
+  }
+
+  /** The enemy decides, at the moment your basic attack lands, whether it blocks or sidesteps. */
+  function tapEnemyReact(e) {
+    if (e.state !== 'idle') return null;
+    const st = e.style === 'mixed' ? e.ai.cur : e.style, t = tapTier(), r = Math.random();
+    const pBlock = st === 'blocker' ? 0.25 + t * 0.07 : t >= 2 ? 0.06 + t * 0.02 : 0;
+    const pDodge = st === 'dodger' ? 0.2 + t * 0.06 : 0;
+    if (r < pBlock) return 'block';
+    if (r < pBlock + pDodge) return 'dodge';
+    return null;
+  }
+  function tapPlayerImpact(p, e) {
+    if (p.hitDone) return; p.hitDone = true; // one hit per attack
+    slashFx(p, false);
+    const counter = e.state === 'recover' || e.state === 'stun';
+    const react = counter ? null : tapEnemyReact(e);
+    if (react === 'dodge') {
+      setState(e, 'dodge'); e.tapSide = Math.random() < 0.5 ? 1 : -1; floatText(e, 'Dodged!', '#6fd3b5'); sfx('whoosh');
+      if (e.ai) e.ai.counter = true; return;
+    }
+    let mult = 1;
+    if (counter && e.state === 'recover') { mult = 1.25; floatText(p, 'COUNTER!', '#ffe066'); }
+    if (react === 'block') { e.blocking = true; e.tapShieldT = 0.4; if (e.ai) e.ai.counter = true; }
+    const res = applyHit(p, e, p.dmg * mult, { kb: 1.4, stun: 0.25, noParry: true, aoe: true, blockCost: 0 });
+    e.blocking = false;
+    btSlash(p, e, null, mult > 1);
+    if (!DG.state.settings.tapHintDone) { DG.state.settings.tapHintDone = true; DG.save(); const h = stageEl.querySelector('#a-taphint'); if (h) h.classList.add('gone'); } // onboarding done after the first hit
+    if (res === 'hit') btBurst(e, mult > 1 ? 'impact1' : 'impact2', mult > 1 ? 3 : 2.2, 0.35, 1.0);
+    else if (res === 'blocked') sprite('shield', { at: at(e, 1.2), size: 2 * match.S, life: 0.45, z: 7, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.5) }) });
+  }
+
+  /** Resolve the enemy's telegraphed attack at impact against the answer you gave during the wind-up. */
+  function tapEnemyImpact(e, p) {
+    const a = e.tap.atk; if (!a || a.resolved) return;
+    a.resolved = true; tapCueEl(null);
+    if (p.state === 'ko' || match.over) return;
+    const right = (a.color === 'blue' && a.choice === 'block') || (a.color === 'red' && a.choice === 'dodge');
+    if (right && a.color === 'blue') {
+      p.blocking = true; p.blockT = Math.max(p.blockT || 0, 0.25); parry(p, e); match.stats.blocks++;
+      btBadge(p, 'blockbadge'); btRing(p, 'ring_b2', 3.4, 0.5); sprite('shield', { at: at(p, 1.2), size: 2.4 * match.S, life: 0.5, z: 7, anim: (k) => ({ s: ease.pop(k), o: fade(k, 0.6) }) });
+      return;
+    }
+    if (right) {
+      if (p.state !== 'dodge') { setState(p, 'dodge'); p.dodgeSide = p.dodgeSide || 1; }
+      perfectDodge(p); match.stats.dodges++; btBadge(p, 'dodgebadge'); btPuffs(p, 5, 1.6);
+      setState(e, 'recover'); e.tap.rec = TAP.recover + TAP.counter; return;
+    }
+    // missed it: the attack lands
+    p.blocking = false; p.invuln = 0;
+    if (p.state === 'dodge') setState(p, 'idle');
+    let dmg = e.dmg * (a.color === 'red' ? TAP.redDmg : 1);
+    if (a.color === 'red' && a.choice === 'block') { floatText(p, 'GUARD BREAK!', '#ff9f40', true); dmg = e.dmg * TAP.guardBreakDmg; }
+    else if (a.choice) floatText(p, a.color === 'blue' ? 'Blue = Block!' : 'Red = Dodge!', '#ffffff');
+    e.facing = Math.atan2(p.pos.x - e.pos.x, p.pos.z - e.pos.z);
+    applyHit(e, p, dmg, { kb: a.color === 'red' ? 3 : 2, stun: TAP.hitStun, noParry: true, aoe: true, heavy: a.color === 'red' });
+    btSlash(e, p, a.color === 'red' ? 'slash2' : 'slash3', a.color === 'red'); btBurst(p, a.color === 'red' ? 'impact3' : 'impact2', a.color === 'red' ? 3.2 : 2.4, 0.4, 1.0);
+  }
+
+  function tapEnemyStart(e, p) {
+    const t = tapTier(), st = e.style === 'mixed' ? e.ai.cur : e.style;
+    e.tap.count++;
+    let red = t === 0 && e.tap.count <= 3 ? 0 : st === 'charger' ? 0.3 : st === 'blocker' ? 0.35 : st === 'dodger' ? 0.5 : 0.45;
+    if (e.ai.counter) { red = Math.max(red, 0.65); e.ai.counter = false; } // a blocked or dodged hit invites a guard-breaking counter
+    const color = Math.random() < red ? 'red' : 'blue';
+    e.tap.atk = { color, choice: null, resolved: false };
+    setState(e, 'windup'); e.windup = tapWindup(e);
+    tapCueEl(e.tap.atk); sfx('charge');
+  }
+  function tapEnemyGap(e) {
+    const t = tapTier(), st = e.style === 'mixed' ? e.ai.cur : e.style;
+    const slow = t === 0 ? 1.5 : t === 1 ? 1.2 : 1;
+    let g = rand(TAP.gapMin, TAP.gapMax) * slow * (st === 'charger' ? 0.8 : st === 'blocker' ? 1.15 : 1);
+    if (st === 'mixed' && Math.random() < 0.35) g = 0.35; // the champion likes quick double attacks
+    return g;
+  }
+
+  function tapStep(dt) {
+    const p = F[0], e = F[1], S = match.S;
+    match.ft += dt;
+    [p, e].forEach((f) => {
+      f.stT += dt; f.flash = Math.max(0, f.flash - dt); f.msgT -= dt; f.invuln = Math.max(0, f.invuln - dt);
+      f.defCd = Math.max(0, (f.defCd || 0) - dt); f.tapShieldT = Math.max(0, (f.tapShieldT || 0) - dt);
+      if (f.chainT > 0) { f.chainT -= dt; if (f.chainT <= 0) f.chain = 0; }
+      if (f.bubble > 0) f.bubble = Math.max(0, f.bubble - dt);
+      Object.keys(f.tapCd || {}).forEach((k) => (f.tapCd[k] = Math.max(0, f.tapCd[k] - dt)));
+    });
+    if (e.style === 'mixed') { e.ai.mixT -= dt; if (e.ai.mixT <= 0) { e.ai.mixT = 7; e.ai.cur = pick(['charger', 'blocker', 'dodger']); } }
+    if (!match.over && p.state !== 'ko') p.special = Math.min(100, p.special + p.charge * dt);
+
+    // --- your input (one per press) ---
+    const k = E('KeyJ') ? 'attack' : E('KeyK') ? 'block' : E('Space') ? 'dodge' : E('KeyL') ? 'sp0' : E('KeyI') ? 'sp1' : null;
+    const inp = tapQ || k; tapQ = null;
+    if (tapMoveTo) { if (['idle', 'recover', 'dodge'].includes(p.state) && !p.blocking) { p.goal = tapMoveTo.clone(); if (p.state === 'recover') setState(p, 'idle'); } tapMoveTo = null; }
+    if (inp && !match.over) {
+      if (inp === 'attack') tapAttack(p);
+      else if (inp === 'block' || inp === 'dodge') tapDefend(p, inp);
+      else tapStartSpecial(p, e, inp === 'sp0' ? 0 : 1);
+    }
+
+    // --- you ---  (you walk to wherever you tapped; an attack runs into range first)
+    if (p.blocking) { p.blockT -= dt; if (p.blockT <= 0) p.blocking = false; }
+    const reach = p.radius + e.radius + 0.25 * S;
+    let walk0 = null; // where to walk this frame, and how fast (world units / second)
+    switch (p.state) {
+      case 'idle': walk0 = [p.goal, p.speed * S * 1.3]; break;
+      case 'windup': if (p.stT >= p.windup) setState(p, 'attack'); break;
+      case 'attack': {
+        const dir = dirTo(p, e), stop = e.pos.clone().addScaledVector(dir, -reach);
+        walk0 = [stop, 16 * S];
+        if (!p.hitDone && (flatDist(p, e) <= reach + 0.2 * S || p.stT >= 0.55)) { if (flatDist(p, e) <= reach + 0.6 * S) tapPlayerImpact(p, e); else { p.hitDone = true; floatText(p, 'Too far!', '#ffe08a'); } }
+        if (p.hitDone) { setState(p, 'recover'); p.goal = p.pos.clone(); }
+        break;
+      }
+      case 'recover': if (p.stT >= TAP.atkRecover) { setState(p, 'idle'); p.goal = p.pos.clone(); } break;
+      case 'dodge': {
+        if (!p.dodgeTo) { const side = new THREE.Vector3(-dirTo(p, e).z, 0, dirTo(p, e).x).multiplyScalar((p.dodgeSide || 1) * 2 * S); p.dodgeTo = p.pos.clone().add(side).addScaledVector(dirTo(p, e), -0.6 * S); }
+        walk0 = [p.dodgeTo, 12 * S];
+        if (p.stT >= TAP.dodgeHold) { setState(p, 'idle'); p.goal = p.pos.clone(); p.dodgeTo = null; }
+        break;
+      }
+      case 'stun': if (p.stT >= p.stunDur) { setState(p, 'idle'); p.goal = p.pos.clone(); } break;
+      case 'move': if (p.mv && p.mv.update(dt)) { p.mv = null; p.mvMul = null; p.spin = false; p.lockFacing = false; p.hopY = 0; setState(p, 'recover'); p.goal = p.pos.clone(); } break;
+    }
+    if (p.state !== 'dodge') p.dodgeTo = null;
+    // --- the opponent ---  (closes in before it winds up; lunges at impact)
+    const t = tapTier(), st = e.style === 'mixed' ? e.ai.cur : e.style;
+    const atkRange = e.radius + p.radius + (st === 'dodger' ? 1.0 : 0.6) * S, hitRange = e.radius + p.radius + 1.9 * S;
+    let walk1 = null;
+    if (e.state !== 'ko' && !match.over) {
+      switch (e.state) {
+        case 'idle': {
+          const d = flatDist(e, p), keep = st === 'dodger' ? atkRange + 2.2 * S : st === 'blocker' ? atkRange + 0.6 * S : atkRange + 1.0 * S;
+          const ready = match.ft >= e.tap.next && p.state !== 'move' && p.state !== 'ko';
+          // circle a little around you while waiting
+          if (Math.random() < dt * 0.4) e.ai.side *= -1;
+          const side = new THREE.Vector3(-dirTo(e, p).z, 0, dirTo(e, p).x).multiplyScalar(e.ai.side * 1.2 * S);
+          const want = p.pos.clone().addScaledVector(dirTo(p, e), ready ? atkRange * 0.95 : keep).add(ready ? new THREE.Vector3() : side);
+          walk1 = [want, e.speed * S * (ready ? 1.5 : 0.7) * (t === 0 ? 0.8 : 1)];
+          if (ready && d <= atkRange + 0.3 * S) tapEnemyStart(e, p);
+          break;
+        }
+        case 'windup':
+          if (e.stT >= e.windup) {
+            // lunge, then resolve: if you've walked out of reach it simply misses
+            e.pos.addScaledVector(dirTo(e, p), Math.min(1.4 * S, Math.max(0, flatDist(e, p) - (e.radius + p.radius))));
+            if (flatDist(e, p) > hitRange && e.tap.atk && !e.tap.atk.resolved) { e.tap.atk.resolved = true; tapCueEl(null); floatText(p, 'Missed!', '#9fe8ff'); }
+            else tapEnemyImpact(e, p);
+            if (e.state === 'windup') { setState(e, 'recover'); e.tap.rec = e.tap.rec || TAP.recover; }
+          }
+          break;
+        case 'recover':
+          if (e.stT >= (e.tap.rec || TAP.recover)) { e.tap.rec = 0; setState(e, 'idle'); e.tap.next = match.ft + tapEnemyGap(e); }
+          break;
+        case 'stun': if (e.stT >= e.stunDur) { setState(e, 'idle'); e.tap.next = match.ft + tapEnemyGap(e) * 0.6; } break;
+        case 'dodge': {
+          if (!e.dodgeTo) e.dodgeTo = e.pos.clone().add(new THREE.Vector3(-dirTo(e, p).z, 0, dirTo(e, p).x).multiplyScalar((e.tapSide || 1) * 1.8 * S));
+          walk1 = [e.dodgeTo, 12 * S];
+          if (e.stT >= 0.4) { setState(e, 'idle'); e.dodgeTo = null; }
+          break;
+        }
+      }
+    }
+    // a telegraph that is no longer valid (the enemy was staggered, knocked out, or the match ended) is cleared
+    if (e.tap.atk && !e.tap.atk.resolved && (e.state !== 'windup' || match.over)) tapCancelCue('interrupted');
+
+    // --- positions: walk toward goals at a steady speed (specials drive their own movement) ---
+    [[p, walk0], [e, walk1]].forEach(([f, w]) => {
+      if (f.state !== 'move') f.vel.set(0, 0, 0); // a special keeps its own velocity
+      if (f.state !== 'move' && w && f.state !== 'ko' && f.state !== 'stun') {
+        const to = new THREE.Vector3(w[0].x - f.pos.x, 0, w[0].z - f.pos.z), d = to.length();
+        if (d > 0.05) { f.vel.copy(to).multiplyScalar(Math.min(w[1], d / Math.max(dt, 0.016)) / d); }
+      }
+      f.pos.addScaledVector(f.vel, dt);
+      f.pos.addScaledVector(f.kb, dt); f.kb.multiplyScalar(Math.max(0, 1 - dt * 7));
+      const lim = match.R - f.radius, d = Math.hypot(f.pos.x, f.pos.z);
+      if (d > lim) { f.pos.x *= lim / d; f.pos.z *= lim / d; }
+      const o = f === p ? e : p;
+      if (!f.lockFacing) { const want = Math.atan2(o.pos.x - f.pos.x, o.pos.z - f.pos.z); let df = ((want - f.facing + Math.PI) % TAU + TAU) % TAU - Math.PI; f.facing += df * Math.min(1, dt * 12); }
+    });
+    // keep the two apart
+    const d = flatDist(p, e), min = p.radius + e.radius;
+    if (d < min && d > 1e-4 && p.state !== 'ko' && e.state !== 'ko') {
+      const push = (min - d) / 2, nx = (e.pos.x - p.pos.x) / d, nz = (e.pos.z - p.pos.z) / d;
+      p.pos.x -= nx * push; p.pos.z -= nz * push; e.pos.x += nx * push; e.pos.z += nz * push;
+    }
+  }
+  /** Colours the opponent's outline / ring and keeps the BLOCK / DODGE cue above its head. */
+  function tapDecor() {
+    if (colView) { // 2D: the glow and bubble are drawn on the canvas; place the cue above the rival's head
+      const e = F[1], a = e && e.tap && e.tap.atk, on = a && !a.resolved && e.state === 'windup', el = stageEl && stageEl.querySelector('#a-cue');
+      const tele = stageEl && stageEl.querySelector('#bt-tele'); if (tele) tele.classList.remove('show');
+      if (el && on) {
+        const b = fighterBox(e), hudBottom = (stageEl.querySelector('.bt-hud') || { offsetHeight: 0 }).offsetHeight + 70;
+        const hat = e.accessory && ACC[e.accessory] && ['hat', 'band'].includes(ACC[e.accessory][0]) ? (b.y1 - b.y0) * 0.42 : 0; // clear the hat
+        el.style.transform = `translate(${b.cx}px, ${Math.max(hudBottom, b.y0 - hat - 4)}px) translate(-50%, -100%)`;
+      }
+      return;
+    }
+    const e = F[1], a = e && e.tap && e.tap.atk, m = e && e.mesh;
+    if (!m) return;
+    const on = a && !a.resolved && e.state === 'windup';
+    if (on) {
+      const k = Math.min(1, e.stT / e.windup), pulse = 0.5 + 0.5 * Math.sin(T * 22);
+      const col = a.color === 'blue' ? 0x3a8cff : 0xff3a3a;
+      m.mats.forEach((mt) => mt.emissive && mt.emissive.setHex(a.color === 'blue' ? (pulse > 0.5 ? 0x123a80 : 0x0a2050) : (pulse > 0.5 ? 0x801010 : 0x500808)));
+      m.tele.material.color.setHex(col); m.tele.visible = true; m.tele.material.opacity = 0.5 + 0.45 * k; m.tele.scale.setScalar(1.35 - 0.3 * k);
+      m.bang.visible = false;
+      if (m.outline) { m.outline.visible = true; m.outline.material.color.setHex(col); }
+    } else {
+      m.tele.material.color.setHex(0xff4040); m.tele.visible = false; m.bang.visible = false;
+      if (m.outline) m.outline.visible = false;
+    }
+    if (e.tapShieldT > 0) m.shield.visible = true;
+    if (F[0].mesh) { F[0].mesh.tele.visible = false; }
+    // cue above the opponent's head
+    const el = stageEl && stageEl.querySelector('#a-cue');
+    const tele = stageEl && stageEl.querySelector('#bt-tele');
+    if (tele) tele.classList.toggle('show', !!on);
+    if (el && on) {
+      const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+      const v = new THREE.Vector3(e.pos.x, (e.mesh.topY + 0.9) * match.S + e.hopY, e.pos.z).project(camera);
+      const hudBottom = (stageEl.querySelector('.bt-hud') || { offsetHeight: 0 }).offsetHeight + 70; // keep the cue below the HUD
+      el.style.transform = `translate(${(v.x * 0.5 + 0.5) * w}px, ${Math.max(hudBottom, (-v.y * 0.5 + 0.5) * h)}px) translate(-50%, -100%)`;
+      if (tele) { // the glowing ring around the opponent's body
+        const c = new THREE.Vector3(e.pos.x, e.mesh.topY * 0.5 * match.S, e.pos.z), c2 = c.clone().add(new THREE.Vector3(1, 0, 0));
+        const pc = c.clone().project(camera), p2 = c2.project(camera), ppu = Math.abs(p2.x - pc.x) * 0.5 * w;
+        const k = Math.min(1, e.stT / e.windup), size = (e.radius * 3.0 + (1 - k) * 0.8 * match.S) * ppu;
+        tele.style.width = size + 'px';
+        tele.style.transform = `translate(${(pc.x * 0.5 + 0.5) * w}px, ${(-pc.y * 0.5 + 0.5) * h}px) translate(-50%, -50%) rotate(${T * 1.5}rad)`;
+      }
+    }
+  }
+  /** Back-face shell around a fighter so the telegraph reads as a coloured outline. */
+  function addOutline(m) {
+    const geo = new THREE.SphereGeometry(1.09, 28, 20);
+    const shell = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x3a8cff, side: THREE.BackSide, transparent: true, opacity: 0.9 }));
+    const main = m.body.children[0];
+    shell.scale.copy(main.scale).multiplyScalar(1.0); shell.position.copy(main.position); shell.visible = false;
+    m.body.add(shell); m.outline = shell;
+  }
+
   /* ===================== Match flow ===================== */
   function startMatch(opts) {
     if (!window.THREE) { DG.ui.toast('3D library not loaded — check your internet connection and reload.'); return; }
@@ -1008,9 +1900,19 @@
     const myDef = opts.net && net.me === 1 ? oDef : pDef;
     const si = opts.net ? Math.max(pDef.stageIdx, oDef.stageIdx) : pDef.stageIdx;
     const S = STAGE_SCALE[si] || 1.2, R = ARENA_R[si] || 10.5;
-    match = { net: !!opts.net, stats: { maxCombo: 0, perfect: 0, parries: 0, smashes: 0 }, hitstop: 0, slow: 0, speedT: 0, practice, opp, S, R, si, time: MATCH_TIME, phase: 'intro', phaseT: 0, over: false, endT: 0, shake: 0, cheer: 0.6, paused: false, winner: null };
+    // tap controls are the default for single-player; friend battles keep the classic controls and protocol
+    const mode = opts.net ? 'classic' : (DG.state.settings.arenaControls === 'classic' ? 'classic' : 'tap');
+    const Rt = mode === 'tap' ? 4.7 * S : R; // tap battles use a cosier painted ring
+    if (mode === 'tap') {
+      DG.seedMoves();
+      Object.assign(pDef, { canSpecial: true, canMove2: false, canUlt: false, tapMoves: DG.state.moves.equipped.slice(0, 2) }); // snapshot of the loadout
+    }
+    tapQ = null;
+    match = { mode, ft: 0, R: Rt, net: !!opts.net, stats: { maxCombo: 0, perfect: 0, parries: 0, smashes: 0, blocks: 0, dodges: 0, specials: 0 }, hitstop: 0, slow: 0, speedT: 0, practice, opp, S, si, time: MATCH_TIME, phase: 'intro', phaseT: 0, over: false, endT: 0, shake: 0, cheer: 0.6, paused: false, winner: null };
+    const tapMv = mode === 'tap' ? pDef.tapMoves.map((id) => ({ id, mv: DG.TAP_MOVES[id], name: DG.MOVES[id].name })) : [];
     root.innerHTML = `
-      <div class="arena-stage" id="a-stage">
+      <div class="arena-stage ${mode === 'tap' ? 'tapmode' : ''}" id="a-stage">
+        ${mode === 'tap' ? '<canvas class="bt-cv" id="bt-cv" aria-label="Battle arena"></canvas>' : ''}
         <div class="a-hud">
           <div class="a-side" id="a-p1"></div>
           <div class="a-timer" id="a-timer">90</div>
@@ -1025,7 +1927,17 @@
         <div class="a-banner"></div>
         <div class="a-floats"></div>
         <button class="a-pause" id="a-pause" aria-label="Pause">⏸</button>
-        <div class="a-touch" id="a-touch" ${DG.ui.isTouch() ? '' : 'hidden'}>
+        ${mode === 'tap' ? `<div class="bt-fx" id="bt-fx"></div>
+        ${btHudHtml(pDef, oDef, opp ? colSrc('o-' + opp.id) : '')}
+        <img class="bt-tele" id="bt-tele" alt="">
+        <div class="a-cue" id="a-cue" role="status" aria-live="assertive"></div>
+        <div class="a-taphint ${DG.state.settings.tapHintDone ? 'gone' : ''}" id="a-taphint"><img src="${btSrc('taphint')}" alt="${DG.ui.isTouch() ? 'Tap' : 'Click'} the opponent to attack!"><small>${DG.ui.isTouch() ? 'Tap the floor to move' : 'Click the floor to move'}</small></div>
+        <nav class="tap-pad" id="tap-pad" aria-label="Battle actions">
+          <button class="tp blk" data-tap="block" aria-label="Block (K) — answers blue attacks"><img src="${btSrc('btn_block')}" alt=""><kbd>K</kbd></button>
+          <button class="tp dge" data-tap="dodge" aria-label="Dodge (Space) — answers red attacks"><img src="${btSrc('btn_dodge')}" alt=""><kbd>Space</kbd></button>
+          ${tapMv.map((x, i) => `<button class="tp sp" data-tap="sp${i}" data-id="${x.id}" aria-label="Special ${i + 1}: ${DG.ui.esc(x.name)}">${btOrb(x.id)}<span class="bt-pips"><i></i><i></i><i></i></span><b>${DG.ui.esc(x.name)}</b><kbd>${i ? 'I' : 'L'}</kbd></button>`).join('')}
+        </nav>` : ''}
+        <div class="a-touch" id="a-touch" ${DG.ui.isTouch() && mode !== 'tap' ? '' : 'hidden'}>
           <div class="joy-zone" id="a-joyzone">
             <div class="joy idle" id="a-joy"><div class="joy-knob"></div></div>
             <span class="joy-hint">Drag anywhere here to move</span>
@@ -1043,15 +1955,33 @@
       </div>`;
     stageEl = root.querySelector('#a-stage');
     if (!renderer) {
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setClearColor(0x000000, 0);
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
       camera = new THREE.PerspectiveCamera(48, 1, 0.1, 400);
     }
-    stageEl.prepend(renderer.domElement);
+    if (mode !== 'tap') stageEl.prepend(renderer.domElement);
     resize();
-    buildScene(DG.state.equipped.arena, R);
+    if (mode === 'tap') { btPreload(); colPreload([pDef, oDef]); buildTapScene(Rt); } else buildScene(DG.state.equipped.arena, R);
     F = [makeFighter(pDef, S), makeFighter(oDef, S)];
     F[0].pos.set(0, 0, R * 0.45); F[1].pos.set(0, 0, -R * 0.45);
+    if (mode === 'tap') {
+      F.forEach((f) => { f.tapCd = {}; f.defCd = 0; f.blockT = 0; });
+      F[1].tap = { atk: null, next: 0, count: 0, rec: 0 };
+      // 2D coliseum: hide the 3D models; size the fighters' reach and height to the painted sprites
+      F.forEach((f) => {
+        f.mesh.g.visible = false;
+        const sf = STAGE_SIZE[Math.min(4, f.stageIdx == null ? 3 : f.stageIdx)], an = ANCH[f.shape].idle, unit = (0.4 * sf * Rt) / PLATE.AU / 1024;
+        f.radius = ((an[7][2] - an[7][0]) / 2) * unit * 0.8;
+        f.mesh.topY = ((875 - an[3]) * unit) / S;
+      });
+      if (!F[1].isPlayer) F[1].tint2d = DG.draw.mix('#' + new THREE.Color(F[1].hex).getHexString(), '#ffffff', 0.3);
+      // feet at the art pack's anchors: you at (0.32, 0.50), the rival at (0.75, 0.51) of the plate
+      F[0].pos.set(((0.32 - PLATE.U0) / PLATE.AU) * Rt, 0, ((0.50 - PLATE.V0) / PLATE.AV) * Rt);
+      F[1].pos.set(((0.75 - PLATE.U0) / PLATE.AU) * Rt, 0, ((0.51 - PLATE.V0) / PLATE.AV) * Rt);
+      F.forEach((f) => (f.goal = f.pos.clone()));
+      const fc = root.querySelector('#bt-face');
+      if (fc) drawFace2D(fc, F[0]);
+    }
     F[0].facing = Math.PI; F[1].facing = 0;
     F[0].hopY = (si === GIANT ? 30 : 12) * S; F[1].hopY = 0;
     camera.position.set(0, R * 1.2, R * 2.2 * camSide()); camera.lookAt(0, 0, 0);
@@ -1066,6 +1996,29 @@
 
   function wireControls() {
     stageEl.querySelector('#a-pause').onclick = () => pause(true);
+    if (match.mode === 'tap') {
+      // tap the rival to attack; buttons and HUD never count as attack taps
+      stageEl.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('button, .tap-pad, .a-hud, .a-pause, .a-rotate, .modal-wrap')) return;
+        DG.audio.unlock();
+        if (!match || match.phase !== 'fight') return;
+        e.preventDefault();
+        if (tapHitsRival(e.clientX, e.clientY)) { tapQueue('attack'); return; }
+        const pt = tapFloorPoint(e.clientX, e.clientY); // anywhere else on the ring: walk there
+        if (pt && !match.over && !match.paused) { tapMoveTo = pt; sprite('goldflat', { at: pt.clone().setY(0.05), size: 1.8 * match.S, life: 0.45, z: 0, anim: (k) => ({ s: 0.5 + k * 0.7, o: 1 - k }) }); }
+      });
+      stageEl.querySelectorAll('[data-tap]').forEach((b) => {
+        b.addEventListener('pointerdown', (e) => {
+          e.preventDefault(); e.stopPropagation(); DG.audio.unlock();
+          if (e.button != null && e.button > 0) return;
+          b.classList.add('down'); tapQueue(b.dataset.tap); if (navigator.vibrate) navigator.vibrate(8);
+        });
+        b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (e.detail === 0) tapQueue(b.dataset.tap); }); // keyboard / switch access
+        const up = () => b.classList.remove('down');
+        b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up);
+        b.addEventListener('contextmenu', (e) => e.preventDefault());
+      });
+    }
     // floating joystick: touch anywhere in the left zone and it appears under your thumb
     const zone = stageEl.querySelector('#a-joyzone'), joy = stageEl.querySelector('#a-joy');
     if (zone && joy) {
@@ -1123,6 +2076,24 @@
     side(them, stageEl.querySelector('#a-p2'));
     stageEl.querySelector('#a-timer').textContent = Math.ceil(match.time);
     const p = me;
+    if (match.mode === 'tap') {
+      btHudUpdate();
+      stageEl.querySelectorAll('.tp.sp').forEach((b, i) => {
+        const s = tapSpecialState(p, i); if (!s.mv) return;
+        const n = Math.floor(Math.min(1, p.special / s.mv.cost) * 3 + 1e-6);
+        b.querySelectorAll('.bt-pips i').forEach((pip, j) => pip.classList.toggle('on', j < n));
+      });
+      stageEl.querySelector('#a-moves').innerHTML = `<span class="mchip ok"><kbd>J</kbd>/click rival Attack</span><span class="mchip ok"><kbd>K</kbd>Block 🔵</span><span class="mchip ok"><kbd>Space</kbd>Dodge 🔴</span>`;
+      stageEl.querySelectorAll('.tp.sp').forEach((b, i) => {
+        const s = tapSpecialState(p, i); if (!s.mv) return;
+        b.classList.toggle('ready', s.ready); b.classList.toggle('off', !s.ready);
+        const why = s.cd > 0 ? `cooling down ${Math.ceil(s.cd)}s` : p.special < s.mv.cost ? `charging ${Math.floor(p.special)}/${s.mv.cost}` : s.ready ? 'ready' : 'busy';
+        b.setAttribute('aria-label', `Special ${i + 1}: ${DG.MOVES[s.id].name}, ${why}`);
+        b.dataset.cd = s.cd > 0 ? Math.ceil(s.cd) : '';
+      });
+      stageEl.querySelectorAll('.tp.blk, .tp.dge').forEach((b) => b.classList.toggle('off', p.defCd > 0 || p.state === 'stun' || p.state === 'move'));
+      return;
+    }
     const chip = (key, label, ok, extra) => `<span class="mchip ${ok ? 'ok' : ''}"><kbd>${key}</kbd>${label}${extra || ''}</span>`;
     stageEl.querySelector('#a-moves').innerHTML =
       chip('J', 'Attack ×3', true) + chip('Hold J', 'Smash', p.sta >= 6) + chip('K', 'Block / Parry', p.sta > 0) + chip('Space', 'Dodge', p.sta >= p.dodgeCost) +
@@ -1139,6 +2110,7 @@
     if (on && match.paused) return;
     match.paused = on;
     if (!on) return;
+    if (match.mode === 'tap') { tapCancelCue('pause'); tapClearInputs(); }
     DG.ui.modal({
       title: '⏸ Paused', dismissable: false,
       html: `<p>Take a breather!</p>${match.practice ? '' : '<p class="fine">Leaving counts as a loss (you still get a few coins, and your snack bonus is used).</p>'}`,
@@ -1150,6 +2122,7 @@
   function endMatch(result, how) {
     if (match.over) return;
     match.over = true; match.result = result; match.how = how; match.endT = 0;
+    if (match.mode === 'tap') { tapCancelCue('end'); tapClearInputs(); }
     match.winner = result === 'win' ? F[0] : result === 'lose' ? F[1] : null;
     const loser = result === 'win' ? F[1] : result === 'lose' ? F[0] : null;
     if (loser && loser.state !== 'ko') { setState(loser, 'ko'); loser.mv = null; loser.hopY = 0; }
@@ -1199,7 +2172,9 @@
       html: `<p>${DG.ui.esc(a.name)} ${Math.round((a.hp / a.maxHp) * 100)}% health · ${DG.ui.esc(b.name)} ${Math.round((b.hp / b.maxHp) * 100)}% health${match.how === 'time' ? ' (time ran out — higher health % wins)' : ''}</p>
         ${coins ? `<p class="gain">+${coins} 🪙 Dumpling Coins</p>` : ''}
         ${lines.map((l) => `<p>${l}</p>`).join('')}
-        <p class="fine">Best combo <b>${match.stats.maxCombo}</b> · Perfect dodges <b>${match.stats.perfect}</b> · Parries <b>${match.stats.parries}</b> · Smashes <b>${match.stats.smashes}</b></p>
+        ${match.mode === 'tap'
+          ? `<p class="fine">Tap controls · Blocked <b>${match.stats.blocks}</b> 🔵 · Dodged <b>${match.stats.dodges}</b> 🔴 · Specials used <b>${match.stats.specials}</b> · Best combo <b>${match.stats.maxCombo}</b></p>`
+          : `<p class="fine">Classic controls · Best combo <b>${match.stats.maxCombo}</b> · Perfect dodges <b>${match.stats.perfect}</b> · Parries <b>${match.stats.parries}</b> · Smashes <b>${match.stats.smashes}</b></p>`}
         <p class="fine">Battle health is separate from home needs — everyone is fully healed now.</p>`,
       buttons: [{ label: '🏠 Return home', cls: 'primary', onClick: () => DG.ui.show('home') }, { label: 'Arena lobby', cls: 'ghost', onClick: () => lobby() }],
     });
@@ -1469,7 +2444,10 @@
     } else if (match.phase === 'count') {
       const c = 3 - Math.floor(match.phaseT / 0.7);
       if (c !== match.cnt && c > 0) { match.cnt = c; banner(String(c), 0.6); sfx('click'); }
-      if (match.phaseT >= 2.1) { match.phase = 'fight'; banner('Steam! 🔥', 0.8); sfx('good'); Object.keys(edges).forEach((k) => (edges[k] = false)); }
+      if (match.phaseT >= 2.1) {
+        match.phase = 'fight'; banner('Steam! 🔥', 0.8); sfx('good'); Object.keys(edges).forEach((k) => (edges[k] = false));
+        if (match.mode === 'tap') { tapQ = null; F[1].tap.next = match.ft + (tapTier() === 0 ? 2.2 : 1.4); }
+      }
     } else if (match.phase === 'fight') {
       if (!match.over) {
         match.time -= dt;
@@ -1479,15 +2457,18 @@
           endMatch(pa > pb ? 'win' : pa < pb ? 'lose' : 'draw', 'time');
         }
       }
-      const i0 = match.over ? { move: { x: 0, z: 0 } } : playerIntents();
-      const i1 = match.over ? { move: { x: 0, z: 0 } } : match.net ? remoteIntents() : aiIntents(F[1], F[0], dt);
-      stepFighter(F[0], F[1], i0, dt);
-      stepFighter(F[1], F[0], i1, dt);
-      // separation
-      const d = flatDist(F[0], F[1]), min = F[0].radius + F[1].radius;
-      if (d < min && d > 1e-4 && F[0].state !== 'ko' && F[1].state !== 'ko') {
-        const push = (min - d) / 2, nx = (F[1].pos.x - F[0].pos.x) / d, nz = (F[1].pos.z - F[0].pos.z) / d;
-        F[0].pos.x -= nx * push; F[0].pos.z -= nz * push; F[1].pos.x += nx * push; F[1].pos.z += nz * push;
+      if (match.mode === 'tap') tapStep(dt);
+      else {
+        const i0 = match.over ? { move: { x: 0, z: 0 } } : playerIntents();
+        const i1 = match.over ? { move: { x: 0, z: 0 } } : match.net ? remoteIntents() : aiIntents(F[1], F[0], dt);
+        stepFighter(F[0], F[1], i0, dt);
+        stepFighter(F[1], F[0], i1, dt);
+        // separation
+        const d = flatDist(F[0], F[1]), min = F[0].radius + F[1].radius;
+        if (d < min && d > 1e-4 && F[0].state !== 'ko' && F[1].state !== 'ko') {
+          const push = (min - d) / 2, nx = (F[1].pos.x - F[0].pos.x) / d, nz = (F[1].pos.z - F[0].pos.z) / d;
+          F[0].pos.x -= nx * push; F[0].pos.z -= nz * push; F[1].pos.x += nx * push; F[1].pos.z += nz * push;
+        }
       }
       // projectiles
       for (let i = projs.length - 1; i >= 0; i--) {
@@ -1507,6 +2488,7 @@
   function render(dt, realDt) {
     if (realDt == null) realDt = dt;
     F.forEach((f) => animFighter(f, dt));
+    if (match.mode === 'tap') tapDecor();
     // fx
     for (let i = fx.length - 1; i >= 0; i--) {
       const e = fx[i]; e.life -= dt;
@@ -1524,20 +2506,36 @@
     const sep = Math.hypot(a.x - b.x, a.z - b.z);
     const aspect = camera.aspect || 1;
     const dist = clamp(sep * (aspect < 1 ? 1.6 : 1.1) + 10 * match.S, 13 * match.S, match.R * 2.6);
-    const want = new THREE.Vector3(mid.x * 0.6, dist * 0.76, mid.z * 0.6 + dist * 0.74 * camSide());
+    let want = new THREE.Vector3(mid.x * 0.6, dist * 0.76, mid.z * 0.6 + dist * 0.74 * camSide());
+    if (match.mode === 'tap') { // the painted coliseum: 2D plate + pose sprites
+      colRender(realDt);
+      fx2Update(dt);
+      btFloatsUpdate(realDt);
+      return;
+    }
+    if (false) {
+      const spanX = Math.abs(a.x - b.x), halfW = spanX / 2 + 1.9 * match.S, vf = (camera.fov * Math.PI) / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * aspect);
+      const fitW = (halfW / Math.tan(hf / 2)) * 1.05, fitH = ((sep + 3.2 * match.S) / 2 / Math.tan(vf / 2)) * 1.05;
+      const dd = clamp(Math.max(fitW, fitH), 7 * match.S, match.R * 1.1);
+      want = aspect < 0.85 ? new THREE.Vector3(mid.x, 1.2 * match.S + dd * 0.6, mid.z + dd * 0.82) // tall: look down more steeply
+        : new THREE.Vector3(mid.x, 1.2 * match.S + dd * 0.38, mid.z + dd * 0.92);
+    }
     camera.position.lerp(want, Math.min(1, realDt * (match.phase === 'intro' ? 1.5 : 4)));
     if (match.shake > 0) {
       camera.position.x += rand(-1, 1) * match.shake; camera.position.y += rand(-1, 1) * match.shake;
       match.shake = Math.max(0, match.shake - realDt * 1.2);
     }
-    camera.lookAt(mid.x, 0.8 * match.S, mid.z);
+    camera.lookAt(mid.x, (match.mode === 'tap' ? 1.0 : 0.8) * match.S, mid.z);
     renderer.render(scene, camera);
-    // floating text
-    const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+    btFloatsUpdate(realDt);
+  }
+  function btFloatsUpdate(realDt) { // floating text
+    const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight, two = match && match.mode === 'tap' && colView;
     for (let i = floats.length - 1; i >= 0; i--) {
       const fl = floats[i]; fl.life -= realDt; fl.pos.y += realDt * 1.5;
-      const v = fl.pos.clone().project(camera);
-      fl.el.style.transform = `translate(${(v.x * 0.5 + 0.5) * w}px, ${(-v.y * 0.5 + 0.5) * h}px) translate(-50%,-50%)`;
+      let sxp, syp;
+      if (two) { const q = pj(fl.pos); sxp = q.x; syp = q.y; } else { const v = fl.pos.clone().project(camera); sxp = (v.x * 0.5 + 0.5) * w; syp = (-v.y * 0.5 + 0.5) * h; }
+      fl.el.style.transform = `translate(${sxp}px, ${syp}px) translate(-50%,-50%)`;
       fl.el.style.opacity = Math.min(1, fl.life * 2);
       if (fl.life <= 0) { fl.el.remove(); floats.splice(i, 1); }
     }
@@ -1573,14 +2571,18 @@
     const portrait = w < h, touchUI = DG.ui.isTouch();
     camera.fov = portrait ? 62 : 48;
     // on phones in portrait, nudge the picture up so the fighters aren't hidden under your thumbs
-    if (portrait && touchUI) camera.setViewOffset(w, h, 0, h * 0.13, w, h); else camera.clearViewOffset();
+    if (match && match.mode === 'tap') camera.setViewOffset(w, h, 0, h * (portrait ? -0.02 : 0.06), w, h); // ring sits mid-screen, above the action buttons
+    else if (portrait && touchUI) camera.setViewOffset(w, h, 0, h * 0.13, w, h); else camera.clearViewOffset();
     camera.updateProjectionMatrix();
     const rot = stageEl.querySelector('#a-rotate');
-    if (rot) rot.hidden = !(portrait && touchUI && !rotDismissed);
+    if (rot) rot.hidden = !(portrait && touchUI && !rotDismissed) || !!(match && match.mode === 'tap');
   }
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 250));
-  document.addEventListener('visibilitychange', () => { if (document.hidden && match && !match.net && match.phase === 'fight' && !match.over && !DG.ui.anyModal()) pause(true); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && match && match.mode === 'tap') tapClearInputs();
+    if (document.hidden && match && !match.net && match.phase === 'fight' && !match.over && !DG.ui.anyModal()) pause(true);
+  });
 
   function cleanupMatch() {
     cancelAnimationFrame(raf);
@@ -1589,7 +2591,9 @@
     }
     scene = null; F = []; fx = []; projs = []; crowd = []; petals = [];
     floats.forEach((f) => f.el.remove()); floats = [];
-    match = null; stageEl = null;
+    if (match && match.faceStop) match.faceStop();
+    fx2Clear();
+    match = null; stageEl = null; tapQ = null; tapMoveTo = null;
     touch.x = touch.y = 0; touch.btn = {}; touch.edge = {};
   }
 
@@ -1609,6 +2613,7 @@
     exit() { if (root && root._stop) root._stop(); netClose(); cleanupMatch(); if (root) root.innerHTML = ''; },
     // test hooks
     _debug: () => ({ match, F }),
+    _tap: { draw: (c, x, y, o) => drawDumpling2D(c, x, y, o), img: (n) => colImg(n), hits: (x, y) => tapHitsRival(x, y), box: () => fighterBox(F[1]), pj: (v) => pj(v), pose: (f) => poseOf(f) },
     _forceEnd: (r) => { if (match) { endMatch(r, 'ko'); match.endT = 99; } },
   };
   DG.ui.register('arena', DG.Arena);

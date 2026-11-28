@@ -888,7 +888,7 @@
     shelf: [185, 218], fish: [89, 129], plant: [140, 140], pot: [97, 127], mat: [172, 43], bath: [240, 163], bowl: [136, 88], basket: [156, 126], bed: [279, 258] };
   const SPR = {};
   if (typeof Image !== 'undefined') Object.keys(SPR_PX).forEach((n) => {
-    const im = new Image(); im.decoding = 'async'; im.src = `img/rm_${n}.webp?v=6`;
+    const im = new Image(); im.decoding = 'async'; im.src = (window.DG_ASSETS && window.DG_ASSETS[`img/rm_${n}.webp`]) || `img/rm_${n}.webp?v=6`; // the one-file build bundles these
     SPR[n] = { im, w: SPR_PX[n][0] * SPR_K, h: SPR_PX[n][1] * SPR_K };
   });
   const sprReady = () => Object.keys(SPR).length && Object.values(SPR).every((o) => o.im.complete && o.im.naturalWidth);

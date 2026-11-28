@@ -40,6 +40,20 @@ def embed_ref(m):
     mime = {'webp': 'image/webp', 'png': 'image/png', 'jpg': 'image/jpeg', 'svg': 'image/svg+xml'}[path.suffix[1:]]
     return m.group(1) + 'data:%s;base64,%s' % (mime, base64.b64encode(path.read_bytes()).decode())
 html = re.sub(r'(src=")img/([\w.-]+?)(?:\?v=\d+)?(?=")', embed_ref, html)
+# image paths written as plain JS strings, e.g. 'img/ar_opp_chili.webp?v=1'
+def data_uri(name):
+    path = root / 'img' / name  # name may include a sub-folder, e.g. 'col/arena.webp'
+    mime = {'webp': 'image/webp', 'png': 'image/png', 'jpg': 'image/jpeg', 'svg': 'image/svg+xml'}[path.suffix[1:]]
+    return 'data:%s;base64,%s' % (mime, base64.b64encode(path.read_bytes()).decode())
+html = re.sub(r"(['\"])img/([\w.-]+?\.(?:webp|png|jpg|svg))(?:\?v=\d+)?\1", lambda m: m.group(1) + data_uri(m.group(2)) + m.group(1), html)
+# images whose names are built at run time (room art: img/rm_<piece>.webp) go into a lookup table the code checks first
+assets = {f'img/{p.name}': data_uri(p.name) for pat in ('rm_*.webp', 'bt_*.webp', 'ar_opp_*.webp') for p in sorted((root / 'img').glob(pat))}
+# the Coliseum battle art lives in img/col/ and is loaded by name at run time
+assets.update({f'img/col/{p.name}': data_uri(f'col/{p.name}') for p in sorted((root / 'img' / 'col').glob('*.webp'))})
+import json
+left = sorted(set(re.findall(r'img/[\w.-]+\.(?:webp|png|jpg|svg)', re.sub(r'/\*.*?\*/', '', html, flags=re.S))))
+assert not left, 'images not bundled: %s' % left
+html = html.replace('<script>', '<script>window.DG_ASSETS = ' + json.dumps(assets) + ';</script>\n<script>', 1)
 html = esc_html(html)  # only touches what is left outside the escaped code (none, normally)
 out = root / 'my-pet-dumpling-single.html'
 out.write_text(html, encoding='ascii')

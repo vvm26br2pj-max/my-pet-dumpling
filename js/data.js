@@ -39,6 +39,24 @@ window.DG = window.DG || {};
     hotpot:      { name: 'Hot Pot Tsunami',   desc: 'ULTIMATE: a cozy tidal wave of broth.' },
   };
 
+  /* Tap-combat specials. Every dumpling equips two. Starters are free for their own species; the rest are bought
+     with coins (price), may need a growth stage (minStage) and may be tied to one species (species).
+     cost = charge-meter points per use, cd = seconds before the same move can be used again,
+     power = damage multiplier on the fighter's base damage. Tune freely. */
+  DG.TAP_MOVES = {
+    steampuff:    { icon: '♨️', price: 60,  minStage: 1, species: null,   cost: 50, cd: 2.5, power: 1.5, starter: 'bao' },
+    bunslam:      { icon: '💥', price: 60,  minStage: 1, species: null,   cost: 50, cd: 3.0, power: 1.7, starter: 'bao' },
+    crispydash:   { icon: '🌀', price: 60,  minStage: 1, species: null,   cost: 50, cd: 2.5, power: 1.6, starter: 'gyoza' },
+    pleatflurry:  { icon: '👏', price: 60,  minStage: 1, species: null,   cost: 50, cd: 3.0, power: 1.8, starter: 'gyoza' },
+    brothbubble:  { icon: '🫧', price: 60,  minStage: 1, species: null,   cost: 50, cd: 3.5, power: 1.4, starter: 'soup' },
+    ladlesplash:  { icon: '🥣', price: 60,  minStage: 1, species: null,   cost: 50, cd: 2.5, power: 1.6, starter: 'soup' },
+    grandsteamer: { icon: '🌋', price: 150, minStage: 2, species: 'bao',   cost: 50, cd: 6,   power: 2.1 },
+    goldenfry:    { icon: '🌪️', price: 150, minStage: 2, species: 'gyoza', cost: 50, cd: 6,   power: 2.1 },
+    hotpot:       { icon: '🌊', price: 150, minStage: 2, species: 'soup',  cost: 50, cd: 6,   power: 2.1 },
+  };
+  /** The two specials each species starts with, in slot order. */
+  DG.TAP_STARTERS = { bao: ['steampuff', 'bunslam'], gyoza: ['crispydash', 'pleatflurry'], soup: ['brothbubble', 'ladlesplash'] };
+
   DG.STARTERS = {
     bao: {
       id: 'bao', name: 'Bao', kind: 'Steamed Bun',

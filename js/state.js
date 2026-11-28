@@ -82,6 +82,7 @@
       if (inv.decor.includes('bunting')) { inv.decor = inv.decor.filter((d) => d !== 'bunting'); DG.state.coins += 20; }
       DG.state.equipped.decor = DG.state.equipped.decor.filter((d) => d !== 'bunting');
       if (!DG.CHEEKS[p.look.cheeks]) p.look.cheeks = 'blush'; // e.g. removed War Paint
+      DG.seedMoves();
     }
     return DG.state;
   };
@@ -101,6 +102,49 @@
 
   DG.pet = () => DG.state && DG.state.pet;
 
+  /* ---------- Tap-combat specials: ownership and the two equipped moves ---------- */
+  /** Fills in owned / equipped specials for saves that don't have them (or have invalid ones). Safe to call any time. */
+  DG.seedMoves = function () {
+    const p = DG.pet(); if (!p) return;
+    const st = DG.state, starters = DG.TAP_STARTERS[p.type] || DG.TAP_STARTERS.bao;
+    if (!st.moves || typeof st.moves !== 'object') st.moves = {};
+    const m = st.moves;
+    m.owned = Array.isArray(m.owned) ? m.owned.filter((id) => DG.TAP_MOVES[id]) : [];
+    starters.forEach((id) => { if (!m.owned.includes(id)) m.owned.push(id); });
+    m.owned = [...new Set(m.owned)];
+    const eq = Array.isArray(m.equipped) ? m.equipped.filter((id) => m.owned.includes(id) && DG.canUseMove(id).ok) : [];
+    m.equipped = [...new Set(eq)].slice(0, 2);
+    for (const id of starters) if (m.equipped.length < 2 && !m.equipped.includes(id)) m.equipped.push(id);
+  };
+  /** Can this dumpling use (or buy) a move right now? {ok, why} */
+  DG.canUseMove = function (id) {
+    const mv = DG.TAP_MOVES[id], p = DG.pet();
+    if (!mv || !p) return { ok: false, why: 'Unknown move' };
+    if (mv.species && mv.species !== p.type) return { ok: false, why: `${DG.STARTERS[mv.species].name} only` };
+    if (DG.realStageIndex() < mv.minStage) return { ok: false, why: `Unlocks at ${DG.STAGES[mv.minStage].name} stage` };
+    return { ok: true };
+  };
+  DG.buyMove = function (id) {
+    const mv = DG.TAP_MOVES[id], m = DG.state.moves;
+    if (!mv) return { ok: false, why: 'Unknown move' };
+    if (m.owned.includes(id)) return { ok: false, why: 'Already yours' };
+    const can = DG.canUseMove(id); if (!can.ok) return can;
+    if (!DG.spend(mv.price)) return { ok: false, why: `Needs ${mv.price} coins` };
+    m.owned.push(id); DG.save(); return { ok: true };
+  };
+  /** Put a move in slot 0 or 1. If it's already in the other slot, the two swap so they stay different. */
+  DG.equipMove = function (slot, id) {
+    const m = DG.state.moves;
+    if (slot !== 0 && slot !== 1) return { ok: false, why: 'Bad slot' };
+    if (!m.owned.includes(id)) return { ok: false, why: 'Not owned' };
+    const can = DG.canUseMove(id); if (!can.ok) return can;
+    const other = 1 - slot;
+    if (m.equipped[other] === id) m.equipped[other] = m.equipped[slot];
+    m.equipped[slot] = id;
+    if (m.equipped[0] === m.equipped[1]) return { ok: false, why: 'Pick two different moves' };
+    DG.save(); return { ok: true };
+  };
+
   DG.adopt = function (type, name, accessory, look) {
     const st = DG.STARTERS[type];
     const now = DG.now();
@@ -117,6 +161,7 @@
       care: { pets: 0, plays: 0, meals: 0, baths: 0, trains: 0 },
     };
     if (accessory && !DG.state.inventory.accessories.includes(accessory)) DG.state.inventory.accessories.push(accessory);
+    DG.state.moves = {}; DG.seedMoves(); // a new dumpling starts with its own species' two specials
     DG.state.lastSeen = now;
     DG.save();
   };
